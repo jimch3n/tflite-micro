@@ -249,7 +249,7 @@ TF_LITE_MICRO_TEST(SimpleTestTanhFloat) {
       tanh_output_vec_fp,          // Expected results.
       output_shape,                // Output shape.
 
-      output_data, 
+      output_data,
 #if !defined(IA8201) && !defined(IA700)
       1e-7 /* tolerance */
 #else

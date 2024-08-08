@@ -25,15 +25,13 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-
-
 #include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
-
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 namespace tflite {
-//namespace ops {
-//namespace micro {
+// namespace ops {
+// namespace micro {
 //		namespace pooling {
 
 //		namespace {
@@ -269,7 +267,7 @@ int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
   int m4 = depth >> 2;
   if (m4 > 0) {
     //   load32x4_vr_postI(VR_x0, pDst, INC1);
-	  ulsr128 UR_Y = align_8x4_store(pY);
+    ulsr128 UR_Y = align_8x4_store(pY);
     for (int jj = 0; jj < m4; jj++) {
       load32x4_vr_postI(VR_acc, pDst, INC1);
       convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);  // 17, Q7 + Q7 , 14+2 , 16
@@ -287,9 +285,9 @@ int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
       // VR_out = shift8_into32_arith(VR_out, 24, 0, VRQ0);
       VR_out = shift32_arith(VR_out, 24, 0);
 
-	  store_8x4_vr_a(VR_out, UR_Y, pY); // , INC1);
+      store_8x4_vr_a(VR_out, UR_Y, pY);  // , INC1);
     }
-	flush_8x4(UR_Y, pY);
+    flush_8x4(UR_Y, pY);
   }
   for (int jj = 0; jj < (depth & 3); jj++) {
     load32x1_vr_postI(VR_acc, pDst, INC1, VRQ0);
@@ -365,16 +363,16 @@ int MaxPoolKernelQuantizedUInt8(
 
   pDst = pScratchOuput;
   if (m4 > 0) {
-	  ulsr128 UR_Y = align_8x4_store(pY); // unaligned 4 store
+    ulsr128 UR_Y = align_8x4_store(pY);  // unaligned 4 store
     for (int jj = 0; jj < m4; jj++) {
       load32x4_vr_postI(VR_max, pDst, INC1);
       SATURATE_INT32_VR128(VR_max, VR_max, data.activation_min,
                            data.activation_max);
       VR_out = shift32_arith(VR_max, 24, 0);
 
-	  store_8x4_vr_a(VR_out, UR_Y, pY);
+      store_8x4_vr_a(VR_out, UR_Y, pY);
     }
-	flush_8x4(UR_Y, pY);
+    flush_8x4(UR_Y, pY);
   }
   // store32x4_vr_postI(VR_max, pOutput32, INC1);
   // byte ?
@@ -439,7 +437,7 @@ int MaxPoolKernelQuantizedInt8(
   int m4 = depth >> 2;
   pDst = pScratchOuput;
   if (m4 > 0) {
-	  ulsr128 UR_Y = align_8x4_store(pY); // unaligned 4 store
+    ulsr128 UR_Y = align_8x4_store(pY);  // unaligned 4 store
     for (int jj = 0; jj < m4; jj++) {
       load32x4_vr_postI(VR_max, pDst, INC1);
       SATURATE_INT32_VR128(VR_max, VR_max, data.activation_min,
@@ -448,7 +446,7 @@ int MaxPoolKernelQuantizedInt8(
 
       store_8x4_vr_a(VR_out, UR_Y, pY);
     }
-	flush_8x4(UR_Y, pY);
+    flush_8x4(UR_Y, pY);
   }
 
   for (int jj = 0; jj < (depth & 3); jj++) {
@@ -783,9 +781,9 @@ int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
       // VR_out = shift8_into32_arith(VR_out, 24, 0, VRQ0);
       VR_out = shift32_arith(VR_out, 24, 0);
 
-      //store8x2_vr_postI(VR_out, pY, INC1);
-	  store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
-	  store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
+      // store8x2_vr_postI(VR_out, pY, INC1);
+      store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+      store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
     }
   }
   if (depth & 1) {
@@ -869,10 +867,10 @@ int MaxPoolKernelQuantizedUInt8(
                           data.activation_max);
       VR_out = shift32_arith(VR_max, 24, 0);
 
-      //store8x2_vr_postI(VR_out, pY, INC1);
+      // store8x2_vr_postI(VR_out, pY, INC1);
 
-	  store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
-	  store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
+      store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+      store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
     }
   }
 
@@ -944,7 +942,7 @@ int MaxPoolKernelQuantizedInt8(
       VR_out = shift32_arith(VR_max, 24, 0);
 
       store8x1_vr_postI(VR_out, pY, INC1, VRL);
-	  store8x1_vr_postI(VR_out, pY, INC1, VRH);
+      store8x1_vr_postI(VR_out, pY, INC1, VRH);
     }
   }
 
@@ -1188,11 +1186,10 @@ static TfLiteStatus AverageEvalQuantized(TfLiteContext *context,
 #ifndef REMOVE_REFOP_SUPPORT
     if (input->type == kTfLiteInt16) {
       reference_integer_ops::AveragePool(
-          op_params,
-                                 tflite::micro::GetTensorShape(input),
-                                 tflite::micro::GetTensorData<int16_t>(input),
-                                 tflite::micro::GetTensorShape(output),
-                                 tflite::micro::GetTensorData<int16_t>(output));
+          op_params, tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int16_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int16_t>(output));
     } else {
       reference_integer_ops::AveragePool(
           op_params, tflite::micro::GetTensorShape(input),
@@ -1238,11 +1235,12 @@ static TfLiteStatus MaxEvalFloat(TfLiteContext *context, TfLiteNode *node,
 #endif
 }
 
-static TfLiteStatus MaxEvalQuantized(TfLiteContext *context, const TfLiteNode *node,
-                                const TfLitePoolParams *params,
-                                const OpData &data,
-                                const TfLiteEvalTensor *input,
-                                TfLiteEvalTensor *output) {
+static TfLiteStatus MaxEvalQuantized(TfLiteContext *context,
+                                     const TfLiteNode *node,
+                                     const TfLitePoolParams *params,
+                                     const OpData &data,
+                                     const TfLiteEvalTensor *input,
+                                     TfLiteEvalTensor *output) {
   RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
   RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
   // const int depth = MatchingDim(input_shape, 3, output_shape, 3);
@@ -1314,13 +1312,12 @@ TfLiteStatus MaxPrepare(TfLiteContext *context, TfLiteNode *node) {
   OpData *data = static_cast<OpData *>(node->user_data);
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
+  MicroContext *micro_context = GetMicroContext(context);
 
-  MicroContext* micro_context = GetMicroContext(context);
-
-  TfLiteTensor* input =
+  TfLiteTensor *input =
       micro_context->AllocateTempInputTensor(node, kPoolingInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output =
+  TfLiteTensor *output =
       micro_context->AllocateTempOutputTensor(node, kPoolingOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
@@ -1402,20 +1399,19 @@ TfLiteStatus AveragePrepare(TfLiteContext *context, TfLiteNode *node) {
   OpData *data = static_cast<OpData *>(node->user_data);
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
+  MicroContext *micro_context = GetMicroContext(context);
 
-  MicroContext* micro_context = GetMicroContext(context);
-
-  TfLiteTensor* input =
+  TfLiteTensor *input =
       micro_context->AllocateTempInputTensor(node, kPoolingInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output =
+  TfLiteTensor *output =
       micro_context->AllocateTempOutputTensor(node, kPoolingOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
   TF_LITE_ENSURE_STATUS(CalculateOpData(context, params, input, output, data));
 
   data->opt_constraint = 0;
-  if (input->type == kTfLiteInt8 ) {
+  if (input->type == kTfLiteInt8) {
     RuntimeShape input_shape = GetTensorShape(input);
     TFLITE_DCHECK_EQ(input_shape.DimensionsCount(), 4);
 
@@ -1446,7 +1442,7 @@ TfLiteStatus AveragePrepare(TfLiteContext *context, TfLiteNode *node) {
     // conv2d.input_offset = -data->input_zero_point;
 
 #if defined(DMX1A_POOL_OPT) || defined(HMD1A_POOL_OPT)
-    if (conv2d.out_ch == conv2d.in_ch )//&& (conv2d.in_ch & 7) == 0)
+    if (conv2d.out_ch == conv2d.in_ch)  //&& (conv2d.in_ch & 7) == 0)
     {
       data->opt_constraint = 1;
     }
@@ -1547,7 +1543,7 @@ TfLiteStatus MaxEval(TfLiteContext *context, TfLiteNode *node) {
       status = MaxEvalFloat(context, node, params, data, input, output);
       break;
 
-    //case kTfLiteUInt8:
+    // case kTfLiteUInt8:
     //  status =
     //      MaxEvalQuantizedUInt8(context, node, params, data, input, output);
     //  break;
@@ -1585,27 +1581,27 @@ TfLiteStatus EvalMaxInt8(TfLiteContext *context, TfLiteNode *node) {
 
 TFLMRegistration Register_AVERAGE_POOL_2D() {
   return tflite::micro::RegisterOp(Init,
-          /*prepare=*/AveragePrepare,
-          /*invoke=*/AverageEval);
+                                   /*prepare=*/AveragePrepare,
+                                   /*invoke=*/AverageEval);
 }
 TFLMRegistration Register_AVERAGE_POOL_2D_INT8() {
   return tflite::micro::RegisterOp(Init,
 
-          /*prepare=*/AveragePrepare,
-          /*invoke=*/AverageEvalInt8);
+                                   /*prepare=*/AveragePrepare,
+                                   /*invoke=*/AverageEvalInt8);
 }
 TFLMRegistration Register_MAX_POOL_2D() {
-return tflite::micro::RegisterOp(Init,
-     
-          /*prepare=*/MaxPrepare,
-          /*invoke=*/MaxEval);
+  return tflite::micro::RegisterOp(Init,
+
+                                   /*prepare=*/MaxPrepare,
+                                   /*invoke=*/MaxEval);
 }
 
 TFLMRegistration Register_MAX_POOL_2D_INT8() {
- return tflite::micro::RegisterOp(Init,
+  return tflite::micro::RegisterOp(Init,
 
-          /*prepare=*/MaxPrepare,
-          /*invoke=*/EvalMaxInt8);
+                                   /*prepare=*/MaxPrepare,
+                                   /*invoke=*/EvalMaxInt8);
 }
 //}  // namespace micro
 //}  // namespace ops

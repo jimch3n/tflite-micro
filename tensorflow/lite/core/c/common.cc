@@ -387,7 +387,7 @@ const char* TfLiteTypeGetName(TfLiteType type) {
   }
   return "Unknown type";
 }
-#if 0 // REMOVED for new delete used
+#if 0  // REMOVED for new delete used
 TfLiteDelegate TfLiteDelegateCreate() { return TfLiteDelegate{}; }
 
 // Returns a tensor data allocation strategy.

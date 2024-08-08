@@ -49,7 +49,7 @@ TFLMRegistration Register_SOFTMAX_INT8_INT8();
 TFLMRegistration Register_SOFTMAX_FLOAT32_FLOAT32();
 TFLMRegistration Register_SOFTMAX_INT8_INT16();
 #endif
-//inline TFLMRegistration Register_SOFTMAX_INT8_INT16() {
+// inline TFLMRegistration Register_SOFTMAX_INT8_INT16() {
 //  return Register_SOFTMAX();
 //}
 #endif

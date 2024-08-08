@@ -13,7 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
-#include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/logistic.h"
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -24,13 +23,15 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/ia8201/config.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_utils.h"
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 namespace tflite {
-//namespace ops {
-//namespace micro {
-//namespace activations {
+// namespace ops {
+// namespace micro {
+// namespace activations {
 namespace {
 
 const int kLogisticInputTensor = 0;
@@ -48,7 +49,6 @@ struct OpData {
 
 TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
                                        OpData* data) {
-
   MicroContext* micro_context = GetMicroContext(context);
 
   TfLiteTensor* input =
@@ -770,8 +770,8 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
       }
       default:
         TF_LITE_KERNEL_LOG(context, "Input %s, output %s not supported.",
-                    TfLiteTypeGetName(input->type),
-                    TfLiteTypeGetName(output->type));
+                           TfLiteTypeGetName(input->type),
+                           TfLiteTypeGetName(output->type));
         return kTfLiteError;
     }
   } else
@@ -820,8 +820,8 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
 
 TFLMRegistration Register_LOGISTIC() {
   return tflite::micro::RegisterOp(LogisticInit,
-          /*prepare=*/LogisticPrepare,
-          /*invoke=*/LogisticEval);
+                                   /*prepare=*/LogisticPrepare,
+                                   /*invoke=*/LogisticEval);
 }
 //}  // namespace micro
 //}  // namespace ops

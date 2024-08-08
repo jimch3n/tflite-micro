@@ -27,7 +27,7 @@ limitations under the License.
 //#define IA8201_DEBUG
 #include "tensorflow/lite/micro/ia8201/platform.h"
 
-#elif defined (IA700)
+#elif defined(IA700)
 #include "tensorflow/lite/micro/ia700/platform.h"
 #endif
 namespace tflite {
@@ -99,8 +99,9 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
     current_subgraph_index_ = subgraph_idx;
     uint32_t operators_size = NumSubgraphOperators(model_, subgraph_idx);
     for (size_t i = 0; i < operators_size; ++i) {
- #if defined(IA8201) || defined(IA700)
-    tflite::is_current_ops_coeffs_mapped(i, context_); // check mapped coeffs in the model
+#if defined(IA8201) || defined(IA700)
+      tflite::is_current_ops_coeffs_mapped(
+          i, context_);  // check mapped coeffs in the model
 #endif
       TfLiteNode* node =
           &(subgraph_allocations_[subgraph_idx].node_and_registrations[i].node);

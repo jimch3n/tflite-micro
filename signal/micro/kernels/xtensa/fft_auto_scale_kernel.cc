@@ -35,7 +35,7 @@ namespace {
 int XtensaFftAutoScale(const int16_t* input, int size, int16_t* output) {
   const int16_t max = tflite::tflm_signal::MaxAbs16(input, size);
   int scale_bits = (sizeof(int16_t) * 8) -
-#ifndef REMOVE_TFLM_SIGNAL // compatible google's branch
+#ifndef REMOVE_TFLM_SIGNAL
                    tflite::tflm_signal::MostSignificantBit32(max) - 1;
 #else
                   MostSignificantBit32(max) - 1;

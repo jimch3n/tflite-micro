@@ -27,19 +27,16 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/micro_time.h"
 
-#if 1 //defined(TF_LITE_USE_CTIME)
+#if 1  // defined(TF_LITE_USE_CTIME)
 #include <ctime>
 #endif
 
 namespace tflite {
-
-
 
 // For platforms that support ctime, we implment the micro_time interface in
 // this central location.
 uint32_t ticks_per_second() { return CLOCKS_PER_SEC; }
 
 uint32_t GetCurrentTimeTicks() { return clock(); }
-
 
 }  // namespace tflite

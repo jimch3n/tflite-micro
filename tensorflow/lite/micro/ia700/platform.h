@@ -16,12 +16,10 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_IA700_PLATFORM_H_
 #define TENSORFLOW_LITE_IA700_PLATFORM_H_
 
-
 #include "tensorflow/lite/c/common.h"
 
-#define KN_TFL_MODEL_NAME "KTL" //knowles Tensorflow
+#define KN_TFL_MODEL_NAME "KTL"  // knowles Tensorflow
 #define KN_TFL_MODEL_LEN 3
-
 
 #ifdef HEMILITE
 #define KN_TFL_MODEL_ARCH_NAME "hml"
@@ -32,10 +30,10 @@ limitations under the License.
 #define KN_TFL_MODEL_ARCH_LEN 3
 
 namespace tflite {
-//namespace dmx1a{
-		int  check_kn_tflite_model(const char *description, TfLiteContext *ctx);
-		bool is_coeffs_mapped(TfLiteContext *ctx);
-		bool is_current_ops_coeffs_mapped(int opIdx, TfLiteContext *ctx);
-	//	}
-}
+// namespace dmx1a{
+int check_kn_tflite_model(const char *description, TfLiteContext *ctx);
+bool is_coeffs_mapped(TfLiteContext *ctx);
+bool is_current_ops_coeffs_mapped(int opIdx, TfLiteContext *ctx);
+//	}
+}  // namespace tflite
 #endif

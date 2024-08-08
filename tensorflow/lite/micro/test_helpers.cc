@@ -442,21 +442,21 @@ const Model* BuildModelWithUnusedOperatorOutputs() {
           *builder, builder->CreateVector(tensor_shape, tensor_shape_size),
           TensorType_INT8, 0,
           builder->CreateString("test_unused_output_tensor"), 0, false)};
-  
-  #ifdef _MSC_VER
+
+#ifdef _MSC_VER
   constexpr size_t inputs_size = 10;
-  #else
+#else
   constexpr size_t inputs_size = 0;
-  #endif
+#endif
 
   const int32_t inputs[inputs_size] = {};
   constexpr size_t outputs_size = 1;
   const int32_t outputs[outputs_size] = {0};
-  #ifndef _MSC_VER
+#ifndef _MSC_VER
   constexpr size_t operator_inputs_size = 0;
-  #else
+#else
   constexpr size_t operator_inputs_size = 10;
-  #endif
+#endif
   const int32_t operator_inputs[operator_inputs_size] = {};
   constexpr size_t operator_outputs_size = 2;
   const int32_t operator_outputs[operator_outputs_size] = {0, 1};

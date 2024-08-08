@@ -14,10 +14,11 @@ limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
 
-#include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/kernels/svdf.h"
+
 #include <cmath>
 #include <cstdint>
+
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
@@ -25,19 +26,17 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
-#include "tensorflow/lite/micro/kernels/svdf.h"
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/kernels/activation_utils.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/svdf.h"
 #include "tensorflow/lite/micro/micro_utils.h"
-
-
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
-
 namespace tflite {
 namespace {
 
 struct OpData {
-
   OpDataSvdf SvdfOp;
 
   int32_t* map_weight_feat;
@@ -915,7 +914,8 @@ void EvalIntegerSVDFRef(TfLiteContext* context, TfLiteNode* node,
                         const TfLiteEvalTensor* bias_tensor,
                         const TfLiteSVDFParams* params,
                         TfLiteEvalTensor* activation_state_tensor,
-                        TfLiteEvalTensor* output_tensor, const OpData& data_ex) {
+                        TfLiteEvalTensor* output_tensor,
+                        const OpData& data_ex) {
   const int n_rank = params->rank;
   const int n_batch = input_tensor->dims->data[0];
   const int n_input = input_tensor->dims->data[1];
@@ -1254,7 +1254,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
     KN_PRINTD(num_units);
     KN_PRINTD(rank);
     KN_PRINTD(input_size);
-    KN_PRINTD(num_filters); 
+    KN_PRINTD(num_filters);
     TF_LITE_ENSURE_OK(context, scratch_output_status);
 #if !(defined(DMX1A_SVDF_OPT) || defined(HMD1A_SVDF_OPT))
     data_ex->opt_constraint = 0;
@@ -1299,11 +1299,13 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
         data_ex->map_weight_feat = (int32_t*)p_dmx1a_fc_mapped_filter;
         // const TfLiteEvalTensor* biasEval =
-        // tflite::micro::GetEvalInput(context, node, kBiasTensor); 	const int32_t
+        // tflite::micro::GetEvalInput(context, node, kBiasTensor); 	const
+        // int32_t
         //*bias_input =  tflite::micro::GetTensorData<int32_t>(biasEval);
         //
         // tflite::ConvertQ31ToAfloat(bias_input,(AScalar*) bias_input, , 17);
-        tflite::ConvertQ31ToAfloat(data->effective_scale_1_a, data_ex->scaleFeat,
+        tflite::ConvertQ31ToAfloat(data->effective_scale_1_a,
+                                   data_ex->scaleFeat,
                                    data->effective_scale_1_b);
         tflite::ConvertQ31ToAfloat(data->effective_scale_2_a, data_ex->scaleAct,
                                    data->effective_scale_2_b + 16);
@@ -1311,13 +1313,13 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         KN_PRINTD(data->input_zero_point);
         // uint32_t offsetVR=offsetInput;
         data_ex->input_offset_int8 = (offsetInput << 24) | (offsetInput << 16) |
-                                  (offsetInput << 8) | offsetInput;
+                                     (offsetInput << 8) | offsetInput;
         //			offsetInput = ( data->input_zero_point&0xff);
         //				data->input_offset_int8_neg =
         //(offsetInput<<24)|(offsetInput<<16)|(offsetInput<<8)|offsetInput;
         KN_PRINTD(data_ex->input_offset_int8);
-        tflite::ConvertQ31ToAfloat(data->output_zero_point, data_ex->outputOffset,
-                                   17);
+        tflite::ConvertQ31ToAfloat(data->output_zero_point,
+                                   data_ex->outputOffset, 17);
         KN_PRINTAFLT(data_ex->outputOffset);
       }
     }
@@ -1352,7 +1354,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   auto* params = reinterpret_cast<TfLiteSVDFParams*>(node->builtin_data);
   TFLITE_DCHECK(node->user_data != nullptr);
   const OpData& data_ex = *(static_cast<const OpData*>(node->user_data));
-  const OpDataSvdf& data = static_cast<const OpDataSvdf >(data_ex.SvdfOp);
+  const OpDataSvdf& data = static_cast<const OpDataSvdf>(data_ex.SvdfOp);
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kInputTensor);
   const TfLiteEvalTensor* weights_feature =
@@ -1380,7 +1382,6 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 #endif
 
     case kTfLiteInt8: {
- 
       switch (weights_time->type) {
         case kTfLiteInt16: {
           EvalInt16SvdfReference(context, node, input, weights_feature,
@@ -1396,7 +1397,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         }
         default:
           TF_LITE_KERNEL_LOG(context, "Type %s not currently supported.",
-                      TfLiteTypeGetName(weights_time->type));
+                             TfLiteTypeGetName(weights_time->type));
           return kTfLiteError;
       }
 
@@ -1447,12 +1448,12 @@ TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
 
 TFLMRegistration Register_SVDF() {
   return tflite::micro::RegisterOp(Init,
-          /*prepare=*/Prepare,
-          /*invoke=*/Eval);
+                                   /*prepare=*/Prepare,
+                                   /*invoke=*/Eval);
 }
 TFLMRegistration Register_SVDF_INT8() {
- return tflite::micro::RegisterOp(Init,
-          /*prepare=*/Prepare,
-          /*invoke=*/EvalInt8);
-    }
+  return tflite::micro::RegisterOp(Init,
+                                   /*prepare=*/Prepare,
+                                   /*invoke=*/EvalInt8);
+}
 }  // namespace tflite

@@ -65,7 +65,7 @@ TFLMRegistration Register_DEPTHWISE_CONV_2D_INT8();
 // implementations.
 TFLMRegistration Register_DEPTHWISE_CONV_2D_INT16();
 #else
-#if  defined(IA8201) || defined(IA700)
+#if defined(IA8201) || defined(IA700)
 // Returns a TfLiteRegistration struct for kernel variant that only supports
 // int8 inputs and outputs.
 TFLMRegistration Register_DEPTHWISE_CONV_2D_INT8();

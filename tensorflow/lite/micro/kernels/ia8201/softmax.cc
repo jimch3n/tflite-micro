@@ -27,11 +27,10 @@ limitations under the License.
 
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/softmax.h"  //prepare init
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_utils.h"
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 namespace tflite {
 namespace {
-
 
 #ifdef DMX1A_SOFTMAX_OPT
 
@@ -159,7 +158,7 @@ void SoftMaxV(float* y, const float* x, int n) {
     load32x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
 
     convert_IEEE_float_to_32F_x4(VR_x0);
-	frx = get_VRQ0(VR_x0);
+    frx = get_VRQ0(VR_x0);
     frx = fpadd(frx, frmax, 2);  // exp(x - max)
     fry = fpmul(frx, fr_log2e, 0);
 
@@ -242,10 +241,10 @@ void SoftMaxV(float* y, const float* x, int n) {
 
     load32x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
     convert_IEEE_float_to_32F_x4(VR_x0);
-	frx = get_VRQ0(VR_x0);
+    frx = get_VRQ0(VR_x0);
     fry = SoftMax1(frx, sum);  // scalar input with sum
-	set_VRQ0(VR_y0, fry);
-	convert_32F_to_IEEE_float_x4(VR_y0);
+    set_VRQ0(VR_y0, fry);
+    convert_32F_to_IEEE_float_x4(VR_y0);
     store32x1_vr_postI(VR_y0, yLocal, INC1, VRQ0);
   }
 
@@ -286,23 +285,22 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
 
   // 1. Subtract max value from each unit to avoid overflow of exponential
   // function
-  replicate_ar(VR_max, 0xf, 0xffffffff);// init - max
+  replicate_ar(VR_max, 0xf, 0xffffffff);  // init - max
   xLocal = (int8_t*)x;
-  if (loopLim > 0)
-  {
-      UR_x = align_8x4_load(xLocal);
-      load_8x4_vr_a(VR_x0, UR_x, xLocal);
+  if (loopLim > 0) {
+    UR_x = align_8x4_load(xLocal);
+    load_8x4_vr_a(VR_x0, UR_x, xLocal);
 
-      // conver int_8_to afloat
-      convert_16I_to_32F_x4(VR_x0, 0);
-      vmaxmin_init(VR_max, VR_x0, tmpMir30);
+    // conver int_8_to afloat
+    convert_16I_to_32F_x4(VR_x0, 0);
+    vmaxmin_init(VR_max, VR_x0, tmpMir30);
 
-      for (jj = 0; jj < loopLim - 1; jj++) {
-          VR_max = vmax(VR_x0, VR_max);
-          load_8x4_vr_a(VR_x0, UR_x, xLocal);
-          convert_16I_to_32F_x4(VR_x0, 0);
-      }
+    for (jj = 0; jj < loopLim - 1; jj++) {
       VR_max = vmax(VR_x0, VR_max);
+      load_8x4_vr_a(VR_x0, UR_x, xLocal);
+      convert_16I_to_32F_x4(VR_x0, 0);
+    }
+    VR_max = vmax(VR_x0, VR_max);
   }
   for (jj = 0; jj < remain; jj++) {
     load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
@@ -319,45 +317,43 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
   VR_sum = vseta_vr(kConstTable_Zero, 0, 0);
   vr128 VR_diff;
   xtbool4 xt_inputDiff;
-  if (loopLim > 0)
-  {
-      UR_x = align_8x4_load(xLocal);
+  if (loopLim > 0) {
+    UR_x = align_8x4_load(xLocal);
 
-      load_8x4_vr_a(VR_x0, UR_x, xLocal);
-      convert_16I_to_32F_x4(VR_x0, 0);
-      
+    load_8x4_vr_a(VR_x0, UR_x, xLocal);
+    convert_16I_to_32F_x4(VR_x0, 0);
 
-      for (int i = 0; i < loopLim - 1; i++) {
-          VR_diff = vadds(VR_x0, VR_max, 0xf0);
-
-          xt_inputDiff = vge(VR_diff, VR_diffMin);
-          // input_beta;
-          VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
-
-          VR_z0 = vmuls(VR_diff, VR_fac, 0);
-
-          pow2(VR_y0, VRQ0, VR_z0, VRQ0);
-          pow2(VR_y0, VRQ1, VR_z0, VRQ1);
-          pow2(VR_y0, VRQ2, VR_z0, VRQ2);
-          pow2(VR_y0, VRQ3, VR_z0, VRQ3);
-
-          VR_y0 = vsel(VR_y0, VR_zero, xt_inputDiff);
-
-          load_8x4_vr_a(VR_x0, UR_x, xLocal);
-          convert_16I_to_32F_x4(VR_x0, 0);
-          VR_sum = vadds(VR_sum, VR_y0, 0);
-      }
+    for (int i = 0; i < loopLim - 1; i++) {
       VR_diff = vadds(VR_x0, VR_max, 0xf0);
 
-      xt_inputDiff = vge(VR_diff, VR_diffMin);  // diff >= diffmin
+      xt_inputDiff = vge(VR_diff, VR_diffMin);
+      // input_beta;
       VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
+
       VR_z0 = vmuls(VR_diff, VR_fac, 0);
+
       pow2(VR_y0, VRQ0, VR_z0, VRQ0);
       pow2(VR_y0, VRQ1, VR_z0, VRQ1);
       pow2(VR_y0, VRQ2, VR_z0, VRQ2);
       pow2(VR_y0, VRQ3, VR_z0, VRQ3);
+
       VR_y0 = vsel(VR_y0, VR_zero, xt_inputDiff);
+
+      load_8x4_vr_a(VR_x0, UR_x, xLocal);
+      convert_16I_to_32F_x4(VR_x0, 0);
       VR_sum = vadds(VR_sum, VR_y0, 0);
+    }
+    VR_diff = vadds(VR_x0, VR_max, 0xf0);
+
+    xt_inputDiff = vge(VR_diff, VR_diffMin);  // diff >= diffmin
+    VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
+    VR_z0 = vmuls(VR_diff, VR_fac, 0);
+    pow2(VR_y0, VRQ0, VR_z0, VRQ0);
+    pow2(VR_y0, VRQ1, VR_z0, VRQ1);
+    pow2(VR_y0, VRQ2, VR_z0, VRQ2);
+    pow2(VR_y0, VRQ3, VR_z0, VRQ3);
+    VR_y0 = vsel(VR_y0, VR_zero, xt_inputDiff);
+    VR_sum = vadds(VR_sum, VR_y0, 0);
   }
 
   if (depth & 3) {
@@ -392,35 +388,12 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
 
   xLocal = (int8_t*)x;
   yLocal = y;
-  if (loopLim > 0)
-  {
-      UR_x = align_8x4_load(xLocal);
-      UR_y = align_8x4_store(yLocal);
-      load_8x4_vr_a(VR_x0, UR_x, xLocal);
-      convert_16I_to_32F_x4(VR_x0, 0);
-      for (int i = 0; i < loopLim - 1; i++) {
-          VR_diff = vadds(VR_x0, VR_max, 0xf0);
-          xt_inputDiff = vge(VR_diff, VR_diffMin);
-          VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
-          VR_z0 = vmuls(VR_diff, VR_fac, 0);
-          pow2(VR_y0, VRQ0, VR_z0, VRQ0);
-          pow2(VR_y0, VRQ1, VR_z0, VRQ1);
-          pow2(VR_y0, VRQ2, VR_z0, VRQ2);
-          pow2(VR_y0, VRQ3, VR_z0, VRQ3);
-
-          VR_y0 = vmuls(VR_y0, VR_sum, 0);        // /sum - 0.1
-          VR_y0 = vexp_adji(VR_y0, 8);            // shift 8 bit??
-          VR_z0 = vadds(VR_y0, VR_minMax, 0xf0);  // -128
-          convert_32F_to_16I_x4(VR_z0, 7, 1);
-          VR_z0 = vsel(VR_z0, VR_NegSat, xt_inputDiff);
-          rnd_sat_pack(VR_q7_out, VRQ0, VR_z0, 1);  // ronding
-          VR_z0 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
-          store_8x4_vr_a(VR_z0, UR_y, yLocal);
-          load_8x4_vr_a(VR_x0, UR_x, xLocal);
-          convert_16I_to_32F_x4(VR_x0, 0);
-      }
-      // VR_y0 = vadds(VR_x0, VR_sum, 0);
-
+  if (loopLim > 0) {
+    UR_x = align_8x4_load(xLocal);
+    UR_y = align_8x4_store(yLocal);
+    load_8x4_vr_a(VR_x0, UR_x, xLocal);
+    convert_16I_to_32F_x4(VR_x0, 0);
+    for (int i = 0; i < loopLim - 1; i++) {
       VR_diff = vadds(VR_x0, VR_max, 0xf0);
       xt_inputDiff = vge(VR_diff, VR_diffMin);
       VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
@@ -438,7 +411,29 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
       rnd_sat_pack(VR_q7_out, VRQ0, VR_z0, 1);  // ronding
       VR_z0 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       store_8x4_vr_a(VR_z0, UR_y, yLocal);
-      flush_8x4(UR_y, yLocal);
+      load_8x4_vr_a(VR_x0, UR_x, xLocal);
+      convert_16I_to_32F_x4(VR_x0, 0);
+    }
+    // VR_y0 = vadds(VR_x0, VR_sum, 0);
+
+    VR_diff = vadds(VR_x0, VR_max, 0xf0);
+    xt_inputDiff = vge(VR_diff, VR_diffMin);
+    VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
+    VR_z0 = vmuls(VR_diff, VR_fac, 0);
+    pow2(VR_y0, VRQ0, VR_z0, VRQ0);
+    pow2(VR_y0, VRQ1, VR_z0, VRQ1);
+    pow2(VR_y0, VRQ2, VR_z0, VRQ2);
+    pow2(VR_y0, VRQ3, VR_z0, VRQ3);
+
+    VR_y0 = vmuls(VR_y0, VR_sum, 0);        // /sum - 0.1
+    VR_y0 = vexp_adji(VR_y0, 8);            // shift 8 bit??
+    VR_z0 = vadds(VR_y0, VR_minMax, 0xf0);  // -128
+    convert_32F_to_16I_x4(VR_z0, 7, 1);
+    VR_z0 = vsel(VR_z0, VR_NegSat, xt_inputDiff);
+    rnd_sat_pack(VR_q7_out, VRQ0, VR_z0, 1);  // ronding
+    VR_z0 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+    store_8x4_vr_a(VR_z0, UR_y, yLocal);
+    flush_8x4(UR_y, yLocal);
   }
   if (remain) {
     for (int i = 0; i < remain; i++) {
@@ -462,7 +457,7 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
       store8x1_vr_postI(VR_q7_out, yLocal, INC1, VRQ0);
     }
   }
-//  WUR_JammingBit(jammingBit);
+  //  WUR_JammingBit(jammingBit);
 }
 #endif
 
@@ -712,33 +707,32 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
 
   // 1. Subtract max value from each unit to avoid overflow of exponential
   // function
-  //int align2_input = ((unsigned)x & 1) == 0;
-  //int align2_output = ((unsigned)y & 1) == 0;
+  // int align2_input = ((unsigned)x & 1) == 0;
+  // int align2_output = ((unsigned)y & 1) == 0;
 
   xLocal = (int8_t*)x;
   // UR_x = align_8x2_load(xLocal);
 
   // conver int_8_to afloat
   replicate_ar(VR_max, 0x3, 0xffffffff);
-  //tmpMir18 = 0;
+  // tmpMir18 = 0;
   vmaxmin_init(VR_max, VR_max, tmpMir18);
-  if (loopLim > 0)
-  {
+  if (loopLim > 0) {
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
+
+    convert_16I_to_32F_x2(VR_x0, 0);
+
+    vmaxmin_init(VR_max, VR_x0, tmpMir18);
+    for (jj = 0; jj < loopLim - 1; jj++) {
+      vmax_idx(VR_x0, VR_max, tmpMir18);
+
       load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
       load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
 
       convert_16I_to_32F_x2(VR_x0, 0);
-      
-      vmaxmin_init(VR_max, VR_x0, tmpMir18);
-      for (jj = 0; jj < loopLim - 1; jj++) {
-          vmax_idx(VR_x0, VR_max, tmpMir18);
-        
-        load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
-        load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
-          
-          convert_16I_to_32F_x2(VR_x0, 0);
-      }
-      vmax_idx(VR_x0, VR_max, tmpMir18);
+    }
+    vmax_idx(VR_x0, VR_max, tmpMir18);
   }
   if (remain) {
     load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
@@ -753,41 +747,38 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
   VR_sum = vseta_vr(kConstTable_Zero, 0);
   vr64 VR_diff;
   atbool xt_inputDiff;
-  if (loopLim > 0)
-  {
-
-      load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
-      load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
-      convert_16I_to_32F_x2(VR_x0, 0);
-      for (int i = 0; i < loopLim - 1; i++) {
-          VR_diff = vadds(VR_x0, VR_max, 0xa);
-          xt_inputDiff = vge(VR_diff, VR_diffMin);
-          // input_beta;
-          VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
-          VR_z0 = vmuls(VR_diff, VR_fac, 0);
-
-          set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
-          set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
-          VR_z0 = vsel(VR_y0, VR_zero, xt_inputDiff);
-
-           
-            load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
-            load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
-          
-          convert_16I_to_32F_x2(VR_x0, 0);
-          VR_sum = vadds(VR_sum, VR_z0, 0);
-      }
+  if (loopLim > 0) {
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
+    convert_16I_to_32F_x2(VR_x0, 0);
+    for (int i = 0; i < loopLim - 1; i++) {
       VR_diff = vadds(VR_x0, VR_max, 0xa);
-
-      xt_inputDiff = vge(VR_diff, VR_diffMin);  // diff >= diffmin
+      xt_inputDiff = vge(VR_diff, VR_diffMin);
+      // input_beta;
       VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
       VR_z0 = vmuls(VR_diff, VR_fac, 0);
 
       set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
       set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
-
       VR_z0 = vsel(VR_y0, VR_zero, xt_inputDiff);
+
+      load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
+      load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
+
+      convert_16I_to_32F_x2(VR_x0, 0);
       VR_sum = vadds(VR_sum, VR_z0, 0);
+    }
+    VR_diff = vadds(VR_x0, VR_max, 0xa);
+
+    xt_inputDiff = vge(VR_diff, VR_diffMin);  // diff >= diffmin
+    VR_diff = vmuls(VR_diff, VR_inputMulti, 0);
+    VR_z0 = vmuls(VR_diff, VR_fac, 0);
+
+    set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
+    set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
+
+    VR_z0 = vsel(VR_y0, VR_zero, xt_inputDiff);
+    VR_sum = vadds(VR_sum, VR_z0, 0);
   }
   if (remain) {
     VR_y0 = vexp_adji(VR_zero, 0);  // reset Y1,2,3 zero, prevent add
@@ -816,50 +807,26 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
 
   xLocal = (int8_t*)x;
   yLocal = y;
-  
 
-  if (loopLim > 0)
-  {
+  if (loopLim > 0) {
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
+
+    convert_16I_to_32F_x2(VR_x0, 0);
+    for (int i = 0; i < loopLim - 1; i++) {
+      VR_diff = vadds(VR_x0, VR_max, 0xa);
+
+      xt_inputDiff = vge(VR_diff, VR_diffMin);
+      VR_x0 = vmuls(VR_diff, VR_inputMulti, 0);
+      VR_z0 = vmuls(VR_x0, VR_fac, 0);
+      set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
+      set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
+      // next load
+
       load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
       load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
 
       convert_16I_to_32F_x2(VR_x0, 0);
-      for (int i = 0; i < loopLim - 1; i++) {
-          VR_diff = vadds(VR_x0, VR_max, 0xa);
-
-          xt_inputDiff = vge(VR_diff, VR_diffMin);
-          VR_x0 = vmuls(VR_diff, VR_inputMulti, 0);
-          VR_z0 = vmuls(VR_x0, VR_fac, 0);
-          set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
-          set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
-          // next load
-           
-              load8x1_vr_postI(VR_x0, xLocal, INC1, VRL);
-              load8x1_vr_postI(VR_x0, xLocal, INC1, VRH);
-          
-          convert_16I_to_32F_x2(VR_x0, 0);
-
-          VR_z0 = vmuls(VR_y0, VR_sum, 0);       // /sum - 0.1
-          VR_y0 = vexp_adji(VR_z0, 8);           // shift 8 bit??
-          VR_z0 = vadds(VR_y0, VR_minMax, 0xa);  // -128
-          convert_32F_to_16I_x2(VR_z0, 7, 1);
-
-          VR_y0 = vsel(VR_z0, VR_NegSat, xt_inputDiff);
-          rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_zero, 1);  // ronding
-          VR_z0 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
-
-          
-        store8x1_vr_postI(VR_z0, yLocal, INC1, VRL);
-        store8x1_vr_postI(VR_z0, yLocal, INC1, VRH);
-          
-      }
-      VR_diff = vadds(VR_x0, VR_max, 0xa);
-      xt_inputDiff = vge(VR_diff, VR_diffMin);
-      VR_x0 = vmuls(VR_diff, VR_inputMulti, 0);
-      VR_z0 = vmuls(VR_x0, VR_fac, 0);
-
-      set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
-      set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
 
       VR_z0 = vmuls(VR_y0, VR_sum, 0);       // /sum - 0.1
       VR_y0 = vexp_adji(VR_z0, 8);           // shift 8 bit??
@@ -870,10 +837,28 @@ void SoftMaxQuantizedInt8(const AScalar& diffMin, const AScalar& inputMultipler,
       rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_zero, 1);  // ronding
       VR_z0 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
 
-      
+      store8x1_vr_postI(VR_z0, yLocal, INC1, VRL);
+      store8x1_vr_postI(VR_z0, yLocal, INC1, VRH);
+    }
+    VR_diff = vadds(VR_x0, VR_max, 0xa);
+    xt_inputDiff = vge(VR_diff, VR_diffMin);
+    VR_x0 = vmuls(VR_diff, VR_inputMulti, 0);
+    VR_z0 = vmuls(VR_x0, VR_fac, 0);
+
+    set_VRL(VR_y0, pow2(get_VRL(VR_z0)));
+    set_VRH(VR_y0, pow2(get_VRH(VR_z0)));
+
+    VR_z0 = vmuls(VR_y0, VR_sum, 0);       // /sum - 0.1
+    VR_y0 = vexp_adji(VR_z0, 8);           // shift 8 bit??
+    VR_z0 = vadds(VR_y0, VR_minMax, 0xa);  // -128
+    convert_32F_to_16I_x2(VR_z0, 7, 1);
+
+    VR_y0 = vsel(VR_z0, VR_NegSat, xt_inputDiff);
+    rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_zero, 1);  // ronding
+    VR_z0 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
+
     store8x1_vr_postI(VR_z0, yLocal, INC1, VRL);
     store8x1_vr_postI(VR_z0, yLocal, INC1, VRH);
-      
   }
   if (remain) {
     // for (int i = 0; i < remain; i++)
@@ -956,8 +941,8 @@ static TfLiteStatus SoftmaxQuantizedInt8Int8(const TfLiteEvalTensor* input,
       op_data.input_multiplier, inputMultipler,
       op_data.input_left_shift -
           19);  // Q7* Qx() >> 31-shift32- op_data.input_left_shift-5
-   KN_PRINT_Q7_SIZE( tflite::micro::GetTensorData<int8_t>(input),
-  	ElementCount(*input->dims));
+  KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
+                   ElementCount(*input->dims));
   const int8_t* pInput =
       (const int8_t*)tflite::micro::GetTensorData<int8_t>(input);
   int8_t* pOutput = (int8_t*)tflite::micro::GetTensorData<int8_t>(output);
@@ -967,61 +952,54 @@ static TfLiteStatus SoftmaxQuantizedInt8Int8(const TfLiteEvalTensor* input,
     pOutput += depth;
     pInput += depth;
   }
-   KN_PRINT_Q7_SIZE( tflite::micro::GetTensorData<int8_t>(output),
- 	ElementCount(*output->dims));
+  KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
+                   ElementCount(*output->dims));
   return kTfLiteOk;
 }
 #endif
 static TfLiteStatus SoftmaxQuantized(const TfLiteEvalTensor* input,
-	TfLiteEvalTensor* output,
-	const SoftmaxParams& op_data) {
-	const auto input_shape = tflite::micro::GetTensorShape(input);
-	const auto output_shape = tflite::micro::GetTensorShape(output);
+                                     TfLiteEvalTensor* output,
+                                     const SoftmaxParams& op_data) {
+  const auto input_shape = tflite::micro::GetTensorShape(input);
+  const auto output_shape = tflite::micro::GetTensorShape(output);
 #if defined(DMX1A_SOFTMAX_OPT) || defined(HMD1A_SOFTMAX_OPT)
-	if (input->type == kTfLiteInt8 && output->type == kTfLiteInt8)
-	{
-		SoftmaxQuantizedInt8Int8(input, output, op_data);
-	}
-	else
+  if (input->type == kTfLiteInt8 && output->type == kTfLiteInt8) {
+    SoftmaxQuantizedInt8Int8(input, output, op_data);
+  } else
 #endif
 
 #ifndef REMOVE_REFOP_SUPPORT
-	{
-		if (input->type == kTfLiteUInt8) {
-			tflite::reference_ops::Softmax(
-				op_data, input_shape, tflite::micro::GetTensorData<uint8_t>(input),
-				output_shape, tflite::micro::GetTensorData<uint8_t>(output));
-		}
-		else if (input->type == kTfLiteInt8) {
-			if (output->type == kTfLiteInt16) {
-				tflite::reference_ops::Softmax(
-					op_data, input_shape, tflite::micro::GetTensorData<int8_t>(input),
-					output_shape, tflite::micro::GetTensorData<int16_t>(output));
-			}
-			else if (input->type == kTfLiteInt8)
+  {
+    if (input->type == kTfLiteUInt8) {
+      tflite::reference_ops::Softmax(
+          op_data, input_shape, tflite::micro::GetTensorData<uint8_t>(input),
+          output_shape, tflite::micro::GetTensorData<uint8_t>(output));
+    } else if (input->type == kTfLiteInt8) {
+      if (output->type == kTfLiteInt16) {
+        tflite::reference_ops::Softmax(
+            op_data, input_shape, tflite::micro::GetTensorData<int8_t>(input),
+            output_shape, tflite::micro::GetTensorData<int16_t>(output));
+      } else if (input->type == kTfLiteInt8)
 
-			{
-                KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
-                    ElementCount(*input->dims));
-				tflite::reference_ops::Softmax(
-					op_data, tflite::micro::GetTensorShape(input),
-					tflite::micro::GetTensorData<int8_t>(input),
-					tflite::micro::GetTensorShape(output),
-					tflite::micro::GetTensorData<int8_t>(output));
-                KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
-                    ElementCount(*output->dims));
-			}
-		}
-		else {
-			tflite::reference_ops::SoftmaxInt16(
-				op_data, input_shape, tflite::micro::GetTensorData<int16_t>(input),
-				output_shape, tflite::micro::GetTensorData<int16_t>(output));
-		}
-	}
+      {
+        KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
+                         ElementCount(*input->dims));
+        tflite::reference_ops::Softmax(
+            op_data, tflite::micro::GetTensorShape(input),
+            tflite::micro::GetTensorData<int8_t>(input),
+            tflite::micro::GetTensorShape(output),
+            tflite::micro::GetTensorData<int8_t>(output));
+        KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
+                         ElementCount(*output->dims));
+      }
+    } else {
+      tflite::reference_ops::SoftmaxInt16(
+          op_data, input_shape, tflite::micro::GetTensorData<int16_t>(input),
+          output_shape, tflite::micro::GetTensorData<int16_t>(output));
+    }
+  }
 #else
-	{
-		return kTfLiteError;
-	}
+  { return kTfLiteError; }
 #endif
   return kTfLiteOk;
 }
@@ -1091,20 +1069,20 @@ TfLiteStatus SoftmaxEvalFloat32(TfLiteContext* context, TfLiteNode* node) {
 
 TFLMRegistration Register_SOFTMAX() {
   return tflite::micro::RegisterOp(SoftmaxInit,
-          /*prepare=*/SoftmaxPrepare,
-          /*invoke=*/SoftmaxEval);
+                                   /*prepare=*/SoftmaxPrepare,
+                                   /*invoke=*/SoftmaxEval);
 }
 #if defined(DMX1A_SOFTMAX_OPT) || defined(HMD1A_SOFTMAX_OPT)
 TFLMRegistration Register_SOFTMAX_INT8_INT8() {
   return tflite::micro::RegisterOp(SoftmaxInit,
-          /*prepare=*/SoftmaxPrepareInt8,
-          /*invoke=*/SoftmaxEvalInt8);
+                                   /*prepare=*/SoftmaxPrepareInt8,
+                                   /*invoke=*/SoftmaxEvalInt8);
 }
 #endif
 TFLMRegistration Register_SOFTMAX_FLOAT32_FLOAT32() {
   return tflite::micro::RegisterOp(SoftmaxInit,
 
-          /*prepare=*/SoftmaxPrepare,
-          /*invoke=*/SoftmaxEvalFloat32);
+                                   /*prepare=*/SoftmaxPrepare,
+                                   /*invoke=*/SoftmaxEvalFloat32);
 }
 }  // namespace tflite

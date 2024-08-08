@@ -106,13 +106,13 @@ void MicroInterpreter::Init(MicroProfilerInterface* profiler) {
   context_.GetExternalContext = MicroContextGetExternalContext;
   context_.AllocatePersistentBuffer = MicroContextAllocatePersistentBuffer;
   context_.GetScratchBuffer = MicroContextGetScratchBuffer;
-  #if defined(IA8201) || defined(IA700) // FIXME: get description identify kn tfl model
-   if(nullptr != model_->description())
-   {
-   const char *model_description = model_->description()->c_str();
-   tflite::check_kn_tflite_model(model_description, &context_);
+#if defined(IA8201) || \
+    defined(IA700)  // FIXME: get description identify kn tfl model
+  if (nullptr != model_->description()) {
+    const char* model_description = model_->description()->c_str();
+    tflite::check_kn_tflite_model(model_description, &context_);
   }
-  #endif
+#endif
   initialization_status_ = kTfLiteOk;
 }
 

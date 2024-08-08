@@ -72,13 +72,13 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt8: {
       switch (filter->type) {
         case kTfLiteInt8: {
-          #ifndef USE_HMD_MVM_OPT
+#ifndef USE_HMD_MVM_OPT
           return XtensaEvalFullyConnectedQuantizedInt8(
               context, node, data, input, filter, bias, output);
-          #else
-            return HmdEvalFullyConnectedQuantizedInt8(
+#else
+          return HmdEvalFullyConnectedQuantizedInt8(
               context, node, data_ex, input, filter, bias, output);
-          #endif
+#endif
         }
         case kTfLiteInt4: {
           return XtensaEvalFullyConnectedQuantizedInt8(
@@ -125,7 +125,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   }
   return kTfLiteOk;
 }
- 
+
 }  // namespace
 
 TFLMRegistration Register_FULLY_CONNECTED() {

@@ -20,8 +20,8 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
-#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/kernels/xtensa/mvm_helper.h"
+#include "tensorflow/lite/micro/micro_log.h"
 namespace tflite {
 struct XtensaFullyConnectedOpData {
   OpDataFullyConnected reference_op_data;
@@ -34,35 +34,24 @@ struct XtensaFullyConnectedOpData {
   uint32_t context_size;
 #endif  // VISION_P6
 };
-/*
-    typedef enum {
-        FC_OPT_NONE = 0,
-        FC_OPT_TYPE1 = 1,
-        FC_OPT_TYPE2 = 2, // input channel align 4
-        FC_OPT_TYPE3 = 3,
-        FC_OPT_TYPE4 = 4,
 
-        // hybrid using MVM MAP
-        FC_OPT_FLT_X_INT8_MVM = 8,
-    } fc_opt_type;
-    */
-  struct OpDataFullyConnectedEx {
+struct OpDataFullyConnectedEx {
   // The scaling factor from input to output (aka the 'real multiplier') can
   // be represented as a fixed point multiplier plus a left shift.
 
   OpDataFullyConnected FcOp;
 
   int buffer_idx;
-  int32_t *mapped_filter;  // aligned 4bytes, int8_t data to store pointer for
+  int32_t* mapped_filter;  // aligned 4bytes, int8_t data to store pointer for
                            // mapping W
   AScalar outputMultipler;
   AScalar outputOffset;
   uint32_t input_offset_int8;
-  int32_t *inputOffsetWithW;
-  //int32_t filter_int8_exp;
-  AScalar filter_scale; // for quantized int8 weight
-  int opt_constraint;  //
-  //int opt_constraint_float;
+  int32_t* inputOffsetWithW;
+  // int32_t filter_int8_exp;
+  AScalar filter_scale;  // for quantized int8 weight
+  int opt_constraint;    //
+  // int opt_constraint_float;
 };
 
 #if defined(HIFIMINI)
@@ -95,12 +84,12 @@ TfLiteStatus XtensaEvalFullyConnectedQuantizedInt8(
     const TfLiteEvalTensor* input, const TfLiteEvalTensor* filter,
     const TfLiteEvalTensor* bias, TfLiteEvalTensor* output);
 
-
 // Hmd
 TfLiteStatus HmdEvalFullyConnectedQuantizedInt8(
-    TfLiteContext* context, TfLiteNode* node, const OpDataFullyConnectedEx& data,
-    const TfLiteEvalTensor* input, const TfLiteEvalTensor* filter,
-    const TfLiteEvalTensor* bias, TfLiteEvalTensor* output);
+    TfLiteContext* context, TfLiteNode* node,
+    const OpDataFullyConnectedEx& data, const TfLiteEvalTensor* input,
+    const TfLiteEvalTensor* filter, const TfLiteEvalTensor* bias,
+    TfLiteEvalTensor* output);
 
 TfLiteStatus XtensaCalculateOpDataFullyConnected(
     TfLiteContext* context, TfLiteFusedActivation activation,
@@ -110,8 +99,8 @@ TfLiteStatus XtensaCalculateOpDataFullyConnected(
 TfLiteStatus XtensaPrepareFullyConnected(TfLiteContext* context,
                                          TfLiteNode* node);
 
-
-TfLiteStatus HmdPrepareFullyConnectedInt8(TfLiteContext *context, TfLiteNode *node);
+TfLiteStatus HmdPrepareFullyConnectedInt8(TfLiteContext* context,
+                                          TfLiteNode* node);
 
 }  // namespace tflite
 

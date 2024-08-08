@@ -26,13 +26,15 @@ limitations under the License.
 #ifdef IA8201
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 #endif
-#define COPY_FLT_BUF(DST, SRC, SIZE) do {\
-    float *dst = (float *) DST;\
-float* src = (float *)SRC;\
-int copy_size = SIZE;\
-for(int ii = 0; ii < copy_size;ii++) \
-{ dst[ii] = src[ii]; }\
-}while(0)
+#define COPY_FLT_BUF(DST, SRC, SIZE)         \
+  do {                                       \
+    float* dst = (float*)DST;                \
+    float* src = (float*)SRC;                \
+    int copy_size = SIZE;                    \
+    for (int ii = 0; ii < copy_size; ii++) { \
+      dst[ii] = src[ii];                     \
+    }                                        \
+  } while (0)
 namespace tflite {
 namespace testing {
 namespace {
@@ -51,7 +53,7 @@ const float simple_weights_data[] = {
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,  // u = 1
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,  // u = 2
 };
-float  simple_weights_data_flt[sizeof(simple_weights_data)/sizeof(float)] ;
+float simple_weights_data_flt[sizeof(simple_weights_data) / sizeof(float)];
 // TODO(b/258710417): INT4 isn't currently supported on Hexagon.
 #if !defined(HEXAGON) && !defined(IA8201) && !defined(IA700)
 const float simple_int4_weights_data[] = {
@@ -65,7 +67,7 @@ const float simple_golden_null_bias_int4_weights[] = {
 #endif
 int simple_bias_dims[] = {1, 3};
 const float simple_bias_data[] = {1, 2, 3};
-float simple_bias_data_flt[sizeof(simple_bias_data)/sizeof(float)];
+float simple_bias_data_flt[sizeof(simple_bias_data) / sizeof(float)];
 const float simple_golden[] = {
     24, 25, 26, 58, 59, 60,
 };
@@ -243,13 +245,16 @@ const float representative_64x16_weights_data[] = {
     -0.0906, 0.1641,  0.0962,  -0.0792, -0.0113, 0.2264,  -0.0736, 0.3170,
     0.0623,  0.0679,  0.0623,  -0.0792, -0.2207, 0.1924,  0.1245,  -0.2773};
 
-float representative_64x16_weights_data_flt[sizeof(representative_64x16_weights_data)/sizeof(float)] ;
+float representative_64x16_weights_data_flt
+    [sizeof(representative_64x16_weights_data) / sizeof(float)];
 int representative_64x16_bias_dims[] = {1, 16};
 const float representative_64x16_bias_data[] = {
     -0.0084, 0.0006,  0.0000,  0.0000,  -0.0087, -0.0006, -0.0003, -0.0003,
     0.0006,  -0.0003, -0.0003, -0.0003, -0.0253, 0.0012,  0.0000,  0.0000};
 
-float representative_64x16_bias_data_flt[sizeof(representative_64x16_bias_data) / sizeof(float)];
+float
+    representative_64x16_bias_data_flt[sizeof(representative_64x16_bias_data) /
+                                       sizeof(float)];
 
 const float representative_64x16_golden[] = {
     3.8624,  -2.9580, 4.3043,  -1.2844, -1.5769, -2.7998, -0.1011, -3.4029,
@@ -347,58 +352,62 @@ TfLiteStatus TestFullyConnectedFloatInt8(
     const float* weights_data, int* bias_dims_data, const float* bias_data,
     const float* golden, int* output_dims_data,
     TfLiteFusedActivation activation, float* output_data) {
-    TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
-    TfLiteIntArray* weights_dims = IntArrayFromInts(weights_dims_data);
-    TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
-    TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
-    const int output_dims_count = ElementCount(*output_dims);
-    bool null_bias = bias_data == nullptr ? true : false;
-    int8_t weights8_data[1024];
-    float scale;
-    convert_ieee_float_to_int8_scale(weights_data, weights8_data, &scale, ElementCount(*weights_dims));
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* weights_dims = IntArrayFromInts(weights_dims_data);
+  TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+  bool null_bias = bias_data == nullptr ? true : false;
+  int8_t weights8_data[1024];
+  float scale;
+  convert_ieee_float_to_int8_scale(weights_data, weights8_data, &scale,
+                                   ElementCount(*weights_dims));
 
-    constexpr int inputs_size = 3;
-    constexpr int outputs_size = 1;
-    constexpr int tensors_size = inputs_size + outputs_size;
-    TfLiteTensor tensors[tensors_size] = {
-        CreateTensor(input_data, input_dims),
-        CreateTensor(weights8_data, weights_dims),
-        CreateTensor(bias_data, bias_dims),
-        CreateTensor(output_data, output_dims),
-    };
-    tensors[1].params.scale = scale;
-    tensors[1].params.zero_point = 0;
-    float torlence = 1.3;
+  constexpr int inputs_size = 3;
+  constexpr int outputs_size = 1;
+  constexpr int tensors_size = inputs_size + outputs_size;
+  TfLiteTensor tensors[tensors_size] = {
+      CreateTensor(input_data, input_dims),
+      CreateTensor(weights8_data, weights_dims),
+      CreateTensor(bias_data, bias_dims),
+      CreateTensor(output_data, output_dims),
+  };
+  tensors[1].params.scale = scale;
+  tensors[1].params.zero_point = 0;
+  float torlence = 1.3;
 
-    return ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias, 
-        activation, torlence, output_dims_count, golden, output_data);
+  return ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias,
+                                       activation, torlence, output_dims_count,
+                                       golden, output_data);
 }
 TfLiteStatus TestFullyConnectedFloat16(
     int* input_dims_data, const float* input_data, int* weights_dims_data,
     const float* weights_data, int* bias_dims_data, const float* bias_data,
     const float* golden, int* output_dims_data,
     TfLiteFusedActivation activation, float* output_data) {
-    TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
-    TfLiteIntArray* weights_dims = IntArrayFromInts(weights_dims_data);
-    TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
-    TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
-    const int output_dims_count = ElementCount(*output_dims);
-    bool null_bias = bias_data == nullptr ? true : false;
-    TfLiteFloat16 weights16_data[1024];
-    convert_ieee_float_to_afloat16(weights_data, (uint16_t*)weights16_data, ElementCount(*weights_dims));
-    
-    constexpr int inputs_size = 3;
-    constexpr int outputs_size = 1;
-    constexpr int tensors_size = inputs_size + outputs_size;
-    TfLiteTensor tensors[tensors_size] = {
-        CreateTensor(input_data, input_dims),
-        CreateTensor(weights16_data, weights_dims),
-        CreateTensor(bias_data, bias_dims),
-        CreateTensor(output_data, output_dims),
-    };
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* weights_dims = IntArrayFromInts(weights_dims_data);
+  TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+  bool null_bias = bias_data == nullptr ? true : false;
+  TfLiteFloat16 weights16_data[1024];
+  convert_ieee_float_to_afloat16(weights_data, (uint16_t*)weights16_data,
+                                 ElementCount(*weights_dims));
 
-    return ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias,
-                                         activation, 1e-4f,      output_dims_count, golden, output_data);
+  constexpr int inputs_size = 3;
+  constexpr int outputs_size = 1;
+  constexpr int tensors_size = inputs_size + outputs_size;
+  TfLiteTensor tensors[tensors_size] = {
+      CreateTensor(input_data, input_dims),
+      CreateTensor(weights16_data, weights_dims),
+      CreateTensor(bias_data, bias_dims),
+      CreateTensor(output_data, output_dims),
+  };
+
+  return ValidateFullyConnectedGoldens(tensors, tensors_size, null_bias,
+                                       activation, 1e-4f, output_dims_count,
+                                       golden, output_data);
 }
 #endif
 template <typename dataT, typename weightT, typename biasT>
@@ -457,69 +466,65 @@ TF_LITE_MICRO_TESTS_BEGIN
 TF_LITE_MICRO_TEST(SimpleTest) {
   float output_data[tflite::testing::simple_output_size];
   COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
-      tflite::testing::simple_weights_data, 30
-      );
+               tflite::testing::simple_weights_data, 30);
   COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
-      tflite::testing::simple_bias_data, 3  );
+               tflite::testing::simple_bias_data, 3);
   TF_LITE_MICRO_EXPECT_EQ(
       tflite::testing::TestFullyConnectedFloat(
           tflite::testing::simple_input_dims,
           tflite::testing::simple_input_data,
           tflite::testing::simple_weights_dims,
           tflite::testing::simple_weights_data_flt,
-          tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data_flt,
-          tflite::testing::simple_golden, tflite::testing::simple_output_dims,
-          kTfLiteActNone, output_data),
+          tflite::testing::simple_bias_dims,
+          tflite::testing::simple_bias_data_flt, tflite::testing::simple_golden,
+          tflite::testing::simple_output_dims, kTfLiteActNone, output_data),
       kTfLiteOk);
 }
 
 #ifdef IA8201
 TF_LITE_MICRO_TEST(SimpleTestFloatInt8) {
-    float output_data[tflite::testing::simple_output_size];
+  float output_data[tflite::testing::simple_output_size];
 
-    COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
-        tflite::testing::simple_weights_data, 30
-    );
-    COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
-        tflite::testing::simple_bias_data, 3);
-    TF_LITE_MICRO_EXPECT_EQ(
-        tflite::testing::TestFullyConnectedFloatInt8(
-            tflite::testing::simple_input_dims,
-            tflite::testing::simple_input_data,
-            tflite::testing::simple_weights_dims,
-            tflite::testing::simple_weights_data_flt,
-            tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data_flt,
-            tflite::testing::simple_golden, tflite::testing::simple_output_dims,
-            kTfLiteActNone, output_data),
-        kTfLiteOk);
+  COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
+               tflite::testing::simple_weights_data, 30);
+  COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
+               tflite::testing::simple_bias_data, 3);
+  TF_LITE_MICRO_EXPECT_EQ(
+      tflite::testing::TestFullyConnectedFloatInt8(
+          tflite::testing::simple_input_dims,
+          tflite::testing::simple_input_data,
+          tflite::testing::simple_weights_dims,
+          tflite::testing::simple_weights_data_flt,
+          tflite::testing::simple_bias_dims,
+          tflite::testing::simple_bias_data_flt, tflite::testing::simple_golden,
+          tflite::testing::simple_output_dims, kTfLiteActNone, output_data),
+      kTfLiteOk);
 }
 
 TF_LITE_MICRO_TEST(SimpleTestFloat16) {
-    float output_data[tflite::testing::simple_output_size];
+  float output_data[tflite::testing::simple_output_size];
 
-    COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
-        tflite::testing::simple_weights_data, 30
-    );
-    COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
-        tflite::testing::simple_bias_data, 3);
-    TF_LITE_MICRO_EXPECT_EQ(
-        tflite::testing::TestFullyConnectedFloat16(
-            tflite::testing::simple_input_dims,
-            tflite::testing::simple_input_data,
-            tflite::testing::simple_weights_dims,
-            tflite::testing::simple_weights_data_flt,
-            tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data_flt,
-            tflite::testing::simple_golden, tflite::testing::simple_output_dims,
-            kTfLiteActNone, output_data),
-        kTfLiteOk);
+  COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
+               tflite::testing::simple_weights_data, 30);
+  COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
+               tflite::testing::simple_bias_data, 3);
+  TF_LITE_MICRO_EXPECT_EQ(
+      tflite::testing::TestFullyConnectedFloat16(
+          tflite::testing::simple_input_dims,
+          tflite::testing::simple_input_data,
+          tflite::testing::simple_weights_dims,
+          tflite::testing::simple_weights_data_flt,
+          tflite::testing::simple_bias_dims,
+          tflite::testing::simple_bias_data_flt, tflite::testing::simple_golden,
+          tflite::testing::simple_output_dims, kTfLiteActNone, output_data),
+      kTfLiteOk);
 }
 
 #endif
 TF_LITE_MICRO_TEST(SimpleTestNullBias) {
   float output_data[tflite::testing::simple_output_size];
 
-  
-    COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
+  COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
                tflite::testing::simple_weights_data,
                sizeof(tflite::testing::simple_weights_data) / sizeof(float));
 
@@ -549,10 +554,9 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8) {
   int8_t output_data[tflite::testing::simple_output_size];
 
   COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
-      tflite::testing::simple_weights_data, 30
-  );
+               tflite::testing::simple_weights_data, 30);
   COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
-      tflite::testing::simple_bias_data, 3);
+               tflite::testing::simple_bias_data, 3);
 
   TF_LITE_MICRO_EXPECT_EQ(
       tflite::testing::TestFullyConnectedQuantized(
@@ -616,10 +620,9 @@ TF_LITE_MICRO_TEST(SimpleTest4DInputQuantizedInt8) {
   int8_t output_data[tflite::testing::simple_output_size];
 
   COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
-      tflite::testing::simple_weights_data, 30
-  );
+               tflite::testing::simple_weights_data, 30);
   COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
-      tflite::testing::simple_bias_data, 3);
+               tflite::testing::simple_bias_data, 3);
 
   TF_LITE_MICRO_EXPECT_EQ(
       tflite::testing::TestFullyConnectedQuantized(
@@ -668,18 +671,17 @@ TF_LITE_MICRO_TEST(SimpleTest4DInput) {
 
   float output_data[tflite::testing::simple_output_size];
   COPY_FLT_BUF(tflite::testing::simple_weights_data_flt,
-      tflite::testing::simple_weights_data, 30
-  );
+               tflite::testing::simple_weights_data, 30);
   COPY_FLT_BUF(tflite::testing::simple_bias_data_flt,
-      tflite::testing::simple_bias_data, 3);
+               tflite::testing::simple_bias_data, 3);
   TF_LITE_MICRO_EXPECT_EQ(
       tflite::testing::TestFullyConnectedFloat(
           input_dims_4d, tflite::testing::simple_input_data,
           tflite::testing::simple_weights_dims,
           tflite::testing::simple_weights_data_flt,
-          tflite::testing::simple_bias_dims, tflite::testing::simple_bias_data_flt,
-          tflite::testing::simple_golden, tflite::testing::simple_output_dims,
-          kTfLiteActNone, output_data),
+          tflite::testing::simple_bias_dims,
+          tflite::testing::simple_bias_data_flt, tflite::testing::simple_golden,
+          tflite::testing::simple_output_dims, kTfLiteActNone, output_data),
       kTfLiteOk);
 }
 
@@ -687,10 +689,13 @@ TF_LITE_MICRO_TEST(Representative1x64Input1x16Output) {
   float output_data[tflite::testing::representative_64x16_output_size];
 
   COPY_FLT_BUF(tflite::testing::representative_64x16_weights_data_flt,
-      tflite::testing::representative_64x16_weights_data, sizeof(tflite::testing::representative_64x16_weights_data)/sizeof(float)
-  );
-  COPY_FLT_BUF(tflite::testing::representative_64x16_bias_data_flt,
-      tflite::testing::representative_64x16_bias_data, sizeof(tflite::testing::representative_64x16_bias_data)/sizeof(float));
+               tflite::testing::representative_64x16_weights_data,
+               sizeof(tflite::testing::representative_64x16_weights_data) /
+                   sizeof(float));
+  COPY_FLT_BUF(
+      tflite::testing::representative_64x16_bias_data_flt,
+      tflite::testing::representative_64x16_bias_data,
+      sizeof(tflite::testing::representative_64x16_bias_data) / sizeof(float));
 
   TF_LITE_MICRO_EXPECT_EQ(
       tflite::testing::TestFullyConnectedFloat(
@@ -765,7 +770,8 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedInt8NullBias) {
 }
 
 // TODO(b/258710417): INT4 isn't currently supported on Hexagon.
-#if !defined(HEXAGON) && !defined(IA8201) && !defined(IA700) // not support in 8201
+#if !defined(HEXAGON) && !defined(IA8201) && \
+    !defined(IA700)  // not support in 8201
 // This test was created by handcrafting simple_int4_weights_data, and
 // simple_golden_null_bias_int4_weights was obtained by running
 // TestFullyConnectedQuantized() with int8 quantization, and ensuring that int4

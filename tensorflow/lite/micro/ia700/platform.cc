@@ -26,11 +26,10 @@ limitations under the License.
 namespace tflite {
 // namespace dmx1a{
 
-//static uint32_t mappedCoeffFlag = 0;
-//static uint8_t mappedOps[256] = {0};
-//static unsigned int mappedOpsCount = 0;
-int  check_kn_tflite_model(const char *description, TfLiteContext *ctx)
-{
+// static uint32_t mappedCoeffFlag = 0;
+// static uint8_t mappedOps[256] = {0};
+// static unsigned int mappedOpsCount = 0;
+int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
   //    printf("description: [%s]\n",model_description);
   if (!strncmp(description, KN_TFL_MODEL_NAME,
                KN_TFL_MODEL_LEN)) {  // TODO: get which operator index is mapped
@@ -47,9 +46,10 @@ int  check_kn_tflite_model(const char *description, TfLiteContext *ctx)
     // printf("current_aech_ptr: %s\n",current_arch_ptr);
     if (!strncmp(current_arch_ptr, KN_TFL_MODEL_ARCH_NAME,
                  KN_TFL_MODEL_ARCH_LEN) ||
-        !strncmp(current_arch_ptr, KN_TFL_MODEL_ARCH_NAME2,
-                 KN_TFL_MODEL_ARCH_LEN) // backword compatible hmd model if true 
-             )
+        !strncmp(
+            current_arch_ptr, KN_TFL_MODEL_ARCH_NAME2,
+            KN_TFL_MODEL_ARCH_LEN)  // backword compatible hmd model if true
+    )
 
     {
       pMappedOps = (uint8_t *)current_arch_ptr + opsLength - 1 -
@@ -67,7 +67,7 @@ int  check_kn_tflite_model(const char *description, TfLiteContext *ctx)
 #ifdef KN_DEBUG
           printf("Mapped[%d] = %d\n", idx, opNumber);
 #endif
-             ctx->mappedOps[idx++] = opNumber;
+          ctx->mappedOps[idx++] = opNumber;
           dec = 0;
           opNumber = 0;
           continue;
@@ -80,39 +80,33 @@ int  check_kn_tflite_model(const char *description, TfLiteContext *ctx)
         dec++;
       }
     }
-        ctx->mappedOpsCount = idx;
+    ctx->mappedOpsCount = idx;
     return 0;
   } else {
-		// reset mopedOps to zero
-		memset(ctx->mappedOps, 0, sizeof(ctx->mappedOps));
+    // reset mopedOps to zero
+    memset(ctx->mappedOps, 0, sizeof(ctx->mappedOps));
     return -1;
   }
 }
 
 // before prepare
-bool is_current_ops_coeffs_mapped(int opIdx, TfLiteContext *ctx)
-{
-    bool result = false;
-    
-    ctx->mappedCoeffFlag = false;
-    for(unsigned int ii =0; ii < ctx->mappedOpsCount; ii++)
-        {
-            if(opIdx == ctx->mappedOps[ii])
-                {
-                    result = true;
-                     #ifdef KN_DEBUG
-                    printf("MAPPED COEFFS %d, opIdx: %d\n", ii, opIdx);
-                     #endif
-                    ctx->mappedCoeffFlag = true;
-                    break;
-                }
-        }
-    return result;
+bool is_current_ops_coeffs_mapped(int opIdx, TfLiteContext *ctx) {
+  bool result = false;
+
+  ctx->mappedCoeffFlag = false;
+  for (unsigned int ii = 0; ii < ctx->mappedOpsCount; ii++) {
+    if (opIdx == ctx->mappedOps[ii]) {
+      result = true;
+#ifdef KN_DEBUG
+      printf("MAPPED COEFFS %d, opIdx: %d\n", ii, opIdx);
+#endif
+      ctx->mappedCoeffFlag = true;
+      break;
+    }
+  }
+  return result;
 }
 
-bool is_coeffs_mapped(TfLiteContext *ctx)
-{
-    return (ctx->mappedCoeffFlag);
-}
+bool is_coeffs_mapped(TfLiteContext *ctx) { return (ctx->mappedCoeffFlag); }
 
 }  // namespace tflite

@@ -305,7 +305,7 @@ GENDIR := $(BASE_GENDIR)/$(TARGET_ARCH)_$(BT)/
 CORE_OBJDIR := $(GENDIR)obj/core/
 KERNEL_OBJDIR := $(GENDIR)obj/kernels/
 THIRD_PARTY_KERNEL_OBJDIR := $(GENDIR)obj/3rdk/
-THIRD_PARTY_OBJDIR := $(GENDIR)obj/3dr/
+THIRD_PARTY_OBJDIR := $(GENDIR)obj/3rd/
 GENERATED_SRCS_DIR := $(GENDIR)genfiles/
 BINDIR := $(GENDIR)bin/
 LIBDIR := $(GENDIR)lib/
@@ -907,8 +907,8 @@ TARGET_SRC_DIR := $(TENSORFLOW_ROOT)/signal/src/
 SIGNAL_HACK_OBJS := $(addprefix $(TARGET_OBJ_SIG_DIR), energy.o filter_bank.o filter_bank_spectral_subtraction.o filter_bank_square_root.o window.o filter_bank_log.o)
 
 #TARGET_OBJS += $(SIGNAL_HACK_OBJS)
-$(info TARGET_OBJS : $(TARGET_OBJS) $(HOST_OS))
-$(info signal objs: $(SIGNAL_HACK_OBJS))
+#$(info TARGET_OBJS : $(TARGET_OBJS) $(HOST_OS))
+#$(info signal objs: $(SIGNAL_HACK_OBJS))
 BUILD_HK_OBJS := $(findstring $(TARGET_OBJS), $(MICROLITE_KERNEL_OBJS))
 ifeq ($(HOST_OS), linux)
 TARGET_TFLIB := /mnt/d/project/IA8201_SDK/Chelsea_SDK_7.0.0_TONLY/Knowles_IA8201_SDK/Rome/Src/Packages/HotWordTFLM/External/AndroidV/libraries/release/v4/libtensorflow-microlite-v4.1.a
@@ -916,8 +916,8 @@ TARGET_TFLIB := /mnt/d/project/IA8201_SDK/Chelsea_SDK_7.0.0_TONLY/Knowles_IA8201
 else
 TARGET_TFLIB := d:/project/IA8201_SDK/Chelsea_SDK_7.0.0_TONLY/Knowles_IA8201_SDK/Rome/Src/Packages/HotWordTFLM/External/CLIB_True/libtensorflow-microlite_KERNELs.a
 endif
-$(info hk $(BUILD_HK_OBJS))
-$(info target lib $(TARGET_TFLIB))
+#$(info hk $(BUILD_HK_OBJS))
+#$(info target lib $(TARGET_TFLIB))
 $(TARGET_OBJS): $(TARGET_TFLIB)   $(MICROLITE_LIB_PATH)
 	@echo archieve  $< $@
 	$(AR) d $< $(notdir $@) && \

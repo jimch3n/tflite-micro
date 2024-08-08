@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
 
-#define ENABLE_DILATION_OPT // enable dialtion optimization 
+#define ENABLE_DILATION_OPT  // enable dialtion optimization
 #include "tensorflow/lite/micro/ia8201/config.h"
 //#include "AVL.h"
 #ifndef REMOVE_REFOP_SUPPORT
@@ -31,10 +31,9 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
 #include "tensorflow/lite/micro/kernels/conv.h"
-
+#include "tensorflow/lite/micro/kernels/ia8201/conv.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/ia8201/conv.h"
 #include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
 namespace tflite {
 namespace {
@@ -42,11 +41,10 @@ namespace {
 // Conv is quantized along dimension 0:
 // https://www.tensorflow.org/lite/performance/quantization_spec
 
-
 #if defined(DMX1A_CONV_OPT)
-int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const float *bias,
-                    int m, int n, const AScalar &act_min,
-                    const AScalar &act_max) {
+int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A,
+                      const float *bias, int m, int n, const AScalar &act_min,
+                      const AScalar &act_max) {
   int loopGroupLim = (m >> 2);
   int loopBlockLim2 = (n >> 2);
   //  int jammingBit = RUR_JammingBit();
@@ -88,8 +86,8 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
       vr128 VR_blk = vseta_vr(0, 0, 0);
       vr128 VR_out0 = VR_blk;
       vr128 VR_out1 = VR_blk;
-      //vr128 VR_out2 = VR_blk;
-      //vr128 VR_out3 = VR_blk;
+      // vr128 VR_out2 = VR_blk;
+      // vr128 VR_out3 = VR_blk;
       vr128 VR_bias;
       vr128 VR_actOut = VR_blk;
 
@@ -100,8 +98,8 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
 
       VR_out0 = vadds(VR_out0, VR_out0, 0xf0);
       VR_out1 = vadds(VR_out1, VR_out1, 0xf0);
-     // VR_out2 = vadds(VR_out2, VR_out2, 0xf0);
-     // VR_out3 = vexp_adji(VR_out1, 0);
+      // VR_out2 = vadds(VR_out2, VR_out2, 0xf0);
+      // VR_out3 = vexp_adji(VR_out1, 0);
       float *pIn0 = (float *)x;
       if (loopBlockLim2 > 0) {
         // register vr128 VR_act;
@@ -114,67 +112,89 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
         convert_IEEE_float_to_32F_x4(VR_blk);
         load_16x4_vr_a(VR_w0, UR_w0, pWa0);
         // convert IEEE to afloat
-        convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
+        convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                              TF_FLT16_BIAS);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
         for (ii = 0; ii < loopBlockLim2 - 1; ii++)  // group
         {
           // KN_PRINT_VR128(VR_blk);  KN_PRINT_VR128(VR_w0);
           affine_adj_L(VR_out0, VR_w0, VR_blk, 0, 0);
           //    KN_PRINT_VR128(VR_out0);
-          load_16x4_vr_a(VR_w0, UR_w1, pWa1); convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-          //convert_IEEE_float_to_32F_x4(VR_w0);
+          load_16x4_vr_a(VR_w0, UR_w1, pWa1);
+          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS);
+          // convert_IEEE_float_to_32F_x4(VR_w0);
           affine_adj_H(VR_out0, VR_w0, VR_blk, 0, 0);
           load_16x4_vr_a(VR_w0, UR_w2, pWa2);
-          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-      
+          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS);
+
           affine_adj_L(VR_out1, VR_w0, VR_blk, 0, 0);
           load_16x4_vr_a(VR_w0, UR_w3, pWa3);
-          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS);
           affine_adj_H(VR_out1, VR_w0, VR_blk, 0, 0);
-         
+
           load_32x4_vr_a(VR_blk, UR_blk, pIn0);  // next for block
-          //convert_IEEE_float_to_32F_x4(VR_w0);
+          // convert_IEEE_float_to_32F_x4(VR_w0);
           convert_IEEE_float_to_32F_x4(VR_blk);
           load_16x4_vr_a(VR_w0, UR_w0, pWa0);
-          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+          convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS);
         }
         // KN_PRINT_VR128(VR_blk);  KN_PRINT_VR128(VR_w0);
-        affine_adj_L(VR_out0,  VR_w0, VR_blk, 0, 0);
+        affine_adj_L(VR_out0, VR_w0, VR_blk, 0, 0);
         //   KN_PRINT_VR128(VR_out0);
-        load_16x4_vr_a(VR_w0, UR_w1, pWa1);convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
-        affine_adj_H(VR_out0,  VR_w0, VR_blk, 0, 0);
-        load_16x4_vr_a(VR_w0, UR_w2, pWa2);convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
-        affine_adj_L(VR_out1,  VR_w0, VR_blk, 0, 0);
-        load_16x4_vr_a(VR_w0, UR_w3, pWa3);convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
-        affine_adj_H(VR_out1,  VR_w0, VR_blk, 0, 0);
+        load_16x4_vr_a(VR_w0, UR_w1, pWa1);
+        convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                              TF_FLT16_BIAS);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
+        affine_adj_H(VR_out0, VR_w0, VR_blk, 0, 0);
+        load_16x4_vr_a(VR_w0, UR_w2, pWa2);
+        convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                              TF_FLT16_BIAS);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
+        affine_adj_L(VR_out1, VR_w0, VR_blk, 0, 0);
+        load_16x4_vr_a(VR_w0, UR_w3, pWa3);
+        convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                              TF_FLT16_BIAS);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
+        affine_adj_H(VR_out1, VR_w0, VR_blk, 0, 0);
       }
 
       if (n & 3) {
-        load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
+        load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);
+        convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS,
+                              VRQ0);
         load32x1_vr_postI(VR_blk, pIn0, INC1, VRQ0);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
         convert_IEEE_float_to_32F_x4(VR_blk);
         for (ii = loopBlockLim2 << 2; ii < n; ii++) {
           fmacs(VR_out0, VRQ0, VR_w0, VRQ0, VR_blk, VRQ0, 0);
-          load16x1_vr_postI(VR_w0, pWa1, INC1, VRQ0);convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
-          //convert_IEEE_float_to_32F_x4(VR_w0);
+          load16x1_vr_postI(VR_w0, pWa1, INC1, VRQ0);
+          convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS, VRQ0);
+          // convert_IEEE_float_to_32F_x4(VR_w0);
           fmacs(VR_out0, VRQ2, VR_w0, VRQ0, VR_blk, VRQ0, 0);
 
-          load16x1_vr_postI(VR_w0, pWa2, INC1, VRQ0); convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
-          //convert_IEEE_float_to_32F_x4(VR_w0);
+          load16x1_vr_postI(VR_w0, pWa2, INC1, VRQ0);
+          convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS, VRQ0);
+          // convert_IEEE_float_to_32F_x4(VR_w0);
           fmacs(VR_out1, VRQ0, VR_w0, VRQ0, VR_blk, VRQ0, 0);
 
-          load16x1_vr_postI(VR_w0, pWa3, INC1, VRQ0); convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
-          //convert_IEEE_float_to_32F_x4(VR_w0);
+          load16x1_vr_postI(VR_w0, pWa3, INC1, VRQ0);
+          convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS, VRQ0);
+          // convert_IEEE_float_to_32F_x4(VR_w0);
           fmacs(VR_out1, VRQ2, VR_w0, VRQ0, VR_blk, VRQ0, 0);
 
           load32x1_vr_postI(VR_blk, pIn0, INC1, VRQ0);
-          load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
+          load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);
+          convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                                TF_FLT16_BIAS, VRQ0);
           convert_IEEE_float_to_32F_x4(VR_blk);
-          //convert_IEEE_float_to_32F_x4(VR_w0);
+          // convert_IEEE_float_to_32F_x4(VR_w0);
         }
       }
       // KN_PRINT_VR128(VR_out0);
@@ -187,7 +207,7 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
       //  } else {
       //    VR_bias = vseta_vr(kConstTable_Zero, 0, 0);
       //  }
-      //convert_IEEE_float_to_32F_x4(VR_bias);
+      // convert_IEEE_float_to_32F_x4(VR_bias);
       //      KN_PRINT_VR128(VR_bias);
       VR_actOut = vadds(VR_actOut, VR_bias, 0);
 
@@ -221,41 +241,48 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
 
       UR_blk = align_32x4_load(pIn0);
       load_32x4_vr_a(VR_blk, UR_blk, pIn0);
-      load_16x4_vr_a(VR_w0, UR_w0, pWa0); convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+      load_16x4_vr_a(VR_w0, UR_w0, pWa0);
+      convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
       convert_IEEE_float_to_32F_x4(VR_blk);
-      //convert_IEEE_float_to_32F_x4(VR_w0);
+      // convert_IEEE_float_to_32F_x4(VR_w0);
 
       for (ii = 0; ii < loopBlockLim2 - 1; ii++)  // group
       {
         affine_adj_L(VR_out0, VR_w0, VR_blk, 0, 0);
-        load_16x4_vr_a(VR_w0, UR_w0, pWa0); convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+        load_16x4_vr_a(VR_w0, UR_w0, pWa0);
+        convert_16F_to_32F_x4(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP,
+                              TF_FLT16_BIAS);
         load_32x4_vr_a(VR_blk, UR_blk, pIn0);  // next for block
         convert_IEEE_float_to_32F_x4(VR_blk);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
       }
 
       affine_adj_L(VR_out0, VR_w0, VR_blk, 0, 0);
     }
 
     if (n & 3) {
-      load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
+      load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);
+      convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS,
+                            VRQ0);
       //  VR_blk = vpermsi(VR_blk, VR_blk, 0, SHR_BY_1_ELEM);
       load32x1_vr_postI(VR_blk, pIn0, INC1, VRQ0);
 
       convert_IEEE_float_to_32F_x4(VR_blk);
-      //convert_IEEE_float_to_32F_x4(VR_w0);
+      // convert_IEEE_float_to_32F_x4(VR_w0);
 
       for (ii = loopBlockLim2 << 2; ii < n; ii++) {
         fmacs(VR_out0, VRQ0, VR_w0, VRQ0, VR_blk, VRQ0, 0);
 
         load32x1_vr_postI(VR_blk, pIn0, INC1, VRQ0);
-        load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, VRQ0);
+        load16x1_vr_postI(VR_w0, pWa0, INC1, VRQ0);
+        convert_16F_to_32F_x1(VR_w0, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS,
+                              VRQ0);
         convert_IEEE_float_to_32F_x4(VR_blk);
-        //convert_IEEE_float_to_32F_x4(VR_w0);
+        // convert_IEEE_float_to_32F_x4(VR_w0);
       }
     }
     dsums_L(VR_actOut, VR_out0, 0, 0);
-    //fadds(VR_actOut, VRQ0, VR_out0, VRQ1, VR_out0, VRQ0, 0);
+    // fadds(VR_actOut, VRQ0, VR_out0, VRQ1, VR_out0, VRQ0, 0);
     // VR_exp = afloat_exp_extract(VR_actOut);
     // fmax(VR_maxExp, VRQ0, VR_maxExp, VRQ0, VR_exp, VRQ0);
     // if (pBiasLocal) {
@@ -263,7 +290,7 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
     //  } else {
     //   VR_bias = vseta_vr(kConstTable_Zero, 0, 0);
     //  }
-    //convert_IEEE_float_to_32F_x4(VR_bias);
+    // convert_IEEE_float_to_32F_x4(VR_bias);
     VR_actOut = vadds(VR_actOut, VR_bias, 0);
     VR_actOut = vmax(VR_actOut, VR_act_min);
     VR_actOut = vmin(VR_actOut, VR_act_max);
@@ -281,14 +308,8 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A, const fl
 // = input*filter+ input_offset*filter
 //
 
-
-
 #endif
 
-
-
-
 }  // namespace
-
 
 }  // namespace tflite

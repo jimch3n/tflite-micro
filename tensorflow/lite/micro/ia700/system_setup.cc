@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/lite/micro/system_setup.h"
+
 #include "tensorflow/lite/micro/ia8201/debug_log_callback.h"
 namespace tflite {
 
@@ -21,11 +22,10 @@ namespace tflite {
 // implementation file, and place it in a subfolder named after the target. See
 // tensorflow/lite/micro/debug_log.cc for a similar example.
 void InitializeTarget() {
-// Register debuglog callback
+  // Register debuglog callback
 
-    RegisterDebugLogCallback(debug_log_printf, 0);
-// ?? change RomeLogPrintF?
-
+  RegisterDebugLogCallback(debug_log_printf, 0);
+  // ?? change RomeLogPrintF?
 }
 
 }  // namespace tflite

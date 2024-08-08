@@ -46,7 +46,7 @@ struct TFLMSignalFilterBankParams {
   tflm_signal::FilterbankConfig config;
 #else
   FilterbankConfig config;
-  #endif
+#endif
   uint64_t* work_area;
 };
 

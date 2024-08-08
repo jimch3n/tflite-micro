@@ -1,5 +1,5 @@
-#include <cstdlib> 
-#include <new> 
+#include <cstdlib>
+#include <new>
 /* Copyright 2020 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,17 +18,17 @@ limitations under the License.
 #define TENSORFLOW_LITE_DMX_NEW_H_
 
 void *kn_malloc(size_t size);
-void operator delete(void *p,  std::nothrow_t) noexcept ;
-void* operator new[](size_t size, std::nothrow_t) noexcept ;
-void operator delete[](void *p,  std::nothrow_t) noexcept ;
+void operator delete(void *p, std::nothrow_t) noexcept;
+void *operator new[](size_t size, std::nothrow_t) noexcept;
+void operator delete[](void *p, std::nothrow_t) noexcept;
 
-void* operator new(size_t size) noexcept ;
-void* operator new(size_t size) ;
+void *operator new(size_t size) noexcept;
+void *operator new(size_t size);
 
-void operator delete(void *p) noexcept ;
+void operator delete(void *p) noexcept;
 
-void* operator new[](size_t size) noexcept ;
+void *operator new[](size_t size) noexcept;
 
-void operator delete[](void *p) noexcept ;
+void operator delete[](void *p) noexcept;
 
 #endif

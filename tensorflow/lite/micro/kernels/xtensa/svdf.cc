@@ -13,11 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
- 
-#define USE_HIFI_TIME_DOT // hybrid mode, fixed point processing 16x16
-#define UNALIGNED_OPERATOR // support that operator's weight cannot convert to aligned mode
+
+#define USE_HIFI_TIME_DOT   // hybrid mode, fixed point processing 16x16
+#define UNALIGNED_OPERATOR  // support that operator's weight cannot convert to
+                            // aligned mode
 #include "tensorflow/lite/micro/kernels/svdf.h"
-   
+
 #include <cmath>
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -32,9 +33,8 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa.h"
 #include "tensorflow/lite/micro/kernels/xtensa/xtensa_svdf.h"
 #include "tensorflow/lite/micro/micro_log.h"
-
 #include "tensorflow/lite/micro/micro_utils.h"
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/kernels/xtensa/mvm_helper.h"
 //#include "UtilsBasicLib.h"
 
 // for hifi
@@ -46,7 +46,6 @@ namespace tflite {
 namespace {
 
 struct OpData {
-
   OpDataSvdf SvdfOp;
 
   int32_t* map_weight_feat;
@@ -59,7 +58,7 @@ struct OpData {
   int32_t* pScratch;
   int32_t* pScratchOutput;
   uint32_t input_offset_int8;
-  int32_t *inputOffsetWithW;
+  int32_t* inputOffsetWithW;
   // int32_t input_offset_int8_neg;
 };
 #if defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
@@ -94,7 +93,6 @@ TfLiteStatus EvalIntegerSvdfHifi(TfLiteContext* context, TfLiteNode* node,
 #else
   xa_nn_memmove_16(state_ptr, state_ptr + 1, (num_bytes >> 1));
 #endif  // defined(HIFI5)
-   KN_PRINTD(num_bytes);
 
   // Note: no need to clear the latest activation, matmul is not accumulative.
 
@@ -103,10 +101,7 @@ TfLiteStatus EvalIntegerSvdfHifi(TfLiteContext* context, TfLiteNode* node,
   const int8_t* weight_feature =
       tflite::micro::GetTensorData<int8_t>(weights_feature_tensor);
   int16_t* result_in_batch = state_ptr + (n_memory - 1);
-KN_PRINTD(n_batch);KN_PRINTD(n_filter);KN_PRINTD(n_input);
-KN_PRINT_Q7_SIZE(weight_feature, n_input*n_filter);
-KN_PRINT_Q7_SIZE(input,n_input);
-KN_PRINTX(data.effective_scale_1_a);KN_PRINTX(data.effective_scale_1_b);
+
   for (int b = 0; b < n_batch; b++) {
     TF_LITE_ENSURE_EQ(context,
                       xa_nn_matXvec_out_stride_sym8sxasym8s_16(
@@ -116,11 +111,7 @@ KN_PRINTX(data.effective_scale_1_a);KN_PRINTX(data.effective_scale_1_b);
                           (data.effective_scale_1_a), data.effective_scale_1_b),
                       0);
   }
-  KN_PRINT_Q15_SIZE(  tflite::micro::GetTensorData<int16_t>(activation_state_tensor),
-  ElementCount(*activation_state_tensor->dims));
-         KN_PRINTD(n_batch);
-         KN_PRINTD( n_memory);
-         KN_PRINTD( n_rank);
+
   // Time weights dot product + activation
   for (int b = 0; b < n_batch; ++b) {
     const int16_t* vector1_ptr =
@@ -135,12 +126,6 @@ KN_PRINTX(data.effective_scale_1_a);KN_PRINTX(data.effective_scale_1_b);
         tflite::micro::GetTensorData<int8_t>(output_tensor) + b * n_unit;
 
     // TODO(#1751): account for optional bias tensor
-    KN_PRINT_Q15_SIZE(vector1_ptr,n_unit );
-        KN_PRINT_Q15_SIZE(vector2_ptr,n_unit );
-
-        KN_PRINT_Q31_SIZE(bias_ptr,n_unit );
-         KN_PRINTD( n_memory * n_rank);
-
     TF_LITE_ENSURE_EQ(
         context,
         xa_nn_dot_prod_16x16_asym8s(
@@ -148,13 +133,11 @@ KN_PRINTX(data.effective_scale_1_a);KN_PRINTX(data.effective_scale_1_b);
             (data.effective_scale_2_a), data.effective_scale_2_b,
             data.output_zero_point, n_unit),
         0);
-
-        KN_PRINT_Q7_SIZE(output_ptr,n_unit );
   }
   return kTfLiteOk;
 }
 #endif
-#endif  //defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
+#endif  // defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
 #ifndef USE_HMD_MVM_OPT
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context != nullptr);
@@ -361,17 +344,17 @@ TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
                                  weights_time, bias, params, activation_state,
                                  output, data);
 #elif defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
-   TfLiteStatus status = EvalIntegerSvdfHifi(context, node, input, weights_feature,
-                             weights_time, bias, params, activation_state,
-                             output, data);
-  
-    KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
-    return status;
+  TfLiteStatus status =
+      EvalIntegerSvdfHifi(context, node, input, weights_feature, weights_time,
+                          bias, params, activation_state, output, data);
+
+  KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
+  return status;
 #else
   EvalInt16SvdfReference(context, node, input, weights_feature, weights_time,
                          bias, params, activation_state, output, data);
 
-  //KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
+  // KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
   return kTfLiteOk;
 #endif  // defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
 }
@@ -406,12 +389,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           data.scratch_tensor_index, activation_state, output);
       break;
     }
- 
+
     case kTfLiteInt8: {
       switch (weights_time->type) {
         case kTfLiteInt16: {
           return EvalInt8(context, node);
-
         }
 
         case kTfLiteInt8: {
@@ -440,7 +422,6 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 #else
-
 
 TfLiteStatus PrepareHmdInt8(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->builtin_data != nullptr);
@@ -574,40 +555,38 @@ TfLiteStatus PrepareHmdInt8(TfLiteContext* context, TfLiteNode* node) {
     KN_PRINTD(num_units);
     KN_PRINTD(rank);
     KN_PRINTD(input_size);
-    KN_PRINTD(num_filters); 
+    KN_PRINTD(num_filters);
     TF_LITE_ENSURE_OK(context, scratch_output_status);
 
-    
-#if 0 //!(defined(DMX1A_SVDF_OPT) || defined(HMD1A_SVDF_OPT))
+#if 0  //!(defined(DMX1A_SVDF_OPT) || defined(HMD1A_SVDF_OPT))
     data_ex->opt_constraint = 0;
     // check able to optimized  input as multiple of 8 ~ 64
     //   int input_length = input->dims->data[0];
 #else
     data_ex->opt_constraint =
-    input->type == kTfLiteInt8 && weights_time->type == kTfLiteInt16 ;//  weight time ttype must 16 only
+        input->type == kTfLiteInt8 &&
+        weights_time->type == kTfLiteInt16;  //  weight time ttype must 16 only
 
 #ifdef UNALIGNED_OPERATOR
-  if((num_filters & ((1<<LOG2_ROWS_PER_GROUP)-1))!= 0 || 
-     (input_size & ((1<<LOG2_COLS_PER_BLOCK)-1))!= 0)
-     {
-      
-  KN_PRINTD(num_filters);
-  KN_PRINTD(input_size);
-        use_internal_persist_weight = true;
-     }
+    if ((num_filters & ((1 << LOG2_ROWS_PER_GROUP) - 1)) != 0 ||
+        (input_size & ((1 << LOG2_COLS_PER_BLOCK) - 1)) != 0) {
+      KN_PRINTD(num_filters);
+      KN_PRINTD(input_size);
+      use_internal_persist_weight = true;
+    }
 
 #endif
 
     KN_PRINTD(use_internal_persist_weight);
- //if(data_ex->opt_constraint)
+    // if(data_ex->opt_constraint)
     {
-      //data_ex->opt_constraint;
- 
+      // data_ex->opt_constraint;
+
       if (data_ex->opt_constraint) {
         int32_t* p_dmx1a_fc_mapped_filter = nullptr;
 
-        const TfLiteEvalTensor* filterEval =
-            tflite::micro::GetEvalInput(context, node, kSvdfWeightsFeatureTensor);
+        const TfLiteEvalTensor* filterEval = tflite::micro::GetEvalInput(
+            context, node, kSvdfWeightsFeatureTensor);
         const int8_t* filter_input =
             tflite::micro::GetTensorData<int8_t>(filterEval);
         const int32_t map_coeff_size = tflite::FullyConnectedMap8bitCoeffs(
@@ -632,51 +611,54 @@ TfLiteStatus PrepareHmdInt8(TfLiteContext* context, TfLiteNode* node) {
           KN_PRINT_Q7_SIZE_ATMOST(p_dmx1a_fc_mapped_filter, map_coeff_size, 64);
         } else {
           p_dmx1a_fc_mapped_filter = (int32_t*)filter_input;  // remapping
-           KN_PRINT_Q7_SIZE_ATMOST( p_dmx1a_fc_mapped_filter,map_coeff_size, 64);
+          KN_PRINT_Q7_SIZE_ATMOST(p_dmx1a_fc_mapped_filter, map_coeff_size, 64);
         }
-          //KN_PRINTX(data->activation_state_zero_point);
+        // KN_PRINTX(data->activation_state_zero_point);
         data_ex->map_weight_feat = (int32_t*)p_dmx1a_fc_mapped_filter;
         // const TfLiteEvalTensor* biasEval =
-        // tflite::micro::GetEvalInput(context, node, kSvdfBiasTensor); 	const int32_t
+        // tflite::micro::GetEvalInput(context, node, kSvdfBiasTensor);
+        // const int32_t
         //*bias_input =  tflite::micro::GetTensorData<int32_t>(biasEval);
         //
         // tflite::ConvertQ31ToAfloat(bias_input,(AScalar*) bias_input, , 17);
-        tflite::ConvertQ31ToAfloat(data->effective_scale_1_a, data_ex->scaleFeat,
+        tflite::ConvertQ31ToAfloat(data->effective_scale_1_a,
+                                   data_ex->scaleFeat,
                                    data->effective_scale_1_b);
         tflite::ConvertQ31ToAfloat(data->effective_scale_2_a, data_ex->scaleAct,
                                    data->effective_scale_2_b + 16);
-        KN_PRINTAFLT( data_ex->scaleFeat);
-        KN_PRINTAFLT( data_ex->scaleAct);
+        KN_PRINTAFLT(data_ex->scaleFeat);
+        KN_PRINTAFLT(data_ex->scaleAct);
         uint8_t offsetInput = -(data->input_zero_point & 0xff);
         KN_PRINTD(data->input_zero_point);
         // uint32_t offsetVR=offsetInput;
         data_ex->input_offset_int8 = (offsetInput << 24) | (offsetInput << 16) |
-                                  (offsetInput << 8) | offsetInput;
+                                     (offsetInput << 8) | offsetInput;
         //			offsetInput = ( data->input_zero_point&0xff);
         //				data->input_offset_int8_neg =
         //(offsetInput<<24)|(offsetInput<<16)|(offsetInput<<8)|offsetInput;
         KN_PRINTX(data_ex->input_offset_int8);
-        tflite::ConvertQ31ToAfloat(data->output_zero_point, data_ex->outputOffset,
-                                   17);
+        tflite::ConvertQ31ToAfloat(data->output_zero_point,
+                                   data_ex->outputOffset, 17);
         KN_PRINTAFLT(data_ex->outputOffset);
 
-     if (data_ex->input_offset_int8 == 0x80808080 ||
-        data_ex->input_offset_int8 == 0x0) {
-      data_ex->opt_constraint = 2;  // faster without input offset
-      data_ex->inputOffsetWithW = nullptr;
+        if (data_ex->input_offset_int8 == 0x80808080 ||
+            data_ex->input_offset_int8 == 0x0) {
+          data_ex->opt_constraint = 2;  // faster without input offset
+          data_ex->inputOffsetWithW = nullptr;
 
-    } else {
-      int inFCMA8 = (((num_filters + 7) >> 3) << 3);
-      int32_t *inputOffsetWithW = (int32_t *)context->AllocatePersistentBuffer(
-          context, inFCMA8 * sizeof(int32_t));
-      data_ex->inputOffsetWithW = inputOffsetWithW;
-   // KN_PRINTD( inFCMA8);
-      MVMInputOffsetPrepare(data_ex->map_weight_feat, inputOffsetWithW,
-                            num_filters, input_size,
-                            data_ex->input_offset_int8);
-      //KN_PRINT_Q31_SIZE(data_ex->inputOffsetWithW, inFCMA8);
-    }
-      KN_PRINTD( data_ex->opt_constraint);
+        } else {
+          int inFCMA8 = (((num_filters + 7) >> 3) << 3);
+          int32_t* inputOffsetWithW =
+              (int32_t*)context->AllocatePersistentBuffer(
+                  context, inFCMA8 * sizeof(int32_t));
+          data_ex->inputOffsetWithW = inputOffsetWithW;
+          // KN_PRINTD( inFCMA8);
+          MVMInputOffsetPrepare(data_ex->map_weight_feat, inputOffsetWithW,
+                                num_filters, input_size,
+                                data_ex->input_offset_int8);
+          // KN_PRINT_Q31_SIZE(data_ex->inputOffsetWithW, inFCMA8);
+        }
+        KN_PRINTD(data_ex->opt_constraint);
       }
     }
 #endif
@@ -734,21 +716,19 @@ TfLiteStatus PrepareHmd(TfLiteContext* context, TfLiteNode* node) {
 
 int SVDFFeatMatInt8InputOffset(int32_t* x, const int32_t* A,
 
-                               int32_t *inputOffsetWithW, int16_t* output, int n_filter,
-                               int n_input, int n_memory,
-                              // const AScalar& outMultiplerFr32,
-                                int signs,
-                                int b_shift,
-                                int32_t out_multiplier, int out_shift
-                                ) 
-{
+                               int32_t* inputOffsetWithW, int16_t* output,
+                               int n_filter, int n_input, int n_memory,
+                               // const AScalar& outMultiplerFr32,
+                               int signs, int b_shift, int32_t out_multiplier,
+                               int out_shift) {
   int16_t* pY = (int16_t*)output;  // act
   int m = n_filter;
   int n = n_input;
   const int32_t* pA = A;
   const int32_t* pX;
   // const int32_t *pB = (  const int32_t *)bias;
-  //int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2), 31-
+  // int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2),
+  // 31-
   // const int bias_exp = 17;
   // const int output_offset_exp = 17;
   int nBlockAligned2 = ((n + 1) >> 1);
@@ -756,19 +736,17 @@ int SVDFFeatMatInt8InputOffset(int32_t* x, const int32_t* A,
   int loopLimRow = ((m + 3) >> 2);         // group 4 alignment
   int processLastLoop = ((m & 3) != 0);
 
-  int out_stride_by_2 = n_memory <<1;
+  int out_stride_by_2 = n_memory << 1;
   // FIX for input size pointer is not align 4 bytes  and  loopLimCol != 0
   // prevent using load_32x2_vr_a unalign,
-  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration 
-  if (((unsigned int)x & 3) != 0 && loopLimCol != 0)
-  {
-      loopLimCol = 0;
+  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration
+  if (((unsigned int)x & 3) != 0 && loopLimCol != 0) {
+    loopLimCol = 0;
   }
 
-  if (((unsigned int)x & 1) != 0)
-  {
+  if (((unsigned int)x & 1) != 0) {
     KN_PRINTS("ERROR!\n");
-      return -1;
+    return -1;
   }
 
   vr64 VR_A;
@@ -776,17 +754,16 @@ int SVDFFeatMatInt8InputOffset(int32_t* x, const int32_t* A,
   vr64 VR_y;
 
   atbool signSpec = (atbool)signs;
-  
+
   int left_shift, right_shift;
-  left_shift = out_shift<0?0:out_shift;
-  right_shift = out_shift>0?0:-out_shift;
-  const int32_t *inputOffsetW = inputOffsetWithW;
+  left_shift = out_shift < 0 ? 0 : out_shift;
+  right_shift = out_shift > 0 ? 0 : -out_shift;
+  const int32_t* inputOffsetW = inputOffsetWithW;
 
-
-   KN_PRINTD(loopLimRow);KN_PRINTD(loopLimCol);
+  KN_PRINTD(loopLimRow);
+  KN_PRINTD(loopLimCol);
 
   for (int i = 0; i < loopLimRow; i++) {
-
     if (inputOffsetWithW) {
       load32x2_vr_postI(VR_y, inputOffsetW, INC1);
       load32x2_vr_postI(VR_x, inputOffsetW, INC1);
@@ -795,26 +772,26 @@ int SVDFFeatMatInt8InputOffset(int32_t* x, const int32_t* A,
       VR_y = vseta_vr(0, 0);
       mov_AccExtend_vr(VR_y);
     }
-    
+
     pX = x;
     ulsr32 UR_A = align_32x2_load(pA);
     ulsr32 UR_x = align_32x2_load(pX);
     load_32x2_vr_a(VR_A, UR_A, pA);
-  //KN_PRINTX_VR64(VR_A);
+    // KN_PRINTX_VR64(VR_A);
     for (int j = 0; j < loopLimCol; j++) {
-      load_32x2_vr_a(VR_x, UR_x, pX);//KN_PRINTX_VR64(VR_x);
+      load_32x2_vr_a(VR_x, UR_x, pX);  // KN_PRINTX_VR64(VR_x);
       WUR_MvmAux(0);
-//KN_PRINTX_VR64(VR_A);
-      mac8bx8b(VR_y, VR_A, VR_x, signSpec); //KN_PRINTX_VR64(VR_y);
+      // KN_PRINTX_VR64(VR_A);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);  // KN_PRINTX_VR64(VR_y);
       load_32x2_vr_a(VR_A, UR_A, pA);
-//KN_PRINTX_VR64(VR_A);
-      mac8bx8b(VR_y, VR_A, VR_x, signSpec); //KN_PRINTX_VR64(VR_y);
-      load_32x2_vr_a(VR_A, UR_A, pA);
-
-      mac8bx8b(VR_y, VR_A, VR_x, signSpec); //KN_PRINTX_VR64(VR_y);
+      // KN_PRINTX_VR64(VR_A);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);  // KN_PRINTX_VR64(VR_y);
       load_32x2_vr_a(VR_A, UR_A, pA);
 
-      mac8bx8b(VR_y, VR_A, VR_x, signSpec); //KN_PRINTX_VR64(VR_y);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);  // KN_PRINTX_VR64(VR_y);
+      load_32x2_vr_a(VR_A, UR_A, pA);
+
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);  // KN_PRINTX_VR64(VR_y);
       load_32x2_vr_a(VR_A, UR_A, pA);
     }
 
@@ -822,63 +799,65 @@ int SVDFFeatMatInt8InputOffset(int32_t* x, const int32_t* A,
       load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
       WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
       //   KN_PRINTX_VR128(VR_A);
-      mac8bx8b(VR_y, VR_A, VR_x, signSpec); //KN_PRINTX_VR64(VR_y);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);  // KN_PRINTX_VR64(VR_y);
       load_32x2_vr_a(VR_A, UR_A, pA);
     }
- //KN_PRINTX_VR64(VR_y);
+    // KN_PRINTX_VR64(VR_y);
 
+    VR_y = shift32_arith(VR_y, -b_shift, 0);
 
-  VR_y = shift32_arith(VR_y,-b_shift, 0);
+    ae_int32x2 ae_in =
+        AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1), move32_ar_vr(VR_y, VRQ0));
 
-  ae_int32x2 ae_in = AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1),move32_ar_vr(VR_y, VRQ0) );
+    ae_int32x2 ae_out0 = AE_SLAA32S(ae_in, left_shift);
+    ae_out0 = AE_MULFP32X2RAS(ae_out0, AE_MOVDA32(out_multiplier));
+    ae_out0 =
+        AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out0), right_shift),
+                            AE_SRAA64(AE_CVT64F32_L(ae_out0), right_shift));
 
-  ae_int32x2 ae_out0 = AE_SLAA32S(ae_in, left_shift); 
-  ae_out0 = AE_MULFP32X2RAS(ae_out0, AE_MOVDA32(out_multiplier)); 
-  ae_out0 = AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out0), right_shift),
-                                AE_SRAA64(AE_CVT64F32_L(ae_out0), right_shift));
+    VR_y = mov_vr_AccExtend();
+    VR_y = shift32_arith(VR_y, -b_shift, 0);
+    ae_in = AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1), move32_ar_vr(VR_y, VRQ0));
+    // KN_PRINTX_AE32X2(ae_in);
+    ae_int32x2 ae_out1 = AE_SLAA32S(ae_in, left_shift);
+    ae_out1 = AE_MULFP32X2RAS(ae_out1, AE_MOVDA32(out_multiplier));
+    ae_out1 =
+        AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out1), right_shift),
+                            AE_SRAA64(AE_CVT64F32_L(ae_out1), right_shift));
 
-  VR_y = mov_vr_AccExtend();
-  VR_y = shift32_arith(VR_y, -b_shift, 0);
-  ae_in = AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1),move32_ar_vr(VR_y, VRQ0) );
-  //KN_PRINTX_AE32X2(ae_in);
-  ae_int32x2 ae_out1 = AE_SLAA32S(ae_in, left_shift); 
-  ae_out1 = AE_MULFP32X2RAS(ae_out1, AE_MOVDA32(out_multiplier)); 
-  ae_out1 = AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out1), right_shift),
-                                AE_SRAA64(AE_CVT64F32_L(ae_out1), right_shift));
-
-    ae_int16x4 out16_0 = AE_SAT16X4(ae_out1, ae_out0 );
+    ae_int16x4 out16_0 = AE_SAT16X4(ae_out1, ae_out0);
     if (i != (loopLimRow - 1) || !processLastLoop) {
-
-//     
-    //KN_PRINTX_AE32X2(AE_SEL16_5432(out16_0, out16_0));
-    //KN_PRINTX_AE32X2(AE_SEL16_6543(out16_0, out16_0));
-    //KN_PRINTX_AE32X2(AE_SEL16_4321(out16_0, out16_0));
-    AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_6543(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-
-
+      //
+      // KN_PRINTX_AE32X2(AE_SEL16_5432(out16_0, out16_0));
+      // KN_PRINTX_AE32X2(AE_SEL16_6543(out16_0, out16_0));
+      // KN_PRINTX_AE32X2(AE_SEL16_4321(out16_0, out16_0));
+      AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+      AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16*)pY,
+                  out_stride_by_2);
+      AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16*)pY,
+                  out_stride_by_2);
+      AE_S16_0_XP(AE_SEL16_6543(out16_0, out16_0), (ae_int16*)pY,
+                  out_stride_by_2);
 
     } else {
-
-      switch(m&3)
-      {
+      switch (m & 3) {
         case 3:
-      AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    break;
+          AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+          AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16*)pY,
+                      out_stride_by_2);
+          AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16*)pY,
+                      out_stride_by_2);
+          break;
         case 2:
-                    AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    break;
+          AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+          AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16*)pY,
+                      out_stride_by_2);
+          break;
 
         case 1:
-                 AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-        break;
+          AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+          break;
       }
-
     }
     // Adjust pointer to compensate for loop priming
     pA -= 2;  // NOTE pointer type int8v4, => 16/4 = 4;
@@ -886,20 +865,18 @@ int SVDFFeatMatInt8InputOffset(int32_t* x, const int32_t* A,
   return 0;
 }
 
-
-
 int SVDFFeatMatInt8(int32_t* x, const int32_t* A, int16_t* output, int n_filter,
-                               int n_input, int n_memory,
-                                const uint32_t input_offset_int8x4,
-                                int signs,  int b_shift, int32_t out_multiplier, int out_shift) 
-{
+                    int n_input, int n_memory,
+                    const uint32_t input_offset_int8x4, int signs, int b_shift,
+                    int32_t out_multiplier, int out_shift) {
   int16_t* pY = (int16_t*)output;  // act
   int m = n_filter;
   int n = n_input;
   const int32_t* pA = A;
   const int32_t* pX;
   // const int32_t *pB = (  const int32_t *)bias;
-  //int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2), 31-
+  // int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2),
+  // 31-
   // const int bias_exp = 17;
   // const int output_offset_exp = 17;
   int nBlockAligned2 = ((n + 1) >> 1);
@@ -909,35 +886,33 @@ int SVDFFeatMatInt8(int32_t* x, const int32_t* A, int16_t* output, int n_filter,
 
   // FIX for input size pointer is not align 4 bytes  and  loopLimCol != 0
   // prevent using load_32x2_vr_a unalign,
-  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration 
-  if (((unsigned int)x & 3) != 0 && loopLimCol != 0)
-  {
-      loopLimCol = 0;
+  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration
+  if (((unsigned int)x & 3) != 0 && loopLimCol != 0) {
+    loopLimCol = 0;
   }
 
-  int out_stride_by_2 = n_memory <<1;
+  int out_stride_by_2 = n_memory << 1;
 
-
-  if (((unsigned int)x & 1) != 0)
-  {
+  if (((unsigned int)x & 1) != 0) {
     KN_PRINTX(x);
     KN_PRINTS("ERROR!!!!\n");
-      return -1;
+    return -1;
   }
-  KN_PRINTX(out_multiplier);  KN_PRINTX(out_shift);
+  KN_PRINTX(out_multiplier);
+  KN_PRINTX(out_shift);
   vr64 VR_A;
   vr64 VR_x;
   vr64 VR_y;
- // vr64 VR_round, VR_nround;
+  // vr64 VR_round, VR_nround;
   atbool signSpec = (atbool)signs;
 
   int left_shift, right_shift;
-  left_shift = out_shift<0?0:out_shift;
-  right_shift = out_shift>0?0:-out_shift;
+  left_shift = out_shift < 0 ? 0 : out_shift;
+  right_shift = out_shift > 0 ? 0 : -out_shift;
 
- // vr64 VR_outMult;
+  // vr64 VR_outMult;
   vr64 VR_inputOffset;
- // replicate_ar(VR_outMult, 0x3, outMultiplerFr32.fr);
+  // replicate_ar(VR_outMult, 0x3, outMultiplerFr32.fr);
   replicate_ar(VR_inputOffset, 0x3, input_offset_int8x4);
 
   // replicate_ar(VR_outOffset, 0x3, outOffsetFr32.fr);
@@ -953,8 +928,7 @@ int SVDFFeatMatInt8(int32_t* x, const int32_t* A, int16_t* output, int n_filter,
     // vr128 VR_b0, VR_b1;
     // load_32x4_vr_a(VR_b0, UR_b, pB); // suppose not grate than 16 bit
 
-    for (int j = 0; j < loopLimCol; j++) 
-    {
+    for (int j = 0; j < loopLimCol; j++) {
       load_32x2_vr_a(VR_x, UR_x, pX);
       VR_x = vbool(VR_x, VR_inputOffset, 0x6);
       WUR_MvmAux(0);
@@ -976,62 +950,69 @@ int SVDFFeatMatInt8(int32_t* x, const int32_t* A, int16_t* output, int n_filter,
       load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
       VR_x = vbool(VR_x, VR_inputOffset, 0x6);
       WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
-         KN_PRINTX_VR64(VR_A);
+      KN_PRINTX_VR64(VR_A);
       mac8bx8b(VR_y, VR_A, VR_x, signSpec);
       load_32x2_vr_a(VR_A, UR_A, pA);
     }
 
-
     KN_PRINTX_VR64(VR_y);
     VR_y = shift32_arith(VR_y, -b_shift, 0);
-    if(1) {KN_PRINTX_VR64(VR_y);}
-    ae_int32x2 ae_in = AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1),move32_ar_vr(VR_y, VRQ0) );
-    if(1) {KN_PRINTX_AE32X2(ae_in);}
-    ae_int32x2 ae_out0 = AE_SLAA32S(ae_in, left_shift); 
-    ae_out0 = AE_MULFP32X2RAS(ae_out0, AE_MOVDA32(out_multiplier)); 
-    ae_out0 = AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out0), right_shift),
-                                  AE_SRAA64(AE_CVT64F32_L(ae_out0), right_shift));
+    if (1) {
+      KN_PRINTX_VR64(VR_y);
+    }
+    ae_int32x2 ae_in =
+        AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1), move32_ar_vr(VR_y, VRQ0));
+    if (1) {
+      KN_PRINTX_AE32X2(ae_in);
+    }
+    ae_int32x2 ae_out0 = AE_SLAA32S(ae_in, left_shift);
+    ae_out0 = AE_MULFP32X2RAS(ae_out0, AE_MOVDA32(out_multiplier));
+    ae_out0 =
+        AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out0), right_shift),
+                            AE_SRAA64(AE_CVT64F32_L(ae_out0), right_shift));
     KN_PRINTX_AE32X2(ae_out0);
     VR_y = mov_vr_AccExtend();
     VR_y = shift32_arith(VR_y, -b_shift, 0);
-    ae_in = AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1),move32_ar_vr(VR_y, VRQ0) );
+    ae_in = AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1), move32_ar_vr(VR_y, VRQ0));
     KN_PRINTX_AE32X2(ae_in);
-    ae_int32x2 ae_out1 = AE_SLAA32S(ae_in, left_shift); 
-    ae_out1 = AE_MULFP32X2RAS(ae_out1, AE_MOVDA32(out_multiplier)); 
-    ae_out1 = AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out1), right_shift),
-                              AE_SRAA64(AE_CVT64F32_L(ae_out1), right_shift));
+    ae_int32x2 ae_out1 = AE_SLAA32S(ae_in, left_shift);
+    ae_out1 = AE_MULFP32X2RAS(ae_out1, AE_MOVDA32(out_multiplier));
+    ae_out1 =
+        AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out1), right_shift),
+                            AE_SRAA64(AE_CVT64F32_L(ae_out1), right_shift));
     KN_PRINTX_AE32X2(ae_out1);
-    ae_int16x4 out16_0 = AE_SAT16X4(ae_out1, ae_out0 );
+    ae_int16x4 out16_0 = AE_SAT16X4(ae_out1, ae_out0);
 
     KN_PRINTX_AE16X4(out16_0);
     if (i != (loopLimRow - 1) || !processLastLoop) {
+      AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+      AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16*)pY,
+                  out_stride_by_2);
+      AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16*)pY,
+                  out_stride_by_2);
+      AE_S16_0_XP(AE_SEL16_6543(out16_0, out16_0), (ae_int16*)pY,
+                  out_stride_by_2);
 
-
-    AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_6543(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-
-
-     
     } else {
-      switch(m&3)
-      {
+      switch (m & 3) {
         case 3:
-             
-    AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    break;
+
+          AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+          AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16*)pY,
+                      out_stride_by_2);
+          AE_S16_0_XP(AE_SEL16_5432(out16_0, out16_0), (ae_int16*)pY,
+                      out_stride_by_2);
+          break;
         case 2:
-             
-    AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-    AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16 *) pY, out_stride_by_2);
-    break;
+
+          AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+          AE_S16_0_XP(AE_SEL16_4321(out16_0, out16_0), (ae_int16*)pY,
+                      out_stride_by_2);
+          break;
         case 1:
-              
-    AE_S16_0_XP(out16_0, (ae_int16 *) pY, out_stride_by_2);
-        break;
+
+          AE_S16_0_XP(out16_0, (ae_int16*)pY, out_stride_by_2);
+          break;
       }
     }
     // Adjust pointer to compensate for loop priming
@@ -1101,13 +1082,11 @@ void SVDFTimeInt16(OpData* data, const int16_t* weight_time,
 
 #else
 void SVDFTimeInt16HifiAddBias(OpData* data, const int16_t* weight_time,
-                  const int16_t* activation_state,  int feature_batch,
-                  int time_batches, const int32_t *bias,
-                  int32_t out_multiplier,
-                  int32_t out_shift,
-                  int32_t out_zero_bias,
-                   int8_t *p_output8) {
-
+                              const int16_t* activation_state,
+                              int feature_batch, int time_batches,
+                              const int32_t* bias, int32_t out_multiplier,
+                              int32_t out_shift, int32_t out_zero_bias,
+                              int8_t* p_output8) {
   int loopLim = time_batches >> 2;
 
   ae_int64 d_out64_0;
@@ -1116,88 +1095,84 @@ void SVDFTimeInt16HifiAddBias(OpData* data, const int16_t* weight_time,
   ae_int16x4 d_inp1_0;
   ae_int16x4 d_inp2_0;
   ae_int32x2 d_out32;
-  const int32_t *pBias = bias;
+  const int32_t* pBias = bias;
   ae_int32x2 d_bias;
   ae_int32x2 max_int8 = AE_MOVDA32(127);
   ae_int32x2 min_int8 = AE_MOVDA32(-128);
-  
+
   int left_shift, right_shift;
   left_shift = out_shift < 0 ? 0 : out_shift;
   right_shift = out_shift > 0 ? 0 : -out_shift;
 
-  int8_t *p_out8 = p_output8;
-  pt_inp1 = (const ae_int16x4 *)((WORD16 *)weight_time);
-  pt_inp2 = (const ae_int16x4 *)((WORD16 *)activation_state);
+  int8_t* p_out8 = p_output8;
+  pt_inp1 = (const ae_int16x4*)((WORD16*)weight_time);
+  pt_inp2 = (const ae_int16x4*)((WORD16*)activation_state);
   KN_PRINTD(time_batches);
   KN_PRINTD(feature_batch);
   for (int ii = 0; ii < feature_batch; ii++) {
-      align_inp1 = AE_LA64_PP(pt_inp1);
-      align_inp2 = AE_LA64_PP(pt_inp2);
-      d_out64_0 = ZERO64;
-
-      AE_LA16X4_IP(d_inp1_0, align_inp1, pt_inp1);
-
-      AE_LA16X4_IP(d_inp2_0, align_inp2, pt_inp2);
-
-
-/*
-#define AE_MULAAAAQ16(q0, d0, d1) \
-{ \
-  ae_int32x2 d2,d3; \
-  ae_int16x4 d = 1; \
-  AE_MUL16X4(d3,d2,d0,d1); \
-  AE_MULAAD32X16_H0_L1(q0,d2,d); \
-  AE_MULAAD32X16_H0_L1(q0,d3,d); \
-}
-*/
-   for (int j = 0; j < loopLim-1; j++) {
-     // AE_MULAAAAQ16(d_out64_0, d_inp1_0, d_inp2_0);
-     ae_int32x2 d2,d3;
-    ae_int16x4 d = 1; 
-    KN_PRINTX_AE16X4(d_inp1_0);    KN_PRINTX_AE16X4(d_inp2_0);
-
-    AE_MUL16X4(d3,d2, d_inp1_0, d_inp2_0);
+    align_inp1 = AE_LA64_PP(pt_inp1);
+    align_inp2 = AE_LA64_PP(pt_inp2);
+    d_out64_0 = ZERO64;
 
     AE_LA16X4_IP(d_inp1_0, align_inp1, pt_inp1);
+
     AE_LA16X4_IP(d_inp2_0, align_inp2, pt_inp2);
 
-    
-    AE_MULAAD32X16_H0_L1(d_out64_0,d2,d);
-    AE_MULAAD32X16_H0_L1_S2(d_out64_0,d3,d);
+    /*
+    #define AE_MULAAAAQ16(q0, d0, d1) \
+    { \
+      ae_int32x2 d2,d3; \
+      ae_int16x4 d = 1; \
+      AE_MUL16X4(d3,d2,d0,d1); \
+      AE_MULAAD32X16_H0_L1(q0,d2,d); \
+      AE_MULAAD32X16_H0_L1(q0,d3,d); \
+    }
+    */
+    for (int j = 0; j < loopLim - 1; j++) {
+      // AE_MULAAAAQ16(d_out64_0, d_inp1_0, d_inp2_0);
+      ae_int32x2 d2, d3;
+      ae_int16x4 d = 1;
+      KN_PRINTX_AE16X4(d_inp1_0);
+      KN_PRINTX_AE16X4(d_inp2_0);
 
+      AE_MUL16X4(d3, d2, d_inp1_0, d_inp2_0);
+
+      AE_LA16X4_IP(d_inp1_0, align_inp1, pt_inp1);
+      AE_LA16X4_IP(d_inp2_0, align_inp2, pt_inp2);
+
+      AE_MULAAD32X16_H0_L1(d_out64_0, d2, d);
+      AE_MULAAD32X16_H0_L1_S2(d_out64_0, d3, d);
     }
     AE_MULAAAAQ16(d_out64_0, d_inp1_0, d_inp2_0);
-    for(int i = 0; i < (time_batches & 3); i++)
-      {
-        AE_L16_IP(d_inp1_0, (ae_int16 *)pt_inp1, 2);
-        AE_L16_IP(d_inp2_0, (ae_int16 *)pt_inp2, 2);
-            KN_PRINTX_AE16X4(d_inp1_0);    KN_PRINTX_AE16X4(d_inp2_0);
-        AE_MULA16_00(d_out64_0, d_inp1_0, d_inp2_0);
-      }
-    //AE_SAT32X2_HIFI4(d_out32, d_out64_0);
-    d_out32 = AE_TRUNCA32X2F64S(ZERO64, d_out64_0, 32); 
-    KN_PRINTX_AE32X2(d_out32); 
-   AE_L32_XP(d_bias, (ae_int32 *)pBias, sizeof(WORD32));
+    for (int i = 0; i < (time_batches & 3); i++) {
+      AE_L16_IP(d_inp1_0, (ae_int16*)pt_inp1, 2);
+      AE_L16_IP(d_inp2_0, (ae_int16*)pt_inp2, 2);
+      KN_PRINTX_AE16X4(d_inp1_0);
+      KN_PRINTX_AE16X4(d_inp2_0);
+      AE_MULA16_00(d_out64_0, d_inp1_0, d_inp2_0);
+    }
+    // AE_SAT32X2_HIFI4(d_out32, d_out64_0);
+    d_out32 = AE_TRUNCA32X2F64S(ZERO64, d_out64_0, 32);
+    KN_PRINTX_AE32X2(d_out32);
+    AE_L32_XP(d_bias, (ae_int32*)pBias, sizeof(WORD32));
     // d_bias = AE_SRAI32(d_bias, 1);
     KN_PRINTX_AE32X2(d_bias);
 
     d_out32 = AE_ADD32S(d_out32, d_bias);
 
-    KN_PRINTX_AE32X2(d_out32); 
-    MPY_BY_QUANT_MULT_X2_OUT32(d_out32, d_out32,
-    out_multiplier,
-    left_shift, right_shift);
-    KN_PRINTX_AE32X2(d_out32); 
-    d_out32 = AE_ADD32S(d_out32 ,out_zero_bias);
-     KN_PRINTX_AE32X2(d_out32); 
-    //AE_MINMAX32_HIFI4(d_out32, min_int8, max_int8);
-    d_out32 = AE_MAX32(d_out32, min_int8); 
+    KN_PRINTX_AE32X2(d_out32);
+    MPY_BY_QUANT_MULT_X2_OUT32(d_out32, d_out32, out_multiplier, left_shift,
+                               right_shift);
+    KN_PRINTX_AE32X2(d_out32);
+    d_out32 = AE_ADD32S(d_out32, out_zero_bias);
+    KN_PRINTX_AE32X2(d_out32);
+    // AE_MINMAX32_HIFI4(d_out32, min_int8, max_int8);
+    d_out32 = AE_MAX32(d_out32, min_int8);
     d_out32 = AE_MIN32(d_out32, max_int8);
-     KN_PRINTX_AE32X2(d_out32);
+    KN_PRINTX_AE32X2(d_out32);
     *p_out8++ = (int8_t)AE_MOVAD32_L(d_out32);
 
-    
-    //store_fr_postI(fr_out, p_out, INC1);
+    // store_fr_postI(fr_out, p_out, INC1);
     //*p_out++ = AE_MOVAD32_L(d_out32);
   }
 }
@@ -1211,31 +1186,27 @@ void SVDFQauntizedInt8(OpData* data, const TfLiteSVDFParams* params,
                        const int16_t* weight_time, const int32_t time_batches,
                        int n_memory, const int32_t* bias, int16_t* state_data,
                        int8_t* output) {
-
-
-
-
   // Shift states.
-  int16_t* const state_ptr =state_data; 
-   //   tflite::micro::GetTensorData<int16_t>(activation_state_tensor);
+  int16_t* const state_ptr = state_data;
+  //   tflite::micro::GetTensorData<int16_t>(activation_state_tensor);
 
   // Left shift the activation_state.
-  int num_bytes = sizeof(*state_ptr) * (input_batches * feature_batches * n_memory - 1);
+  int num_bytes =
+      sizeof(*state_ptr) * (input_batches * feature_batches * n_memory - 1);
 
   // memmove_HMD
-  xa_nn_memmove_16(state_ptr, state_ptr + 1, (num_bytes>>1));
+  xa_nn_memmove_16(state_ptr, state_ptr + 1, (num_bytes >> 1));
 
   int16_t* result_in_batch = state_data + (n_memory - 1);
-   
-  int  sign = (-128 == data->SvdfOp.input_zero_point)
-             ? 1
-             : 3;  // assumption: 128 + sign 8bit = unsigned
-  int b_shift = (sign == 1 )? 1 : 2;
-//KN_PRINTD(data->SvdfOp.input_zero_point);
-//KN_PRINTD(input_height);
-//KN_PRINTD(b_shift);KN_PRINTD(b_shift);
-  for (int i_batch = 0; i_batch < input_batches; i_batch++) 
-  {
+
+  int sign = (-128 == data->SvdfOp.input_zero_point)
+                 ? 1
+                 : 3;  // assumption: 128 + sign 8bit = unsigned
+  int b_shift = (sign == 1) ? 1 : 2;
+  // KN_PRINTD(data->SvdfOp.input_zero_point);
+  // KN_PRINTD(input_height);
+  // KN_PRINTD(b_shift);KN_PRINTD(b_shift);
+  for (int i_batch = 0; i_batch < input_batches; i_batch++) {
     //    const int8_t *buffer_1 = weight_feature;
 
     // MVM8bx8b with input offset
@@ -1244,34 +1215,31 @@ void SVDFQauntizedInt8(OpData* data, const TfLiteSVDFParams* params,
 
         result_in_batch + i_batch * n_memory * feature_batches;
 
-  if(data->opt_constraint == 2)
-  {
-      
-    SVDFFeatMatInt8(
-        (int32_t*)input_data_batch, (const int32_t*)data->map_weight_feat,
-        output_data_batch, feature_batches,
-        input_height, n_memory, data->input_offset_int8, 
-       // data->scaleFeat, 
-       
-        sign,b_shift,
-        (data->SvdfOp.effective_scale_1_a), data->SvdfOp.effective_scale_1_b);
+    if (data->opt_constraint == 2) {
+      SVDFFeatMatInt8((int32_t*)input_data_batch,
+                      (const int32_t*)data->map_weight_feat, output_data_batch,
+                      feature_batches, input_height, n_memory,
+                      data->input_offset_int8,
+                      // data->scaleFeat,
 
-  }else{
-    SVDFFeatMatInt8InputOffset(
-        (int32_t*)input_data_batch, (const int32_t*)data->map_weight_feat,
-        data->inputOffsetWithW, output_data_batch, feature_batches,
-        input_height, n_memory,
-        // data->scaleFeat,
-         sign,
-         b_shift,
-          (data->SvdfOp.effective_scale_1_a), data->SvdfOp.effective_scale_1_b);
-  }
-    
+                      sign, b_shift, (data->SvdfOp.effective_scale_1_a),
+                      data->SvdfOp.effective_scale_1_b);
+
+    } else {
+      SVDFFeatMatInt8InputOffset(
+          (int32_t*)input_data_batch, (const int32_t*)data->map_weight_feat,
+          data->inputOffsetWithW, output_data_batch, feature_batches,
+          input_height, n_memory,
+          // data->scaleFeat,
+          sign, b_shift, (data->SvdfOp.effective_scale_1_a),
+          data->SvdfOp.effective_scale_1_b);
+    }
   }
 
-    KN_PRINT_Q15_SIZE(result_in_batch, feature_batches*n_memory);
-    KN_PRINT_Q15_OFFSET_SIZE(result_in_batch, feature_batches*n_memory, n_memory);
-    KN_PRINT_Q15_SIZE(state_data, feature_batches*time_batches);
+  KN_PRINT_Q15_SIZE(result_in_batch, feature_batches * n_memory);
+  KN_PRINT_Q15_OFFSET_SIZE(result_in_batch, feature_batches * n_memory,
+                           n_memory);
+  KN_PRINT_Q15_SIZE(state_data, feature_batches * time_batches);
 
 #ifndef USE_HIFI_TIME_DOT
   // time
@@ -1284,36 +1252,33 @@ void SVDFQauntizedInt8(OpData* data, const TfLiteSVDFParams* params,
 
     SVDFTimeInt16(data, weight_time, activation_state_batch, feature_batches,
                   time_batches, outputScratch);
-   //   KN_PRINT_AFLOAT(outputScratch, feature_batches);
-      //KN_PRINT_AFLOAT
+    //   KN_PRINT_AFLOAT(outputScratch, feature_batches);
+    // KN_PRINT_AFLOAT
   }
 
-  #else
+#else
 
   KN_PRINTD(feature_batches);
-   KN_PRINTD(time_batches);
-      KN_PRINTD(input_batches);
+  KN_PRINTD(time_batches);
+  KN_PRINTD(input_batches);
 
-  int feat_per_batch =    feature_batches/input_batches;
-    for (int i_batch = 0; i_batch < input_batches; i_batch++) {
-    //const int16_t* vector1_ptr =
+  int feat_per_batch = feature_batches / input_batches;
+  for (int i_batch = 0; i_batch < input_batches; i_batch++) {
+    // const int16_t* vector1_ptr =
     //    tflite::micro::GetTensorData<int16_t>(weights_time_tensor);
 
     const int16_t* activation_state_batch =
         state_data + i_batch * time_batches * feature_batches;
-    int8_t* output_batch =
-        output + i_batch *  feat_per_batch;
-   //int32_t* outputScratch = data->pScratch + i_batch * feature_batches;
+    int8_t* output_batch = output + i_batch * feat_per_batch;
+    // int32_t* outputScratch = data->pScratch + i_batch * feature_batches;
 
-
-    SVDFTimeInt16HifiAddBias(data, weight_time, 
-    activation_state_batch, 
-    feat_per_batch, time_batches* input_batches, bias,
-    (data->SvdfOp.effective_scale_2_a), 
-    data->SvdfOp.effective_scale_2_b,
-    data->SvdfOp.output_zero_point, output_batch);
-    }
-    #endif
+    SVDFTimeInt16HifiAddBias(data, weight_time, activation_state_batch,
+                             feat_per_batch, time_batches * input_batches, bias,
+                             (data->SvdfOp.effective_scale_2_a),
+                             data->SvdfOp.effective_scale_2_b,
+                             data->SvdfOp.output_zero_point, output_batch);
+  }
+#endif
 }
 
 void EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
@@ -1328,7 +1293,7 @@ void EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
   TFLITE_DCHECK(context->GetScratchBuffer != nullptr);
 
   //  const int n_memory = weights_time_tensor->dims->data[1];
-#if 1 // defined(DMX1A_SVDF_OPT) || defined(HMD1A_SVDF_OPT)
+#if 1  // defined(DMX1A_SVDF_OPT) || defined(HMD1A_SVDF_OPT)
 
   OpDataSvdf* data = static_cast<OpDataSvdf*>(&data_ex->SvdfOp);
   if (data_ex->opt_constraint > 0) {
@@ -1362,17 +1327,17 @@ void EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
         (int16_t*)tflite::micro::GetTensorData<int16_t>(
             activation_state_tensor),
         tflite::micro::GetTensorData<int8_t>(output_tensor));
- KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output_tensor), 
- ElementCount(*output_tensor->dims));
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output_tensor),
+                     ElementCount(*output_tensor->dims));
   } else
 #endif
   {
-  EvalInt8SvdfReference(context, node, input_tensor, weights_feature_tensor,
-                                weights_time_tensor, bias_tensor, params, activation_state_tensor,
-                                output_tensor, *data);
-   // EvalIntegerSVDFRef(context, node, input_tensor, weights_feature_tensor,
-  //                     weights_time_tensor, bias_tensor, params,
-  //                     activation_state_tensor, output_tensor, *data_ex);
+    EvalInt8SvdfReference(context, node, input_tensor, weights_feature_tensor,
+                          weights_time_tensor, bias_tensor, params,
+                          activation_state_tensor, output_tensor, *data);
+    // EvalIntegerSVDFRef(context, node, input_tensor, weights_feature_tensor,
+    //                     weights_time_tensor, bias_tensor, params,
+    //                     activation_state_tensor, output_tensor, *data_ex);
   }
 }
 

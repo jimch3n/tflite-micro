@@ -31,6 +31,7 @@ limitations under the License.
 // tensorflow/lite/micro/bluepill/debug_log.cc file.
 
 #include "tensorflow/lite/micro/debug_log.h"
+
 #include "tensorflow/lite/micro/ia8201/debug_log_callback.h"
 
 static DebugLogCallback debug_log_callback = nullptr;
@@ -39,7 +40,9 @@ static unsigned char pluginInstID = 0;
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
 #include <cstdio>
 #endif
-void RegisterDebugLogCallback(int (*cb)(unsigned char pluginInstanceID, const char *pBuf), unsigned char pluginInstanceID) {
+void RegisterDebugLogCallback(int (*cb)(unsigned char pluginInstanceID,
+                                        const char* pBuf),
+                              unsigned char pluginInstanceID) {
   debug_log_callback = cb;
   pluginInstID = pluginInstanceID;
 }
@@ -50,19 +53,19 @@ extern "C" void DebugLog(const char* format, va_list args) {
   // maximum reduction in binary size. This is because we have DebugLog calls
   // via TF_LITE_CHECK that are not stubbed out by TF_LITE_REPORT_ERROR.
   vfprintf(stderr, format, args);
-  
- // if (debug_log_callback != nullptr) {
+
+  // if (debug_log_callback != nullptr) {
   //  debug_log_callback(pluginInstID, (const char*)s);
- // }
+  // }
 #endif
 }
 
-int debug_log_printf(unsigned char pluginInstId, const char *pBuf)
-{
+int debug_log_printf(unsigned char pluginInstId, const char* pBuf) {
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
-    printf("%s", pBuf); fflush(stdout);
+  printf("%s", pBuf);
+  fflush(stdout);
 #endif
-    return 0;
+  return 0;
 }
 #ifndef TF_LITE_STRIP_ERROR_STRINGS
 // Only called from MicroVsnprintf (micro_log.h)

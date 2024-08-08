@@ -30,13 +30,12 @@ limitations under the License.
 //#define KN_DEBUG
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/micro/kernels/kernel_util.h"
-
-#include "tensorflow/lite/micro/kernels/lstm_shared.h"
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/lstm_shared.h"
 namespace tflite {
 
-    // extension struct
+// extension struct
 struct OpDataLSTMEx {
   struct OpDataLSTM OpLSTM;
 
@@ -45,7 +44,7 @@ struct OpDataLSTMEx {
   // The scratch tensor index.
   int scratch_tensor_index;
   bool compute_row_sums = false;
- // IntegerLstmParameter integer_lstm_param;
+  // IntegerLstmParameter integer_lstm_param;
 
   int opt_constraint;
   int8_t* mapped_i2i_w;
@@ -371,7 +370,7 @@ void CalculateLstmGate(
   AddElementWise(gate_output, fc_output_buffer,
                  /*n_batch=*/gate_output_shape.DimsData()[0],
                  /*n_state=*/gate_output_shape.DimsData()[1], gate_output);
-    KN_PRINT_Q15_SIZE(gate_output, gate_output_shape.FlatSize());
+  KN_PRINT_Q15_SIZE(gate_output, gate_output_shape.FlatSize());
   // Apply activation
   switch (activation) {
     case kTfLiteActSigmoid:
@@ -386,7 +385,7 @@ void CalculateLstmGate(
       // Only Sigmoid or Tanh is used.
       TFLITE_ASSERT_FALSE;
   }
-      KN_PRINT_Q15_SIZE(gate_output, gate_output_shape.FlatSize());
+  KN_PRINT_Q15_SIZE(gate_output, gate_output_shape.FlatSize());
 }
 
 // Update the cell state using the output from the forget gate, input gate, and
@@ -681,8 +680,8 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
               step_info.StateShape().FlatSize() * sizeof(ActivationType));
 
   KN_PRINT_Q15_SIZE(tflite::micro::GetTensorData<ActivationType>(hidden_state) +
-                  step_info.HiddenStateOffset(),
-                  step_info.StateShape().FlatSize() );
+                        step_info.HiddenStateOffset(),
+                    step_info.StateShape().FlatSize());
 }
 #else   // #if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
 template <typename ActivationType, typename WeightType, typename CellType,

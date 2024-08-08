@@ -24,13 +24,14 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/requantize.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 namespace tflite {
-//namespace ops {
-//namespace micro {
-//namespace dequantize {
+// namespace ops {
+// namespace micro {
+// namespace dequantize {
 
 struct OpData {
   tflite::DequantizationParams quantization_params;
@@ -42,15 +43,15 @@ struct OpData {
 
   AScalar scale;
   AScalar zero_point;
-  
-  // requantize
-  //AScalar Requantize;
-  //AScalar inZeroPoint;
-  //AScalar outZeroPoint;
 
+  // requantize
+  // AScalar Requantize;
+  // AScalar inZeroPoint;
+  // AScalar outZeroPoint;
 };
 
-void* DequantizeInit(TfLiteContext* context, const char* buffer, size_t length) {
+void* DequantizeInit(TfLiteContext* context, const char* buffer,
+                     size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
@@ -75,7 +76,7 @@ TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, input->type == kTfLiteUInt8 ||
                               input->type == kTfLiteInt8 ||
                               input->type == kTfLiteInt16 ||
-  input->type == kTfLiteFloat16);
+                              input->type == kTfLiteFloat16);
   TF_LITE_ENSURE(context, output->type == kTfLiteFloat32);
   if (input->type != kTfLiteFloat16) {  // bypass float16-> float32
     if (output->type == kTfLiteInt32) {
@@ -95,7 +96,7 @@ TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
         AScalar(data->quantization_params
                     .zero_point);  // / CONST_ASCALAR(128.0); //Q7 for INT8
   }
-  
+
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
@@ -103,66 +104,63 @@ TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
 
 #ifdef DMX1A_DEQUANTIZE_OPT
 void DequantizeInt8ToFloat32(struct OpData* op_data,
-    const RuntimeShape& input_shape,
-    const int8_t* input_data,
-    const RuntimeShape& output_shape,
-    float* output_data)
-{
-    // tflite::QuantizationParams op_params = op_data->quantization_params;
- //  const int32_t zero_point = op_params.zero_point;
- //  const double scale = op_params.scale;
-    const int flat_size = MatchingFlatSize(input_shape, output_shape);
+                             const RuntimeShape& input_shape,
+                             const int8_t* input_data,
+                             const RuntimeShape& output_shape,
+                             float* output_data) {
+  // tflite::QuantizationParams op_params = op_data->quantization_params;
+  //  const int32_t zero_point = op_params.zero_point;
+  //  const double scale = op_params.scale;
+  const int flat_size = MatchingFlatSize(input_shape, output_shape);
 
-    int loopLim = flat_size >> 2;
-    uint8_t* pInput = (uint8_t*)input_data;
-    uint32_t* pOut = (uint32_t*)output_data;
-    vr128 VR_dataIn, VR_scale;
-    vr128 VR_zeroPoint;
-    vr128 VR_output;
-    ulsr128 UR_dataIn = align_8x4_load(pInput);
-    ulsr128 UR_out = align_32x4_store(pOut);
-    replicate_ar(VR_scale, 0xf, op_data->scale.fr);
-    replicate_ar(VR_zeroPoint, 0xf, op_data->zero_point.fr);
+  int loopLim = flat_size >> 2;
+  uint8_t* pInput = (uint8_t*)input_data;
+  uint32_t* pOut = (uint32_t*)output_data;
+  vr128 VR_dataIn, VR_scale;
+  vr128 VR_zeroPoint;
+  vr128 VR_output;
+  ulsr128 UR_dataIn = align_8x4_load(pInput);
+  ulsr128 UR_out = align_32x4_store(pOut);
+  replicate_ar(VR_scale, 0xf, op_data->scale.fr);
+  replicate_ar(VR_zeroPoint, 0xf, op_data->zero_point.fr);
 
-    //KN_
-    KN_PRINTAFLT(op_data->scale);
-    KN_PRINTAFLT(op_data->zero_point);
-    if (loopLim > 0)
-    {
-        load_8x4_vr_a(VR_dataIn, UR_dataIn, pInput);
-        for (int i = 0; i < loopLim - 1; i++) {
-            convert_16I_to_32F_x4(VR_dataIn, 7);
-            VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xf0), 0x0);
-            load_8x4_vr_a(VR_dataIn, UR_dataIn, pInput);
-            convert_32F_to_IEEE_float_x4(VR_output);
-            store_32x4_vr_a(VR_output, UR_out, pOut);
-           
-        }
-        convert_16I_to_32F_x4(VR_dataIn, 7);
-        VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xf0), 0x0);
-        convert_32F_to_IEEE_float_x4(VR_output);
-        store_32x4_vr_a(VR_output, UR_out, pOut);
-
-        flush_32x4(UR_out, pOut);
+  // KN_
+  KN_PRINTAFLT(op_data->scale);
+  KN_PRINTAFLT(op_data->zero_point);
+  if (loopLim > 0) {
+    load_8x4_vr_a(VR_dataIn, UR_dataIn, pInput);
+    for (int i = 0; i < loopLim - 1; i++) {
+      convert_16I_to_32F_x4(VR_dataIn, 7);
+      VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xf0), 0x0);
+      load_8x4_vr_a(VR_dataIn, UR_dataIn, pInput);
+      convert_32F_to_IEEE_float_x4(VR_output);
+      store_32x4_vr_a(VR_output, UR_out, pOut);
     }
-    // TODO:
-    if (flat_size & 3) {
-        for (int ii = 0; ii < (flat_size & 3); ii++) {
-            load8x1_vr_postI(VR_dataIn, pInput, INC1, VRQ0);
-            convert_16I_to_32F_x4(VR_dataIn, 7);
-            fadds(VR_dataIn, VRQ0, VR_dataIn, VRQ0, VR_zeroPoint, VRQ0, 0x10 );
-            fmuls(VR_output, VRQ0, VR_scale, VRQ0, VR_dataIn, VRQ0, 0);
-            convert_32F_to_IEEE_float_x4(VR_output);
-            store32x1_vr_postI(VR_output,  pOut, INC1, VRQ0);
-        }
+    convert_16I_to_32F_x4(VR_dataIn, 7);
+    VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xf0), 0x0);
+    convert_32F_to_IEEE_float_x4(VR_output);
+    store_32x4_vr_a(VR_output, UR_out, pOut);
+
+    flush_32x4(UR_out, pOut);
+  }
+  // TODO:
+  if (flat_size & 3) {
+    for (int ii = 0; ii < (flat_size & 3); ii++) {
+      load8x1_vr_postI(VR_dataIn, pInput, INC1, VRQ0);
+      convert_16I_to_32F_x4(VR_dataIn, 7);
+      fadds(VR_dataIn, VRQ0, VR_dataIn, VRQ0, VR_zeroPoint, VRQ0, 0x10);
+      fmuls(VR_output, VRQ0, VR_scale, VRQ0, VR_dataIn, VRQ0, 0);
+      convert_32F_to_IEEE_float_x4(VR_output);
+      store32x1_vr_postI(VR_output, pOut, INC1, VRQ0);
     }
+  }
 }
 
 void DequantizeFloat16ToFloat32(struct OpData* op_data,
-                             const RuntimeShape& input_shape,
-                             const int16_t* input_data,
-                             const RuntimeShape& output_shape,
-                             float* output_data) {
+                                const RuntimeShape& input_shape,
+                                const int16_t* input_data,
+                                const RuntimeShape& output_shape,
+                                float* output_data) {
   // tflite::QuantizationParams op_params = op_data->quantization_params;
   //  const int32_t zero_point = op_params.zero_point;
   //  const double scale = op_params.scale;
@@ -172,10 +170,10 @@ void DequantizeFloat16ToFloat32(struct OpData* op_data,
   uint16_t* pInput = (uint16_t*)input_data;
   uint32_t* pOut = (uint32_t*)output_data;
   vr128 VR_dataIn;
-  //vr128 VR_output;
+  // vr128 VR_output;
   ulsr128 UR_dataIn = align_16x4_load(pInput);
   ulsr128 UR_out = align_32x4_store(pOut);
-  
+
   if (loopLim > 0) {
     load_16x4_vr_a(VR_dataIn, UR_dataIn, pInput);
     for (int i = 0; i < loopLim - 1; i++) {
@@ -207,64 +205,58 @@ void DequantizeFloat16ToFloat32(struct OpData* op_data,
 
 #ifdef HMD1A_DEQUANTIZE_OPT
 void DequantizeInt8ToFloat32(struct OpData* op_data,
-    const RuntimeShape& input_shape,
-    const int8_t* input_data,
-    const RuntimeShape& output_shape,
-    float* output_data)
-{
-    // tflite::QuantizationParams op_params = op_data->quantization_params;
- //  const int32_t zero_point = op_params.zero_point;
- //  const double scale = op_params.scale;
-    const int flat_size = MatchingFlatSize(input_shape, output_shape);
+                             const RuntimeShape& input_shape,
+                             const int8_t* input_data,
+                             const RuntimeShape& output_shape,
+                             float* output_data) {
+  // tflite::QuantizationParams op_params = op_data->quantization_params;
+  //  const int32_t zero_point = op_params.zero_point;
+  //  const double scale = op_params.scale;
+  const int flat_size = MatchingFlatSize(input_shape, output_shape);
 
-    int loopLim = flat_size >> 1;
-    int remain = flat_size & 1;
-    uint8_t* pInput = (uint8_t*)input_data;
-    uint32_t* pOut = (uint32_t*)output_data;
-    vr64 VR_dataIn, VR_scale;
-    vr64 VR_zeroPoint;
-    vr64 VR_output;
-    //ulsr32 UR_dataIn = align_8x4_load(pInput);
-    ulsr32 UR_out = align_32x2_store(pOut);
-    replicate_ar(VR_scale, 0x3, op_data->scale.fr);
-    replicate_ar(VR_zeroPoint, 0x3, op_data->zero_point.fr);
+  int loopLim = flat_size >> 1;
+  int remain = flat_size & 1;
+  uint8_t* pInput = (uint8_t*)input_data;
+  uint32_t* pOut = (uint32_t*)output_data;
+  vr64 VR_dataIn, VR_scale;
+  vr64 VR_zeroPoint;
+  vr64 VR_output;
+  // ulsr32 UR_dataIn = align_8x4_load(pInput);
+  ulsr32 UR_out = align_32x2_store(pOut);
+  replicate_ar(VR_scale, 0x3, op_data->scale.fr);
+  replicate_ar(VR_zeroPoint, 0x3, op_data->zero_point.fr);
 
-    //KN_
-    KN_PRINTAFLT(op_data->scale);
-    KN_PRINTAFLT(op_data->zero_point);
-    if (loopLim > 0)
-    {
-        load8x2_vr_postI(VR_dataIn,  pInput, INC1);
-        for (int i = 0; i < loopLim - 1; i++) {
-            convert_16I_to_32F_x2(VR_dataIn, 7);
-            VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xa), 0x0);
-            load8x2_vr_postI(VR_dataIn,  pInput, INC1);
-            convert_32F_to_IEEE_float_x2(VR_output);
-            store_32x2_vr_a(VR_output, UR_out, pOut);
-
-        }
-        convert_16I_to_32F_x2(VR_dataIn, 7);
-        VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xa), 0x0);
-        convert_32F_to_IEEE_float_x2(VR_output);
-        store_32x2_vr_a(VR_output, UR_out, pOut);
-
-        flush_32x2(UR_out, pOut);
+  // KN_
+  KN_PRINTAFLT(op_data->scale);
+  KN_PRINTAFLT(op_data->zero_point);
+  if (loopLim > 0) {
+    load8x2_vr_postI(VR_dataIn, pInput, INC1);
+    for (int i = 0; i < loopLim - 1; i++) {
+      convert_16I_to_32F_x2(VR_dataIn, 7);
+      VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xa), 0x0);
+      load8x2_vr_postI(VR_dataIn, pInput, INC1);
+      convert_32F_to_IEEE_float_x2(VR_output);
+      store_32x2_vr_a(VR_output, UR_out, pOut);
     }
+    convert_16I_to_32F_x2(VR_dataIn, 7);
+    VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xa), 0x0);
+    convert_32F_to_IEEE_float_x2(VR_output);
+    store_32x2_vr_a(VR_output, UR_out, pOut);
 
-    if (remain) {
+    flush_32x2(UR_out, pOut);
+  }
 
-        load8x1_vr_postI(VR_dataIn,  pInput, INC1, VRQ0);
+  if (remain) {
+    load8x1_vr_postI(VR_dataIn, pInput, INC1, VRQ0);
 
-        convert_16I_to_32F_x2(VR_dataIn, 7);
-   
-        VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xa), 0x0);
+    convert_16I_to_32F_x2(VR_dataIn, 7);
 
-        convert_32F_to_IEEE_float_x2(VR_output);
-        store32x1_vr_postI(VR_output, pOut, INC1, VRQ0);
+    VR_output = vmuls(VR_scale, vadds(VR_dataIn, VR_zeroPoint, 0xa), 0x0);
 
-    }
+    convert_32F_to_IEEE_float_x2(VR_output);
+    store32x1_vr_postI(VR_output, pOut, INC1, VRQ0);
+  }
 }
-
 
 void DequantizeFloat16ToFloat32(struct OpData* op_data,
                                 const RuntimeShape& input_shape,
@@ -280,13 +272,13 @@ void DequantizeFloat16ToFloat32(struct OpData* op_data,
   uint16_t* pInput = (uint16_t*)input_data;
   uint32_t* pOut = (uint32_t*)output_data;
   vr64 VR_dataIn;
-  //vr64 VR_output;
-  //ulsr128 UR_dataIn = align_16x4_load(pInput);
+  // vr64 VR_output;
+  // ulsr128 UR_dataIn = align_16x4_load(pInput);
   ulsr32 UR_out = align_32x2_store(pOut);
 
   if (loopLim > 0) {
-    load16x2_vr_postI(VR_dataIn,  pInput, INC1);
-    
+    load16x2_vr_postI(VR_dataIn, pInput, INC1);
+
     for (int i = 0; i < loopLim - 1; i++) {
       convert_16F_to_32F_x2(VR_dataIn, TF_FLT16_SIGN, TF_FLT16_EXP,
                             TF_FLT16_BIAS);
@@ -303,18 +295,14 @@ void DequantizeFloat16ToFloat32(struct OpData* op_data,
   }
   // TODO:
   if (flat_size & 1) {
- 
-      load16x1_vr_postI(VR_dataIn, pInput, INC1, VRQ0);
-      convert_16F_to_32F_x2(VR_dataIn, TF_FLT16_SIGN, TF_FLT16_EXP,
-                            TF_FLT16_BIAS);
-      convert_32F_to_IEEE_float_x2(VR_dataIn);
-      store32x1_vr_postI(VR_dataIn, pOut, INC1, VRQ0);
-    
+    load16x1_vr_postI(VR_dataIn, pInput, INC1, VRQ0);
+    convert_16F_to_32F_x2(VR_dataIn, TF_FLT16_SIGN, TF_FLT16_EXP,
+                          TF_FLT16_BIAS);
+    convert_32F_to_IEEE_float_x2(VR_dataIn);
+    store32x1_vr_postI(VR_dataIn, pOut, INC1, VRQ0);
   }
 }
 #endif
-
-
 
 TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
@@ -335,21 +323,22 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
         break;
 #endif
       case kTfLiteInt8:
-          KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input), ElementCount(*input->dims));
+        KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
+                         ElementCount(*input->dims));
 #if defined(DMX1A_DEQUANTIZE_OPT) || defined(HMD1A_DEQUANTIZE_OPT)
-          DequantizeInt8ToFloat32(data,
-              tflite::micro::GetTensorShape(input),
-              tflite::micro::GetTensorData<int8_t>(input),
-              tflite::micro::GetTensorShape(output),
-              tflite::micro::GetTensorData<float>(output));
+        DequantizeInt8ToFloat32(data, tflite::micro::GetTensorShape(input),
+                                tflite::micro::GetTensorData<int8_t>(input),
+                                tflite::micro::GetTensorShape(output),
+                                tflite::micro::GetTensorData<float>(output));
 #else
-          reference_ops::Dequantize(data->quantization_params,
+        reference_ops::Dequantize(data->quantization_params,
                                   tflite::micro::GetTensorShape(input),
                                   tflite::micro::GetTensorData<int8_t>(input),
                                   tflite::micro::GetTensorShape(output),
                                   tflite::micro::GetTensorData<float>(output));
 #endif
-          KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), ElementCount(*output->dims));
+        KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                       ElementCount(*output->dims));
         break;
 #ifndef REMOVE_REFOP_SUPPORT
       case kTfLiteInt16:
@@ -361,15 +350,15 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
         break;
 #endif
 
-              case kTfLiteFloat16:
+      case kTfLiteFloat16:
         KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
                          ElementCount(*input->dims));
 #if defined(DMX1A_DEQUANTIZE_OPT) || defined(HMD1A_DEQUANTIZE_OPT)
         DequantizeFloat16ToFloat32(data, tflite::micro::GetTensorShape(input),
-                                tflite::micro::GetTensorData<int16_t>(input),
-                                tflite::micro::GetTensorShape(output),
-                                tflite::micro::GetTensorData<float>(output));
-        #else
+                                   tflite::micro::GetTensorData<int16_t>(input),
+                                   tflite::micro::GetTensorShape(output),
+                                   tflite::micro::GetTensorData<float>(output));
+#else
 
         TF_LITE_KERNEL_LOG(context, "Input %s, output %s not supported.",
                            TfLiteTypeGetName(input->type),
@@ -399,9 +388,9 @@ TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
 
 TFLMRegistration Register_DEQUANTIZE() {
   return tflite::micro::RegisterOp(DequantizeInit,
-     
-          /*prepare=*/DequantizePrepare,
-          /*invoke=*/DequantizeEval);
+
+                                   /*prepare=*/DequantizePrepare,
+                                   /*invoke=*/DequantizeEval);
 }
 
 //}  // namespace micro

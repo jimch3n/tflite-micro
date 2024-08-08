@@ -32,13 +32,13 @@ limitations under the License.
 //        TfLiteStatus invoke_status = interpreter->Invoke();
 //    }
 
-typedef int (*DebugLogCallback)(unsigned char pluginInstanceID, const char *pBuf);
+typedef int (*DebugLogCallback)(unsigned char pluginInstanceID,
+                                const char *pBuf);
 
 // Registers and application-specific callback for debug logging. It must be
 // called before the first call to DebugLog().
-void RegisterDebugLogCallback(DebugLogCallback callback, unsigned char pluginInstanceID);
-
-
+void RegisterDebugLogCallback(DebugLogCallback callback,
+                              unsigned char pluginInstanceID);
 
 int debug_log_printf(unsigned char pluginInstId, const char *pBuf);
 

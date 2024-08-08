@@ -13,7 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "tensorflow/lite/micro/kernels/ia8201/lstm_eval.h"
 
+#include <limits>
+
+#include "tensorflow/lite/c/builtin_op_data.h"
+#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
 #include "tensorflow/lite/kernels/internal/reference/fully_connected.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/fully_connected.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/logistic.h"
@@ -21,20 +27,12 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/tanh.h"
 #include "tensorflow/lite/kernels/internal/reference/logistic.h"
 #include "tensorflow/lite/kernels/internal/reference/mul.h"
-#include "tensorflow/lite/kernels/internal/reference/tanh.h"
-#include "tensorflow/lite/micro/kernels/ia8201/lstm_eval.h"
-
-#include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/c/common.h"
-#include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
 #include "tensorflow/lite/kernels/internal/reference/portable_tensor_utils_impl.h"
+#include "tensorflow/lite/kernels/internal/reference/tanh.h"
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
-
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
-#include <limits>
-
-
 namespace tflite {
 
 LstmTensors::LstmTensors(TfLiteContext* context, TfLiteNode* node) {
@@ -112,7 +110,6 @@ TfLiteStatus LstmTensors::ValidateTensorStatus(TfLiteContext* context) const {
 }
 namespace lstm_internal {
 
-  
 #if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
 const int32_t kInt16Max = std::numeric_limits<int16_t>::max();
 const int32_t kInt16Min = std::numeric_limits<int16_t>::min();
@@ -146,18 +143,16 @@ void AddElementWise(const float* input_1, const float* input_2, int n_batch,
 
 #if defined(DMX1A_LSTM_OPT)
 
-int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
-                                const int32_t *bias, int16_t *output, int m,
-                                int n, const int32_t outMultipler,
-                              //  const int32_t *inputOffsetWithW,  // xor 128
-                                const int32_t shift, int32_t outOffset,
-                                int signs) 
-{
-  int16_t *pY = output;
+int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
+                          int16_t* output, int m, int n,
+                          const int32_t outMultipler,
+                          //  const int32_t *inputOffsetWithW,  // xor 128
+                          const int32_t shift, int32_t outOffset, int signs) {
+  int16_t* pY = output;
 
-  const int32_t *pA = A;
-  const int32_t *pX;
-  const int32_t *pB = (const int32_t *)bias;
+  const int32_t* pA = A;
+  const int32_t* pX;
+  const int32_t* pB = (const int32_t*)bias;
   int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2), 31-
   // const int bias_exp = 17;
   // const int output_offset_exp = 17;
@@ -167,25 +162,23 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
   int processLastLoop = ((m & 7) != 0);
 
   // FIX for input size pointer is not align 4 bytes  and  loopLimCol != 0
-// prevent using load_32x4_vr_a unalign,
-// nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration 
-  if (((unsigned int)x & 3) != 0 && loopLimCol != 0)
-  {
-      loopLimCol = 0;
+  // prevent using load_32x4_vr_a unalign,
+  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration
+  if (((unsigned int)x & 3) != 0 && loopLimCol != 0) {
+    loopLimCol = 0;
   }
 
-  if (((unsigned int)x & 1) != 0)
-  {
-      return -1;
+  if (((unsigned int)x & 1) != 0) {
+    return -1;
   }
   vr128 VR_A;
   vr128 VR_x;
   vr128 VR_y;
-  //vr128 VR_inputOffset;
+  // vr128 VR_inputOffset;
   xtbool2 signSpec = int_to_xt_bool2(signs);
 
   vr128 VR_outMult;
-  //vr128 VR_outOffset;
+  // vr128 VR_outOffset;
   vr128 VR_b0 = vseta_vr(kConstTable_Zero, 0, 0);
   ulsr128 UR_out = align_16x4_store(pY);
   AScalar outMultiplerFr32;
@@ -193,33 +186,31 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
   ConvertQ31ToAfloat(outMultipler, outMultiplerFr32, shift);
 
   replicate_ar(VR_outMult, 0xf, outMultiplerFr32.fr);
-  //replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
-  //replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
+  // replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
+  // replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
   for (int i = 0; i < loopLimRow; i++) {
-
     pX = x;
     ulsr128 UR_A = align_32x4_load(pA);
     ulsr128 UR_x = align_32x4_load(pX);
     ulsr128 UR_b;
     load_32x4_vr_a(VR_A, UR_A, pA);
 
-    //if (pB) 
+    // if (pB)
     {
       UR_b = align_32x4_load(pB);
       load_32x4_vr_a(VR_y, UR_b, pB);  // suppose not grate than 16 bit
 
       VR_y = shift32_arith(VR_y, 2, 0);
-      load_32x4_vr_a(VR_b0, UR_b, pB); 
+      load_32x4_vr_a(VR_b0, UR_b, pB);
 
       VR_b0 = shift32_arith(VR_b0, 2, 0);
-
     }
-    //VR_y = vexp_adji(VR_b0, 0); //vseta_vr(0, 0, 0);
+    // VR_y = vexp_adji(VR_b0, 0); //vseta_vr(0, 0, 0);
     mov_AccExtend_vr(VR_b0);
 
     for (int j = 0; j < loopLimCol; j++) {
       load_32x4_vr_a(VR_x, UR_x, pX);
-     // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
+      // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
       WUR_MvmAux(0);
 
       mac8bx8b(VR_y, VR_A, VR_x, signSpec);
@@ -249,7 +240,7 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
 
     for (int32_t j = (loopLimCol << 3); j < nBlockAligned2; j++) {
       load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
-      //VR_x = vbool(VR_x, VR_inputOffset, 0x6);
+      // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
       WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
       mac8bx8b(VR_y, VR_A, VR_x, signSpec);
       load_32x4_vr_a(VR_A, UR_A, pA);
@@ -261,25 +252,25 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      //vr128 VR_q7_out;
+      // vr128 VR_q7_out;
 
       vr128 VR_out;
 
-     // VR_out = vadds(VR_y, VR_b0, 0x0);
+      // VR_out = vadds(VR_y, VR_b0, 0x0);
       VR_out = vmuls(VR_y, VR_outMult, 0);
-      //VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
       convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
-     // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       // accExt
       // store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
-      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       store_16x4_vr_a(VR_out, UR_out, pY);
 
-     // if (pB) {
+      // if (pB) {
       //  load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
-     // }
+      // }
 
       VR_y = mov_vr_AccExtend();
 
@@ -288,14 +279,14 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-     // VR_out = vadds(VR_y, VR_b0, 0x0);
+      // VR_out = vadds(VR_y, VR_b0, 0x0);
       VR_out = vmuls(VR_y, VR_outMult, 0);
-      //VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
       convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
 
-      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
       store_16x4_vr_a(VR_out, UR_out, pY);
       flush_16x4(UR_out, pY);
@@ -307,17 +298,17 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      //vr128 VR_q7_out;
+      // vr128 VR_q7_out;
 
       vr128 VR_out;
 
-      //VR_out = vadds(VR_y, VR_b0, 0x0);
+      // VR_out = vadds(VR_y, VR_b0, 0x0);
       VR_out = vmuls(VR_y, VR_outMult, 0);
-      //VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
       convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
-      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       for (int32_t j = 0; j < (m & 0x7) && j < 4; j++) {
         store16x1_vr_postI(VR_out, pY, INC1, VRQ0);
         VR_out = vpermsi(VR_out, VR_out, 0, SHR_BY_1_ELEM);
@@ -328,7 +319,7 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
       }
       VR_y = mov_vr_AccExtend();
 
-      //if (pB) {
+      // if (pB) {
       //  load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
       //}
 
@@ -337,13 +328,13 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      //VR_out = vadds(VR_y, VR_b0, 0x0);
+      // VR_out = vadds(VR_y, VR_b0, 0x0);
       VR_out = vmuls(VR_y, VR_outMult, 0);
-     // VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
       convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
-      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
       for (int32_t j = 4; j < (m & 0x7) && j < 8; j++) {
         store16x1_vr_postI(VR_out, pY, INC1, VRQ0);
@@ -356,15 +347,14 @@ int MVMQuantizedInt8x8_16(int32_t *x, const int32_t *A,
   return 0;
 }
 
-
-void MVMBatchVectorCwiseProductAccumulate(
-    const int16_t* vector, int v_size, const int16_t* batch_vector, int n_batch,
-    int32_t multiplier, int shift, int16_t* result) {
-
-//  perm16 permX0 = set_perm16(0xC840);
- // perm16 permX1 = set_perm16(0xC840);
- // perm16 permX2 = set_perm16(0xC840);
-  //perm16 permX3 = set_perm16(0xC840);
+void MVMBatchVectorCwiseProductAccumulate(const int16_t* vector, int v_size,
+                                          const int16_t* batch_vector,
+                                          int n_batch, int32_t multiplier,
+                                          int shift, int16_t* result) {
+  //  perm16 permX0 = set_perm16(0xC840);
+  // perm16 permX1 = set_perm16(0xC840);
+  // perm16 permX2 = set_perm16(0xC840);
+  // perm16 permX3 = set_perm16(0xC840);
 
   vr128 VR_multipler;
   AScalar multiplierFr32;
@@ -387,39 +377,15 @@ void MVMBatchVectorCwiseProductAccumulate(
 
     vr128 VR_prod, VR_result;
     int v_size4 = v_size >> 2;
-    //replicate_ar(VR_result, 0xf, result);
-    
-    
+    // replicate_ar(VR_result, 0xf, result);
+
     if (v_size4 > 0) {
       load_16x4_vr_a(VR_vector, UR_vector, pVector);
       convert_16I_to_32F_x4(VR_vector, 0);
       load_16x4_vr_a(VR_bvector, UR_bvector, pBVector);
       convert_16I_to_32F_x4(VR_bvector, 0);
-       
-        for (int v = 0; v < v_size4-1; v++) {
-        load_16x4_vr_a(VR_result, UR_result1, pResult1);
-          convert_16I_to_32F_x4(VR_result, 0);
 
-        //VR_prod = vmacs_adj(VR_result, VR_vector, VR_bvector, 0, 0);
-          VR_prod = vmuls( VR_vector, VR_bvector,  0);
-          VR_prod = vmuls(VR_multipler, VR_prod, 0);
-
-          vr128 VR_out = vadds(VR_prod, VR_result, 0);
-
-          convert_32F_to_16I_x4(VR_out, 0, 0);
-          store_16x4_vr_a(VR_out, UR_result2, pResult2);
-
-          load_16x4_vr_a(VR_vector, UR_vector, pVector);
-          convert_16I_to_32F_x4(VR_vector, 0);
-          load_16x4_vr_a(VR_bvector, UR_bvector, pBVector);
-          convert_16I_to_32F_x4(VR_bvector, 0);
-        //int32_t prod = vector[v] * *batch_vector++;
-      //prod = MultiplyByQuantizedMultiplier(prod, multiplier, shift);
-     // int32_t output = prod + *result;
-     // output = std::max(std::min(static_cast<int32_t>(32767), output),
-      //                  static_cast<int32_t>(-32768));
-      //*result++ = output;
-      }
+      for (int v = 0; v < v_size4 - 1; v++) {
         load_16x4_vr_a(VR_result, UR_result1, pResult1);
         convert_16I_to_32F_x4(VR_result, 0);
 
@@ -431,22 +397,44 @@ void MVMBatchVectorCwiseProductAccumulate(
 
         convert_32F_to_16I_x4(VR_out, 0, 0);
         store_16x4_vr_a(VR_out, UR_result2, pResult2);
-        flush_16x4(UR_result2, pResult2);
+
+        load_16x4_vr_a(VR_vector, UR_vector, pVector);
+        convert_16I_to_32F_x4(VR_vector, 0);
+        load_16x4_vr_a(VR_bvector, UR_bvector, pBVector);
+        convert_16I_to_32F_x4(VR_bvector, 0);
+        // int32_t prod = vector[v] * *batch_vector++;
+        // prod = MultiplyByQuantizedMultiplier(prod, multiplier, shift);
+        // int32_t output = prod + *result;
+        // output = std::max(std::min(static_cast<int32_t>(32767), output),
+        //                  static_cast<int32_t>(-32768));
+        //*result++ = output;
+      }
+      load_16x4_vr_a(VR_result, UR_result1, pResult1);
+      convert_16I_to_32F_x4(VR_result, 0);
+
+      // VR_prod = vmacs_adj(VR_result, VR_vector, VR_bvector, 0, 0);
+      VR_prod = vmuls(VR_vector, VR_bvector, 0);
+      VR_prod = vmuls(VR_multipler, VR_prod, 0);
+
+      vr128 VR_out = vadds(VR_prod, VR_result, 0);
+
+      convert_32F_to_16I_x4(VR_out, 0, 0);
+      store_16x4_vr_a(VR_out, UR_result2, pResult2);
+      flush_16x4(UR_result2, pResult2);
     }
 
     // reminder
   }
 }
 
-
 void Sigmoid(int16_t* data, int32_t data_size) {
-  //xa_nn_vec_sigmoid_sym16s_sym16s(data, data, 0, 0, data_size);
+  // xa_nn_vec_sigmoid_sym16s_sym16s(data, data, 0, 0, data_size);
 }
 
 void Sigmoid(float* data, int32_t data_size) {
   int data_dims[2] = {1, data_size};
   RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(data_dims));
-  //reference_ops::Logistic(data_shape, data, data_shape, data);
+  // reference_ops::Logistic(data_shape, data, data_shape, data);
 }
 
 void Tanh(int32_t cell_state_scale_power, int16_t* input_data,
@@ -463,7 +451,7 @@ void Tanh(int32_t cell_state_scale_power, int16_t* input_data,
     input_multiplier = 3;
 #endif
   }
-  //xa_nn_vec_tanh_sym16s_sym16s(output_data, input_data, input_multiplier,
+  // xa_nn_vec_tanh_sym16s_sym16s(output_data, input_data, input_multiplier,
   //                             tanh_input_left_shift, data_size);
 }
 
@@ -471,26 +459,26 @@ void Tanh(int32_t cell_state_scale_power, float* input_data, float* output_data,
           int32_t data_size) {
   int data_dims[2] = {1, data_size};
   RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(data_dims));
-  //reference_ops::Tanh(data_shape, input_data, data_shape, output_data);
+  // reference_ops::Tanh(data_shape, input_data, data_shape, output_data);
 }
 
 // Input and output have the same shape in LSTM
 void Mul(const ArithmeticParams& params, const int16_t* input1_data,
          const int16_t* input2_data, int8_t* output_data, int32_t data_size) {
- // xa_nn_elm_mul_sym16sxsym16s_asym8s(
+  // xa_nn_elm_mul_sym16sxsym16s_asym8s(
   //    output_data, params.output_offset, params.output_shift,
   //    params.output_multiplier, params.quantized_activation_min,
-   //   params.quantized_activation_max, input1_data, input2_data, data_size);
+  //   params.quantized_activation_max, input1_data, input2_data, data_size);
 }
 
 // Input and output have the same shape in LSTM
 void Mul(const ArithmeticParams& params, const int16_t* input1_data,
          const int16_t* input2_data, int16_t* output_data, int32_t data_size) {
-  //int dims_4D[4] = {1, 1, 1, data_size};
- // xa_nn_elm_mul_broadcast_4D_sym16sxsym16s_sym16s(
- //     output_data, dims_4D, params.output_shift, params.output_multiplier,
- //     params.quantized_activation_min, params.quantized_activation_max,
- //     input1_data, dims_4D, input2_data, dims_4D);
+  // int dims_4D[4] = {1, 1, 1, data_size};
+  // xa_nn_elm_mul_broadcast_4D_sym16sxsym16s_sym16s(
+  //     output_data, dims_4D, params.output_shift, params.output_multiplier,
+  //     params.quantized_activation_min, params.quantized_activation_max,
+  //     input1_data, dims_4D, input2_data, dims_4D);
   return;
 }
 
@@ -510,15 +498,16 @@ void FullyConnected(const FullyConnectedParams& params,
                     const int accum_depth) {
 #pragma loop_count min = 1
   for (int b = 0; b < num_batches; b++) {
-   // xa_nn_matXvec_out_stride_sym8sxasym8s_16(
-   //     output_data + b * output_depth, filter_data,
-  //      input_data + b * accum_depth, bias_data, output_depth, accum_depth,
-  //      accum_depth, 1, params.input_offset, params.output_multiplier,
-  //      params.output_shift);
+    // xa_nn_matXvec_out_stride_sym8sxasym8s_16(
+    //     output_data + b * output_depth, filter_data,
+    //      input_data + b * accum_depth, bias_data, output_depth, accum_depth,
+    //      accum_depth, 1, params.input_offset, params.output_multiplier,
+    //      params.output_shift);
 
-  MVMQuantizedInt8x8_16((int32_t *)input_data, (int32_t *)filter_data,
-  bias_data, output_data, output_depth, accum_depth, params.output_multiplier,
-  params.output_shift, params.output_offset, 3);
+    MVMQuantizedInt8x8_16((int32_t*)input_data, (int32_t*)filter_data,
+                          bias_data, output_data, output_depth, accum_depth,
+                          params.output_multiplier, params.output_shift,
+                          params.output_offset, 3);
   }
   return;
 }
@@ -528,7 +517,7 @@ void FullyConnected(const FullyConnectedParams& params,
                     const int64_t* bias_data, int16_t* output_data,
                     const int num_batches, const int output_depth,
                     const int accum_depth) {
-  //xa_nn_matmul_sym8sxsym16s_sym16s(
+  // xa_nn_matmul_sym8sxsym16s_sym16s(
   //    output_data, filter_data, input_data, bias_data, output_depth,
   //    accum_depth, accum_depth, num_batches, accum_depth, output_depth, 1,
   //    params.input_offset, params.output_multiplier, params.output_shift,
@@ -619,17 +608,17 @@ void FullyConnected(const FullyConnectedParams& params,
                     const RuntimeShape& filter_shape, const int8_t* filter_data,
                     const RuntimeShape& bias_shape, const int32_t* bias_data,
                     const RuntimeShape& output_shape, int16_t* output_data) {
-  
   //
   KN_PRINT_Q7_SIZE(input_data, input_shape.FlatSize());
-  
-   tflite::reference_integer_ops::FullyConnected(
+
+  tflite::reference_integer_ops::FullyConnected(
       params, input_shape, input_data, filter_shape, filter_data, bias_shape,
       bias_data, output_shape, output_data);
 
-//    MVMQuantizedInt8x8_16((int32_t*)input_data, (int32_t*)op_data_ex->mapped_i2i_w,
-//        (int32_t *)input_to_gate_bias, (int16_t*)gate, n_output,
-//        n_input, input_to_gate_scale_a, input_to_gate_scale_b, 0, 3);
+  //    MVMQuantizedInt8x8_16((int32_t*)input_data,
+  //    (int32_t*)op_data_ex->mapped_i2i_w,
+  //        (int32_t *)input_to_gate_bias, (int16_t*)gate, n_output,
+  //        n_input, input_to_gate_scale_a, input_to_gate_scale_b, 0, 3);
 
   KN_PRINT_Q15_SIZE(output_data, output_shape.FlatSize());
 }
@@ -689,8 +678,8 @@ void UpdateLstmCell(const LstmStepManager& step_info,
                    tflite::micro::GetTensorShape(cell_state).FlatSize());
 
   // Multiplier is equivalent to 0.5 here so adding 1 to shifts
- // xa_nn_lstm_cell_state_update_16(
- //     tflite::micro::GetTensorData<int16_t>(cell_state) +
+  // xa_nn_lstm_cell_state_update_16(
+  //     tflite::micro::GetTensorData<int16_t>(cell_state) +
   //        step_info.CellStateOffset(),
   //    forget_gate_output, cell_gate_output, input_gate_output,
   //    forget_cell_mul_params.output_shift - 1,
@@ -743,11 +732,10 @@ void UpdateLstmCell(const LstmStepManager& step_info,
 // Calculates a single LSTM gate, int8x8_16 version.
 // Implements the same functionality as CalculateLstmGateFloat.
 void CalculateLstmGateInteger8x8_16(
-    const OpDataLSTMEx *op_data_ex,
+    const OpDataLSTMEx* op_data_ex,
     // Input and weights
     const int8_t* input, const int8_t* input_to_gate_weights,
-    const int32_t* input_to_gate_bias, 
-    const int32_t input_to_gate_scale_a,
+    const int32_t* input_to_gate_bias, const int32_t input_to_gate_scale_a,
     const int32_t input_to_gate_scale_b,
     // Output state and weights
     const int8_t* output_state, const int8_t* recurrent_to_gate_weights,
@@ -779,15 +767,16 @@ void CalculateLstmGateInteger8x8_16(
   std::fill_n(gate, n_batch * n_cell, 0);
 #if defined(DMX1A_LSTM_OPT)
 
-    MVMQuantizedInt8x8_16((int32_t*)input, (int32_t*)op_data_ex->mapped_i2i_w,
-        (int32_t *)input_to_gate_bias, (int16_t*)gate, n_output,
-        n_input, input_to_gate_scale_a, input_to_gate_scale_b, 0, 3);
+  MVMQuantizedInt8x8_16((int32_t*)input, (int32_t*)op_data_ex->mapped_i2i_w,
+                        (int32_t*)input_to_gate_bias, (int16_t*)gate, n_output,
+                        n_input, input_to_gate_scale_a, input_to_gate_scale_b,
+                        0, 3);
 #else
   // For each batch and cell: compute input_weight * input.
   tensor_utils::PortableMatrixBatchVectorMultiplyAccumulate(
       input, input_to_gate_bias, input_to_gate_weights, input_to_gate_scale_a,
       input_to_gate_scale_b, n_batch, n_input, n_cell, 0, scratch5, gate, NULL);
-  #endif
+#endif
 
   KN_PRINT_Q15_SIZE(gate, n_output);
 // Note: no aux_input.
@@ -795,36 +784,34 @@ void CalculateLstmGateInteger8x8_16(
 // For each batch and cell: compute recurrent_weight * output_state.
 #if defined(DMX1A_LSTM_OPT)
 
-      MVMQuantizedInt8x8_16(
-      (int32_t*)output_state, (int32_t*)op_data_ex->mapped_r2i_w, //recurrent_to_gate_weights,
+  MVMQuantizedInt8x8_16(
+      (int32_t*)output_state,
+      (int32_t*)op_data_ex->mapped_r2i_w,  // recurrent_to_gate_weights,
       (int32_t*)recurrent_to_gate_bias, (int16_t*)gate, n_output, n_cell,
-      recurrent_to_gate_scale_a, recurrent_to_gate_scale_b, 0,
-                        3);
+      recurrent_to_gate_scale_a, recurrent_to_gate_scale_b, 0, 3);
 #else
   tensor_utils::PortableMatrixBatchVectorMultiplyAccumulate(
       output_state, recurrent_to_gate_bias, recurrent_to_gate_weights,
       recurrent_to_gate_scale_a, recurrent_to_gate_scale_b, n_batch, n_output,
       n_cell, 0, scratch5, gate, NULL);
 #endif
-      KN_PRINT_Q15_SIZE(gate, n_output);
+  KN_PRINT_Q15_SIZE(gate, n_output);
   // For each batch and cell: compute cell_weight * cell_state (peephole LSTM)
   if (use_peephole) {
+#if defined(DMX1A_LSTM_OPT)
 
-      #if defined(DMX1A_LSTM_OPT)
-
-      MVMBatchVectorCwiseProductAccumulate(
+    MVMBatchVectorCwiseProductAccumulate(
         cell_to_gate_weights, n_output, cell_state, n_batch,
         cell_to_gate_scale_a, cell_to_gate_scale_b, gate);
-      #else
+#else
     tensor_utils::PortableVectorBatchVectorCwiseProductAccumulate(
         cell_to_gate_weights, n_output, cell_state, n_batch,
         cell_to_gate_scale_a, cell_to_gate_scale_b, gate);
-    #endif
+#endif
   }
   // Do layer normalization (if layer norm LSTM)
   if (use_layer_norm) {
-    
-      tensor_utils::PortableApplyLayerNorm(
+    tensor_utils::PortableApplyLayerNorm(
         gate, layer_norm_coefficients, layer_norm_bias,
         layer_norm_input_scale_a, layer_norm_input_scale_b,
         layer_norm_variance_guard, n_batch, n_cell, gate);
@@ -833,18 +820,18 @@ void CalculateLstmGateInteger8x8_16(
   switch (activation) {
     case kTfLiteActSigmoid:
 #if defined(DMX1A_LSTM_OPT)
-      //scratch = MVMConvert();
+      // scratch = MVMConvert();
       SigmoidV_Full(gate_flt, gate, n_cell);
 #else
-       tensor_utils::PortableApplySigmoid(gate, n_batch, n_cell, gate);
+      tensor_utils::PortableApplySigmoid(gate, n_batch, n_cell, gate);
 
 #endif  // !defined(DMX1A_LSTM_OPT)
       break;
     case kTfLiteActTanh:
 #if defined(DMX1A_LSTM_OPT)
-       //tanV(
+      // tanV(
 #else
-       tensor_utils::PortableApplyTanh(3, gate, n_batch, n_cell, gate);
+      tensor_utils::PortableApplyTanh(3, gate, n_batch, n_cell, gate);
 
 #endif  // !defined(DMX1A_LSTM_OPT)
       break;
@@ -892,7 +879,6 @@ void UpdateLstmCellInteger(int n_batch, int n_cell, int16_t* cell_state,
   }
 
 #endif  // !defined(HIFI5)
-
 }
 
 // Increment the data offset so the sigle time step invocation call can access

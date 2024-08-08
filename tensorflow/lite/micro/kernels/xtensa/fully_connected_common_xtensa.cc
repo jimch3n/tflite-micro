@@ -38,16 +38,12 @@ void* XtensaInitFullyConnected(TfLiteContext* context, const char* buffer,
   return context->AllocatePersistentBuffer(context,
                                            sizeof(OpDataFullyConnected));
 #else
-  
-
   void* data = context->AllocatePersistentBuffer(
       context, sizeof(XtensaFullyConnectedOpData));
-
 #if !defined(HIFIMINI)
   if (InitXtensaContext()) {
     return nullptr;
   }
-
 #endif
   return data;
 #endif  // defined(VISION_P6)
@@ -117,17 +113,16 @@ TfLiteStatus XtensaPrepareFullyConnected(TfLiteContext* context,
   TF_LITE_ENSURE(context, output != nullptr);
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
 #ifdef USE_HMD_MVM_OPT
-  if(filter->type == kTfLiteInt8)
-  {
-     HmdPrepareFullyConnectedInt8(context, node);
-       micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(filter);
-  if (bias != nullptr) {
-    micro_context->DeallocateTempTfLiteTensor(bias);
+  if (filter->type == kTfLiteInt8) {
+    HmdPrepareFullyConnectedInt8(context, node);
+    micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(filter);
+    if (bias != nullptr) {
+      micro_context->DeallocateTempTfLiteTensor(bias);
+    }
+    micro_context->DeallocateTempTfLiteTensor(output);
+    return kTfLiteOk;
   }
-  micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
-  } 
 #endif
   if (filter->type == kTfLiteInt4) {
     int filter_size =

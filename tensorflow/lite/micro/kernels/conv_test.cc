@@ -17,10 +17,9 @@ limitations under the License.
 #elif defined(IA700)
 #include "tensorflow/lite/micro/ia700/config.h"
 #endif
-#include "tensorflow/lite/micro/kernels/conv_test.h"
-
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/kernels/conv_test.h"
 #include "tensorflow/lite/micro/kernels/kernel_runner.h"
 #include "tensorflow/lite/micro/kernels/testdata/conv_test_data.h"
 #include "tensorflow/lite/micro/micro_utils.h"
@@ -31,13 +30,15 @@ limitations under the License.
 #elif defined(IA700)
 #include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #endif
-#define COPY_FLT_BFUR(DST, SRC, SIZE) do {\
-    float *dst = (float *) DST;\
-float* src = (float *)SRC;\
-int copy_size = SIZE;\
-for(int ii = 0; ii < copy_size;ii++) \
-{ dst[ii] = src[ii]; }\
-}while(0)
+#define COPY_FLT_BFUR(DST, SRC, SIZE)        \
+  do {                                       \
+    float* dst = (float*)DST;                \
+    float* src = (float*)SRC;                \
+    int copy_size = SIZE;                    \
+    for (int ii = 0; ii < copy_size; ii++) { \
+      dst[ii] = src[ii];                     \
+    }                                        \
+  } while (0)
 namespace tflite {
 namespace testing {
 namespace {
@@ -62,11 +63,10 @@ static const float kGoldenData[kOutputElements] = {18, 2, 5, 18, 2, 5,
                                                    17, 4, 3, 37, 4, 3};
 
 static float kFilterDataFlt[kFilterElements];
-static  float kBiasDataFlt[kBiasElements];
-#if  defined(IA8201) || defined(IA700) 
-static const float kGoldenDataDilation[kOutputElements] = { 4, 2, 1, 2,
-1, 2, 8, 4,
--1, 4, -1, 0 };
+static float kBiasDataFlt[kBiasElements];
+#if defined(IA8201) || defined(IA700)
+static const float kGoldenDataDilation[kOutputElements] = {4, 2, 1,  2, 1,  2,
+                                                           8, 4, -1, 4, -1, 0};
 #endif
 
 static TfLiteConvParams common_conv_params = {
@@ -149,13 +149,11 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedPerChannel) {
 TF_LITE_MICRO_TEST(SimpleTestFloat) {
   float output_data[tflite::testing::kOutputElements];
 
-  COPY_FLT_BFUR(tflite::testing::kFilterDataFlt,
-      tflite::testing::kFilterData,
-      tflite::testing::kFilterElements);
+  COPY_FLT_BFUR(tflite::testing::kFilterDataFlt, tflite::testing::kFilterData,
+                tflite::testing::kFilterElements);
 
-  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt,
-      tflite::testing::kBiasData,
-      tflite::testing::kBiasElements);
+  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt, tflite::testing::kBiasData,
+                tflite::testing::kBiasElements);
   TF_LITE_MICRO_EXPECT_EQ(
       kTfLiteOk,
       tflite::testing::TestConvFloat(
@@ -169,66 +167,62 @@ TF_LITE_MICRO_TEST(SimpleTestFloat) {
 #if defined(IA8201) || defined(IA700)
 
 TF_LITE_MICRO_TEST(SimpleTestFloatInt8) {
-    float output_data[tflite::testing::kOutputElements];
+  float output_data[tflite::testing::kOutputElements];
 
-
-    COPY_FLT_BFUR(tflite::testing::kBiasDataFlt,
-        tflite::testing::kBiasData,
-        tflite::testing::kBiasElements);
-    TF_LITE_MICRO_EXPECT_EQ(
-        kTfLiteOk,
-        tflite::testing::TestConvFloatInt8(
-            tflite::testing::kInputShape, tflite::testing::kInputData,
-            tflite::testing::kFilterShape, tflite::testing::kFilterData, // tflite::testing::kFilterDataFlt,
-            tflite::testing::kBiasShape, tflite::testing::kBiasDataFlt,
-            tflite::testing::kOutputShape, tflite::testing::kGoldenData,
-            &tflite::testing::common_conv_params, tflite::Register_CONV_2D(),
-            output_data));
+  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt, tflite::testing::kBiasData,
+                tflite::testing::kBiasElements);
+  TF_LITE_MICRO_EXPECT_EQ(
+      kTfLiteOk,
+      tflite::testing::TestConvFloatInt8(
+          tflite::testing::kInputShape, tflite::testing::kInputData,
+          tflite::testing::kFilterShape,
+          tflite::testing::kFilterData,  // tflite::testing::kFilterDataFlt,
+          tflite::testing::kBiasShape, tflite::testing::kBiasDataFlt,
+          tflite::testing::kOutputShape, tflite::testing::kGoldenData,
+          &tflite::testing::common_conv_params, tflite::Register_CONV_2D(),
+          output_data));
 }
 
 TF_LITE_MICRO_TEST(SimpleTestFloat16) {
-    float output_data[tflite::testing::kOutputElements];
+  float output_data[tflite::testing::kOutputElements];
 
-   
-    COPY_FLT_BFUR(tflite::testing::kBiasDataFlt,
-        tflite::testing::kBiasData,
-        tflite::testing::kBiasElements);
-    TF_LITE_MICRO_EXPECT_EQ(
-        kTfLiteOk,
-        tflite::testing::TestConvFloat16(
-            tflite::testing::kInputShape, tflite::testing::kInputData,
-            tflite::testing::kFilterShape, tflite::testing::kFilterData, // tflite::testing::kFilterDataFlt,
-            tflite::testing::kBiasShape, tflite::testing::kBiasDataFlt,
-            tflite::testing::kOutputShape, tflite::testing::kGoldenData,
-            &tflite::testing::common_conv_params, tflite::Register_CONV_2D(),
-            output_data));
+  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt, tflite::testing::kBiasData,
+                tflite::testing::kBiasElements);
+  TF_LITE_MICRO_EXPECT_EQ(
+      kTfLiteOk,
+      tflite::testing::TestConvFloat16(
+          tflite::testing::kInputShape, tflite::testing::kInputData,
+          tflite::testing::kFilterShape,
+          tflite::testing::kFilterData,  // tflite::testing::kFilterDataFlt,
+          tflite::testing::kBiasShape, tflite::testing::kBiasDataFlt,
+          tflite::testing::kOutputShape, tflite::testing::kGoldenData,
+          &tflite::testing::common_conv_params, tflite::Register_CONV_2D(),
+          output_data));
 }
 
 TF_LITE_MICRO_TEST(SimpleTestFloatDilation) {
-    float output_data[tflite::testing::kOutputElements];
+  float output_data[tflite::testing::kOutputElements];
 
-    COPY_FLT_BFUR(tflite::testing::kFilterDataFlt,
-        tflite::testing::kFilterData,
-        tflite::testing::kFilterElements);
+  COPY_FLT_BFUR(tflite::testing::kFilterDataFlt, tflite::testing::kFilterData,
+                tflite::testing::kFilterElements);
 
-    COPY_FLT_BFUR(tflite::testing::kBiasDataFlt,
-        tflite::testing::kBiasData,
-        tflite::testing::kBiasElements);
-    tflite::testing::common_conv_params.dilation_width_factor = 2;
-    tflite::testing::common_conv_params.dilation_height_factor = 3;
+  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt, tflite::testing::kBiasData,
+                tflite::testing::kBiasElements);
+  tflite::testing::common_conv_params.dilation_width_factor = 2;
+  tflite::testing::common_conv_params.dilation_height_factor = 3;
 
-    TF_LITE_MICRO_EXPECT_EQ(
-        kTfLiteOk,
-        tflite::testing::TestConvFloat(
-            tflite::testing::kInputShape, tflite::testing::kInputData,
-            tflite::testing::kFilterShape, tflite::testing::kFilterDataFlt,
-            tflite::testing::kBiasShape, tflite::testing::kBiasDataFlt,
-            tflite::testing::kOutputShape, tflite::testing::kGoldenDataDilation,
-            &tflite::testing::common_conv_params, tflite::Register_CONV_2D(),
-            output_data));
+  TF_LITE_MICRO_EXPECT_EQ(
+      kTfLiteOk,
+      tflite::testing::TestConvFloat(
+          tflite::testing::kInputShape, tflite::testing::kInputData,
+          tflite::testing::kFilterShape, tflite::testing::kFilterDataFlt,
+          tflite::testing::kBiasShape, tflite::testing::kBiasDataFlt,
+          tflite::testing::kOutputShape, tflite::testing::kGoldenDataDilation,
+          &tflite::testing::common_conv_params, tflite::Register_CONV_2D(),
+          output_data));
 
-    tflite::testing::common_conv_params.dilation_width_factor = 1;
-    tflite::testing::common_conv_params.dilation_height_factor = 1;
+  tflite::testing::common_conv_params.dilation_width_factor = 1;
+  tflite::testing::common_conv_params.dilation_height_factor = 1;
 }
 #endif
 TF_LITE_MICRO_TEST(InputAndFilterSameWidthHeight) {
@@ -266,13 +260,11 @@ TF_LITE_MICRO_TEST(InputOutputDifferentTypeIsError) {
   constexpr int tensors_size = inputs_size + outputs_size;
 
   int8_t output_data[tflite::testing::kOutputElements];
-  COPY_FLT_BFUR(tflite::testing::kFilterDataFlt,
-      tflite::testing::kFilterData,
-      tflite::testing::kFilterElements);
+  COPY_FLT_BFUR(tflite::testing::kFilterDataFlt, tflite::testing::kFilterData,
+                tflite::testing::kFilterElements);
 
-  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt,
-      tflite::testing::kBiasData,
-      tflite::testing::kBiasElements);
+  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt, tflite::testing::kBiasData,
+                tflite::testing::kBiasElements);
   TfLiteTensor tensors[tensors_size] = {
       CreateTensor(tflite::testing::kInputData, input_dims),
       CreateTensor(tflite::testing::kFilterDataFlt, filter_dims),
@@ -286,7 +278,7 @@ TF_LITE_MICRO_TEST(InputOutputDifferentTypeIsError) {
                                   &tflite::testing::common_conv_params,
                                   tflite::Register_CONV_2D(), output_data));
 }
-#if !defined(IA8201)  &&  !defined(IA700)
+#if !defined(IA8201) && !defined(IA700)
 TF_LITE_MICRO_TEST(HybridModeIsError) {
   using tflite::testing::CreateQuantizedTensor;
   using tflite::testing::CreateTensor;
@@ -303,9 +295,8 @@ TF_LITE_MICRO_TEST(HybridModeIsError) {
 
   int8_t filter_data[tflite::testing::kFilterElements] = {};
   float output_data[tflite::testing::kOutputElements];
-  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt,
-      tflite::testing::kBiasData,
-      tflite::testing::kBiasElements);
+  COPY_FLT_BFUR(tflite::testing::kBiasDataFlt, tflite::testing::kBiasData,
+                tflite::testing::kBiasElements);
   TfLiteTensor tensors[tensors_size] = {
       CreateTensor(tflite::testing::kInputData, input_dims),
       CreateQuantizedTensor(filter_data, filter_dims,

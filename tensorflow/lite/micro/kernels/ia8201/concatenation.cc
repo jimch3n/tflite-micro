@@ -13,10 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
-#include "tensorflow/lite/micro/ia8201/config.h"
-
-
 #include "tensorflow/lite/kernels/internal/reference/concatenation.h"
+
 #include <cstdint>
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -25,9 +23,11 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/ia8201/config.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/micro_log.h"
 namespace tflite {
 #if defined(IA8201) || defined(IA700)
 void block_copy_bytes(int8_t* pDes, const int8_t* pSrc, int32_t nBytes);
@@ -35,11 +35,12 @@ void block_copy_bytes(int8_t* pDes, const int8_t* pSrc, int32_t nBytes);
 
 template <typename Scalar>
 inline void ConcatenationEx(const ConcatenationParams& params,
-                          const RuntimeShape* const* input_shapes,
-                          const Scalar* const* input_data,
-                          const RuntimeShape& output_shape, Scalar* output_data,
-                          uint16_t* input_offset = nullptr,
-                          uint32_t* input_size = nullptr) {
+                            const RuntimeShape* const* input_shapes,
+                            const Scalar* const* input_data,
+                            const RuntimeShape& output_shape,
+                            Scalar* output_data,
+                            uint16_t* input_offset = nullptr,
+                            uint32_t* input_size = nullptr) {
   int axis = params.axis;
   int inputs_count = params.inputs_count;
   const int concat_dimensions = output_shape.DimensionsCount();
@@ -89,7 +90,7 @@ inline void ConcatenationEx(const ConcatenationParams& params,
   }
 }
 
-namespace  {
+namespace {
 
 constexpr int kMaxInputNum = 64;  // Maximum number of input tensors
 constexpr int kOutputTensor = 0;
@@ -164,34 +165,35 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  const ConCatOpDataEx* data = static_cast<const ConCatOpDataEx*>(node->user_data);
+  const ConCatOpDataEx* data =
+      static_cast<const ConCatOpDataEx*>(node->user_data);
 
 #if defined(DMX1A_CONCATENATION_OPT) || defined(HMD1A_CONCATENATION_OPT)
-  if (data->opt_constraint)
-  {
-      int8_t* output_ptr = tflite::micro::GetTensorData<int8_t>(output);
-      uint32_t* cp_size = data->input_size;
-      uint16_t* cp_offset = data->input_offset;
-      for (int k = 0; k < data->outer_size; k++) {
-          for (int i = 0; i < data->inputs_count; ++i) {
-              const int copy_size = *cp_size; //input_shapes[i]->Dims(axis) * base_inner_size;
-              const data_type* input_ptr = inputs_data[i] + *cp_offset;
+  if (data->opt_constraint) {
+    int8_t* output_ptr = tflite::micro::GetTensorData<int8_t>(output);
+    uint32_t* cp_size = data->input_size;
+    uint16_t* cp_offset = data->input_offset;
+    for (int k = 0; k < data->outer_size; k++) {
+      for (int i = 0; i < data->inputs_count; ++i) {
+        const int copy_size =
+            *cp_size;  // input_shapes[i]->Dims(axis) * base_inner_size;
+        const data_type* input_ptr = inputs_data[i] + *cp_offset;
 
-              block_copy_bytes((int8_t*)output_ptr, (const int8_t*)input_ptr, copy_size);
-              cp_offset++;
-              cp_size++;
-              output_ptr += copy_size; // use byte as pointer
-          }
+        block_copy_bytes((int8_t*)output_ptr, (const int8_t*)input_ptr,
+                         copy_size);
+        cp_offset++;
+        cp_size++;
+        output_ptr += copy_size;  // use byte as pointer
       }
-  }
-  else
+    }
+  } else
 #endif
   {
-      reference_ops::Concatenation(data->params, inputs_shape_ptr, inputs_data,
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<data_type>(output));
+    reference_ops::Concatenation(
+        data->params, inputs_shape_ptr, inputs_data,
+        tflite::micro::GetTensorShape(output),
+        tflite::micro::GetTensorData<data_type>(output));
   }
-
 }
 
 void EvalQuantizedUInt8(TfLiteContext* context, TfLiteNode* node) {
@@ -207,7 +209,8 @@ void EvalQuantizedUInt8(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  const ConCatOpDataEx* data = static_cast<const ConCatOpDataEx*>(node->user_data);
+  const ConCatOpDataEx* data =
+      static_cast<const ConCatOpDataEx*>(node->user_data);
 
   reference_ops::ConcatenationWithScaling(
       data->params, inputs_shape_ptr, inputs_data,
@@ -215,7 +218,8 @@ void EvalQuantizedUInt8(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetTensorData<uint8_t>(output));
 }
 
-void* ConcatenationInit(TfLiteContext* context, const char* buffer, size_t length) {
+void* ConcatenationInit(TfLiteContext* context, const char* buffer,
+                        size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
   return context->AllocatePersistentBuffer(context, sizeof(ConCatOpDataEx));
 }
@@ -225,7 +229,6 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
   // performed in the reference implementation called during Eval().
   const TfLiteConcatenationParams* params =
       reinterpret_cast<TfLiteConcatenationParams*>(node->builtin_data);
-
 
   MicroContext* micro_context = GetMicroContext(context);
 
@@ -257,7 +260,7 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
 
   // Shapes with dimensions >4 are not yet supported with static allocation.
   for (int i = 0; i < num_inputs; ++i) {
-  //  const TfLiteTensor* input = GetInput(context, node, i);
+    //  const TfLiteTensor* input = GetInput(context, node, i);
     TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, i);
     TF_LITE_ENSURE(context, input != nullptr);
     int num_dimensions = NumDimensions(input);
@@ -276,7 +279,7 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   ConCatOpDataEx* data = static_cast<ConCatOpDataEx*>(node->user_data);
 
-  //TfLiteTensor* output = GetOutput(context, node, kOutputTensor);
+  // TfLiteTensor* output = GetOutput(context, node, kOutputTensor);
 
   TfLiteTensor* output =
       micro_context->AllocateTempOutputTensor(node, kOutputTensor);
@@ -309,7 +312,7 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
       // Allocate persistent scale and zeropoint buffers.
       // Store input scale and zero point values in OpParams:
       for (int i = 0; i < node->inputs->size; ++i) {
-        //const TfLiteTensor* t = GetInput(context, node, i);
+        // const TfLiteTensor* t = GetInput(context, node, i);
         TfLiteTensor* t = micro_context->AllocateTempInputTensor(node, i);
         TF_LITE_ENSURE(context, t != nullptr);
         input_scales[i] = t->params.scale;
@@ -330,7 +333,7 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteError;
   }
 #if defined(DMX1A_CONCATENATION_OPT) || defined(HMD1A_CONCATENATION_OPT)
-    TfLiteEvalTensor* outputEval =
+  TfLiteEvalTensor* outputEval =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
   const RuntimeShape* inputs_shape_ptr[kMaxInputNum];
   const float* inputs_data_flt[kMaxInputNum];
@@ -339,38 +342,40 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
   const RuntimeShape& output_shape = GetTensorShape(output);
   int32_t outer_size = 1;
   for (int i = 0; i < data->params.axis; ++i) {
-      outer_size *= output_shape.Dims(i);
+    outer_size *= output_shape.Dims(i);
   }
   data->inputs_count = inputs_count;
   data->outer_size = outer_size;
-  data->input_offset = (uint16_t*)context->AllocatePersistentBuffer(context, sizeof(uint16_t)* inputs_count* outer_size);
-  data->input_size = (uint32_t*)context->AllocatePersistentBuffer(context, sizeof(uint32_t) * inputs_count * outer_size);
+  data->input_offset = (uint16_t*)context->AllocatePersistentBuffer(
+      context, sizeof(uint16_t) * inputs_count * outer_size);
+  data->input_size = (uint32_t*)context->AllocatePersistentBuffer(
+      context, sizeof(uint32_t) * inputs_count * outer_size);
   data->opt_constraint = 0;
-  //const RuntimeShape* input_shape =(const RuntimeShape*) GetTensorShape(input);
+  // const RuntimeShape* input_shape =(const RuntimeShape*)
+  // GetTensorShape(input);
   RuntimeShape inputs_shape[kMaxInputNum];
   GetAllInputTensorShapes(context, node, inputs_shape);
   GetShapesPointers(inputs_shape, node->inputs->size, inputs_shape_ptr);
-  //const uint8_t* inputs_data[kMaxInputNum];
-  
-  
+  // const uint8_t* inputs_data[kMaxInputNum];
+
   switch (output_type) {
-  case kTfLiteFloat32:
-  case kTfLiteInt32:
+    case kTfLiteFloat32:
+    case kTfLiteInt32:
       GetAllInputTensorData(context, node, inputs_data_flt);
-#if 0 //OLD API
+#if 0  // OLD API
       reference_ops::Concatenation<float>(data->params, inputs_shape_ptr, inputs_data_flt,
           output_shape,
           (float*)0, data->input_offset, data->input_size);
 #endif
       // target log size and offset,
-          ConcatenationEx(data->params, inputs_shape_ptr, inputs_data_flt,
-          output_shape,
-          tflite::micro::GetTensorData<float>(outputEval),
-            data->input_offset, data->input_size);
+      ConcatenationEx(data->params, inputs_shape_ptr, inputs_data_flt,
+                      output_shape,
+                      tflite::micro::GetTensorData<float>(outputEval),
+                      data->input_offset, data->input_size);
 
       data->opt_constraint = 1;
       break;
-  case kTfLiteInt8:
+    case kTfLiteInt8:
       GetAllInputTensorData(context, node, inputs_data_int8);
 #if 0
       reference_ops::Concatenation<int8_t>(data->params, inputs_shape_ptr, inputs_data_int8,
@@ -378,26 +383,27 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
           (int8_t*)0, data->input_offset, data->input_size);
 #endif
       ConcatenationEx(data->params, inputs_shape_ptr, inputs_data_int8,
-          output_shape,
-          tflite::micro::GetTensorData<int8_t>(outputEval));
+                      output_shape,
+                      tflite::micro::GetTensorData<int8_t>(outputEval));
 
       data->opt_constraint = 1;
       break;
-  case kTfLiteInt64:
-  case kTfLiteBool:
-  case kTfLiteInt16:
-  case kTfLiteFloat16:
-     // GetAllInputTensorData(context, node, inputs_data_int8);
-    //  reference_ops::Concatenation<int8_t>(data->params, inputs_shape_ptr, inputs_data_int8,
-    //      output_shape,
-    //      (int8_t*)0, data->input_offset, data->input_size);
+    case kTfLiteInt64:
+    case kTfLiteBool:
+    case kTfLiteInt16:
+    case kTfLiteFloat16:
+      // GetAllInputTensorData(context, node, inputs_data_int8);
+      //  reference_ops::Concatenation<int8_t>(data->params, inputs_shape_ptr,
+      //  inputs_data_int8,
+      //      output_shape,
+      //      (int8_t*)0, data->input_offset, data->input_size);
       break;
-  default:
+    default:
       return kTfLiteError;
   }
 
-  KN_PRINT_Q15_SIZE(data->input_offset, int( inputs_count* outer_size));
-  KN_PRINT_Q15_SIZE(data->input_size, int(inputs_count* outer_size));
+  KN_PRINT_Q15_SIZE(data->input_offset, int(inputs_count * outer_size));
+  KN_PRINT_Q15_SIZE(data->input_size, int(inputs_count * outer_size));
 #endif
 
   micro_context->DeallocateTempTfLiteTensor(output);
@@ -405,13 +411,13 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
-  //const TfLiteTensor* output_tensor = GetOutput(context, node, kOutputTensor);
-  //TF_LITE_ENSURE(context, output_tensor != nullptr);
-    //get output from eval saving times
-TfLiteEvalTensor* output_tensor =
-    tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+  // const TfLiteTensor* output_tensor = GetOutput(context, node,
+  // kOutputTensor); TF_LITE_ENSURE(context, output_tensor != nullptr); get
+  // output from eval saving times
+  TfLiteEvalTensor* output_tensor =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
   TF_LITE_ENSURE(context, output_tensor != nullptr);
-    
+
   TfLiteType output_type = output_tensor->type;
 
   switch (output_type) {  // Already know in/outtypes are same.
@@ -448,37 +454,35 @@ TfLiteEvalTensor* output_tensor =
 }
 
 TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
-    //const TfLiteTensor* output_tensor = GetOutput(context, node, kOutputTensor);
-    //TF_LITE_ENSURE(context, output_tensor != nullptr);
-      //get output from eval saving times
-    TfLiteEvalTensor* output_tensor =
-        tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+  // const TfLiteTensor* output_tensor = GetOutput(context, node,
+  // kOutputTensor); TF_LITE_ENSURE(context, output_tensor != nullptr); get
+  // output from eval saving times
+  TfLiteEvalTensor* output_tensor =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
-    TfLiteType output_type = output_tensor->type;
-    if (output_type != kTfLiteFloat32) {
-        MicroPrintf("Op Concatenation does not currently support Type '%s'.",
-            TfLiteTypeGetName(output_type));
-        return kTfLiteError;
-    }
-    EvalUnquantized<float>(context, node);
+  TfLiteType output_type = output_tensor->type;
+  if (output_type != kTfLiteFloat32) {
+    MicroPrintf("Op Concatenation does not currently support Type '%s'.",
+                TfLiteTypeGetName(output_type));
+    return kTfLiteError;
+  }
+  EvalUnquantized<float>(context, node);
 
-        
-
-    return kTfLiteOk;
+  return kTfLiteOk;
 }
 
-}  // namespace concatenation
+}  // namespace
 
 TFLMRegistration Register_CONCATENATION() {
   return tflite::micro::RegisterOp(ConcatenationInit,
-          /*prepare=*/ConcatenationPrepare,
-          /*invoke=*/ConcatenationEval);
+                                   /*prepare=*/ConcatenationPrepare,
+                                   /*invoke=*/ConcatenationEval);
 }
 
 TFLMRegistration Register_CONCATENATION_FLOAT32() {
   return tflite::micro::RegisterOp(ConcatenationInit,
                                    /*prepare=*/ConcatenationPrepare,
-        /*invoke=*/EvalFloat32);
+                                   /*invoke=*/EvalFloat32);
 }
 //}  // namespace micro
 //}  // namespace ops

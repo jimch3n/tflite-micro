@@ -47,12 +47,12 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   micro_op_resolver.AddFullyConnected();
   micro_op_resolver.AddLogistic();
 
-  // Create an area of memory to use for input, output, and intermediate arrays.
-  #if defined(IA8201) || defined(IA700)
-  constexpr int tensor_arena_size = 660 * 1024; //remap coefficients
-  #else
+// Create an area of memory to use for input, output, and intermediate arrays.
+#if defined(IA8201) || defined(IA700) || defined(XTENSA)
+  constexpr int tensor_arena_size = 660 * 1024;  // remap coefficients
+#else
   constexpr int tensor_arena_size = 16 * 1024;
-  #endif
+#endif
   alignas(16) uint8_t tensor_arena[tensor_arena_size];
 
   // Build an interpreter to run the model with.

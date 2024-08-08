@@ -164,7 +164,7 @@ void TestDepthwiseConvQuantizedPerChannel(
       expected_output_data, expected_output_data_quantized, output_data,
       output_scale, output_zero_point, conv_params, filter_packed_type);
 }
-#if !defined(IA8201) && !defined(IA700) 
+#if !defined(IA8201) && !defined(IA700)
 void TestDepthwiseConvQuantizedPerChannel(
     int* input_dims_data, const float* input_data, int16_t* input_quantized,
     float input_scale, int input_zero_point, int* filter_dims_data,
@@ -1025,7 +1025,7 @@ TF_LITE_MICRO_TEST(SimpleTestQuantizedPerChannel) {
       output_scale, output_zero_point, &conv_params);
 }
 // Not implement
-#if !defined(IA8201) && !defined(IA700) 
+#if !defined(IA8201) && !defined(IA700)
 TF_LITE_MICRO_TEST(SimpleTestQuantizedPerChannelInt16InputInt8Filter) {
   const int input_elements = 12;
   int input_shape[] = {4, 1, 3, 2, 2};

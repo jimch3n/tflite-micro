@@ -17,10 +17,6 @@ limitations under the License.
 // (defined in the keras LSTM layer, e.g., no peephole etc.) is supported here.
 // Currently used by the 16 bits activation case only
 
-//#define KN_DEBUG
-
-#include "tensorflow/lite/micro//ia8201/debug_helper.h"
-
 #include <algorithm>
 #include <limits>
 
@@ -89,10 +85,6 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
   }
   // request buffers (four buffers)
   for (size_t i = 0; i < 4; i++) {
-
-    KN_PRINTD(op_data->size_info.batch_size);
-    
-    KN_PRINTD(op_data->buffer_indices[i]);
     TF_LITE_ENSURE_OK(context, context->RequestScratchBufferInArena(
                                    context,
                                    op_data->size_info.batch_size *
@@ -100,8 +92,6 @@ TfLiteStatus UnidirectionalSequenceLstmPrepare(TfLiteContext* context,
                                        TfLiteTypeGetSize(cell_state_type),
                                    &(op_data->buffer_indices[i])));
   }
-
-
   return kTfLiteOk;
 }
 

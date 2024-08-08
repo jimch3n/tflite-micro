@@ -73,13 +73,14 @@ TfLiteStatus CalculateOpDataFullyConnected(
 // implementation (reference or optimized) must define this function.
 TFLMRegistration Register_FULLY_CONNECTED();
 
-#if defined(CMSIS_NN) || defined(HEXAGON) || defined(XTENSA) || defined(IA8201) || defined(IA700)
+#if defined(CMSIS_NN) || defined(HEXAGON) || defined(XTENSA) || \
+    defined(IA8201) || defined(IA700)
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8.
 TFLMRegistration Register_FULLY_CONNECTED_INT8();
 TFLMRegistration Register_FULLY_CONNECTED_FLOAT32();
 
-//support float32 x float16 and float32 x int8 hybrid
+// support float32 x float16 and float32 x int8 hybrid
 TFLMRegistration Register_FULLY_CONNECTED_FLOAT16();
 TFLMRegistration Register_FULLY_CONNECTED_FLOATINT8();
 #else

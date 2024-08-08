@@ -12,8 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/lite/micro/ia8201/config.h"
-
 #include "tensorflow/lite/micro/kernels/reshape.h"
 
 #include <cstring>
@@ -23,6 +21,8 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/ia8201/config.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_utils.h"
@@ -44,15 +44,16 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 
   // Do nothing for in-place reshape.
   if (input->data.raw != output->data.raw) {
-    // Otherwise perform reshape with copy.
-    #if defined(DMX1A_RESHAPE_OPT) || defined(HMD1A_RESHAPE_OPT)
+// Otherwise perform reshape with copy.
+#if defined(DMX1A_RESHAPE_OPT) || defined(HMD1A_RESHAPE_OPT)
 
-    tflite::block_copy_bytes((int8_t*)output->data.raw,(const int8_t*) input->data.raw, input_bytes);
-    #else
+    tflite::block_copy_bytes((int8_t*)output->data.raw,
+                             (const int8_t*)input->data.raw, input_bytes);
+#else
     for (size_t i = 0; i < input_bytes; ++i) {
       output->data.raw[i] = input->data.raw[i];
     }
-    #endif
+#endif
   }
   return kTfLiteOk;
 }

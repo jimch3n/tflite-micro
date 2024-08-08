@@ -135,7 +135,7 @@ typedef enum {
   kTfLiteInt4 = 18,
   kTfLiteBFloat16 = 19,
 #if defined(IA8201) || defined(IA700)
-  kTfLiteAfloat32 = 20 // KNOWLES DSP
+  kTfLiteAfloat32 = 20  // KNOWLES DSP
 #endif
 } TfLiteType;
 

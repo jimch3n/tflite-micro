@@ -129,71 +129,73 @@ TfLiteStatus TestConvFloat(int* input_dims_data, const float* input_data,
 }
 #if defined(IA8201) || defined(IA700)
 TfLiteStatus TestConvFloat16(int* input_dims_data, const float* input_data,
-    int* filter_dims_data, const float* filter_data,
-    int* bias_dims_data, const float* bias_data,
-    int* output_dims_data,
-    const float* expected_output_data,
-    TfLiteConvParams* conv_params,
-    TFLMRegistration registration,
-    float* output_data) {
-    TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
-    TfLiteIntArray* filter_dims = IntArrayFromInts(filter_dims_data);
-    TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
-    TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
-    const int output_dims_count = ElementCount(*output_dims);
-    constexpr int inputs_size = 3;
-    constexpr int outputs_size = 1;
-    constexpr int tensors_size = inputs_size + outputs_size;
+                             int* filter_dims_data, const float* filter_data,
+                             int* bias_dims_data, const float* bias_data,
+                             int* output_dims_data,
+                             const float* expected_output_data,
+                             TfLiteConvParams* conv_params,
+                             TFLMRegistration registration,
+                             float* output_data) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* filter_dims = IntArrayFromInts(filter_dims_data);
+  TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+  constexpr int inputs_size = 3;
+  constexpr int outputs_size = 1;
+  constexpr int tensors_size = inputs_size + outputs_size;
 
-    TfLiteFloat16 filter16_data[1024];
-    convert_ieee_float_to_afloat16(filter_data, (uint16_t*)filter16_data, ElementCount(*filter_dims));
+  TfLiteFloat16 filter16_data[1024];
+  convert_ieee_float_to_afloat16(filter_data, (uint16_t*)filter16_data,
+                                 ElementCount(*filter_dims));
 
-    TfLiteTensor tensors[tensors_size] = {
-        CreateTensor(input_data, input_dims),
-        CreateTensor(filter16_data, filter_dims),
-        CreateTensor(bias_data, bias_dims),
-        CreateTensor(output_data, output_dims),
-    };
+  TfLiteTensor tensors[tensors_size] = {
+      CreateTensor(input_data, input_dims),
+      CreateTensor(filter16_data, filter_dims),
+      CreateTensor(bias_data, bias_dims),
+      CreateTensor(output_data, output_dims),
+  };
 
-    return ValidateConvGoldens(tensors, tensors_size, expected_output_data,
-        output_dims_count, conv_params, registration,
-        output_data);
+  return ValidateConvGoldens(tensors, tensors_size, expected_output_data,
+                             output_dims_count, conv_params, registration,
+                             output_data);
 }
 TfLiteStatus TestConvFloatInt8(int* input_dims_data, const float* input_data,
-    int* filter_dims_data, const float* filter_data,
-    int* bias_dims_data, const float* bias_data,
-    int* output_dims_data,
-    const float* expected_output_data,
-    TfLiteConvParams* conv_params,
-    TFLMRegistration registration,
-    float* output_data) {
-    TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
-    TfLiteIntArray* filter_dims = IntArrayFromInts(filter_dims_data);
-    TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
-    TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
-    const int output_dims_count = ElementCount(*output_dims);
-    constexpr int inputs_size = 3;
-    constexpr int outputs_size = 1;
-    constexpr int tensors_size = inputs_size + outputs_size;
+                               int* filter_dims_data, const float* filter_data,
+                               int* bias_dims_data, const float* bias_data,
+                               int* output_dims_data,
+                               const float* expected_output_data,
+                               TfLiteConvParams* conv_params,
+                               TFLMRegistration registration,
+                               float* output_data) {
+  TfLiteIntArray* input_dims = IntArrayFromInts(input_dims_data);
+  TfLiteIntArray* filter_dims = IntArrayFromInts(filter_dims_data);
+  TfLiteIntArray* bias_dims = IntArrayFromInts(bias_dims_data);
+  TfLiteIntArray* output_dims = IntArrayFromInts(output_dims_data);
+  const int output_dims_count = ElementCount(*output_dims);
+  constexpr int inputs_size = 3;
+  constexpr int outputs_size = 1;
+  constexpr int tensors_size = inputs_size + outputs_size;
 
-    int8_t filter_int8_data[1024];
-    float scale;
-    convert_ieee_float_to_int8_scale(filter_data, filter_int8_data, &scale, ElementCount(*filter_dims));
+  int8_t filter_int8_data[1024];
+  float scale;
+  convert_ieee_float_to_int8_scale(filter_data, filter_int8_data, &scale,
+                                   ElementCount(*filter_dims));
 
-    TfLiteTensor tensors[tensors_size] = {
-        CreateTensor(input_data, input_dims),
-        CreateTensor(filter_int8_data, filter_dims),
-        CreateTensor(bias_data, bias_dims),
-        CreateTensor(output_data, output_dims),
-    };
-    // set scale in param;
-    tensors[1].params.scale = scale;
-    tensors[1].params.zero_point = 0;
-    // allow toralence 0.07
-    float tolerance = 0.3;
-    return ValidateConvGoldens(tensors, tensors_size, expected_output_data,
-        output_dims_count, conv_params, registration,
-        output_data, tolerance);
+  TfLiteTensor tensors[tensors_size] = {
+      CreateTensor(input_data, input_dims),
+      CreateTensor(filter_int8_data, filter_dims),
+      CreateTensor(bias_data, bias_dims),
+      CreateTensor(output_data, output_dims),
+  };
+  // set scale in param;
+  tensors[1].params.scale = scale;
+  tensors[1].params.zero_point = 0;
+  // allow toralence 0.07
+  float tolerance = 0.3;
+  return ValidateConvGoldens(tensors, tensors_size, expected_output_data,
+                             output_dims_count, conv_params, registration,
+                             output_data, tolerance);
 }
 #endif
 
