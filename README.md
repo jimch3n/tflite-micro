@@ -12,6 +12,51 @@
 <!-- Added by: advaitjain, at: Mon 04 Oct 2021 11:23:57 AM PDT -->
 
 <!--te-->
+# Introduction
+
+This tensorflow micro-lite target is Knowles IA8201.
+The base is https://github.com/cad-audio/tflite-micro  update: 07/23/2024
+
+## Prerequisite
+* Xtensa Development Kit, 2020.4-RI Linux/Win32
+* [Contributing](#contributing)
+
+## Build library
+
+build/build_xtensa_lib.sh <target-platform> <make-target>
+
+target-platform: 
+* dmx: DMX core
+* hmd: HMD core
+* hifi: HMD core/ hifi-3 instruction hmd core
+
+make-target:
+* << empty is release >>
+* test_kernel_fully_connected_test
+
+example: 
+build dmx test
+```
+$ cd build
+$ bash build_xtensa_lib.sh dmx test 
+```
+or make command make a release hifi 
+```
+$ make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 \
+XTENSA_TOOLS_VERSION=RI-2020.4-linux XTENSA_CORE=hmd1aRI04 XTENSA_BASE=/home/jimchen/xtensa/XtDevTools/install/ \
+ BUILD_TYPE=release RM_TFLM_SIGNAL=1 TEST_MODE=0
+ ```
+***
+* Xtensa SVDF/FC was optimized by HMD MVM instructions by enabling USE_HMD_MVM_OPT macro
+* The kernl's weights was supposed re-mapping in the external 
+
+***
+
+***
+Known issues:
+* DMX/HMD DTLN test was fail due to rounding in FC was no compatible.
+* LSTM operator was not optimize in DMX/HMD core yet.
+***
 
 # TensorFlow Lite for Microcontrollers
 

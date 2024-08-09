@@ -898,7 +898,7 @@ endif
 ######## IA8201 HMD Core use MVM ############
 ifeq ($(TARGET), xtensa)
 TARGET_OBJ_DIR := $(KERNEL_OBJDIR)/tensorflow/lite/micro/kernels/
-TARGET_OBJS := $(addprefix $(TARGET_OBJ_DIR), xtensa/mvm_helper.o xtensa/svdf.o svdf_common.o xtensa/fully_connected_int8.o)
+TARGET_OBJS := $(addprefix $(TARGET_OBJ_DIR), xtensa/svdf.o svdf_common.o xtensa/fully_connected_int8.o)
 
 TARGET_OBJ_SIG_DIR := $(KERNEL_OBJDIR)/signal/src/
 TARGET_SRC_DIR := $(TENSORFLOW_ROOT)/signal/src/
