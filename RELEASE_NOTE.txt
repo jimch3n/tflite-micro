@@ -1,0 +1,34 @@
+Release NOTE:
+
+===== v0.0.1 =====
+
+
+The major change two parts
+
+•	xtensa SVDF/FC kernels  
+tensorflow\lite\micro\kernels\xtensa\
+MUST enabling macro USE_HMD_MVM_OPT, 
+this is enabling ML instruction mac8bx8b instruction, 
+this macro assume external model's weight has remapping by 
+"third_party\ia8201_sdk\iaxxx_tflite_model_converter"
+
+(Since there is no attribute yet to indicate weight's perm like FullyConnectedOptionsWeightsFormat_SHUFFLED4x16INT8)
+
+KERNEL_COEFF_MAP_ENABLE is force remapping coefficient in runtime in persist memory for unit-test
+
+1. add mvm_helper.cc from ia8201
+2. change in svdf.cc
+3. change in fully_connected_int8.cc , Register_FULLY_CONNECTED_INT8
+4. change in fully_connected*.cc is for Register_FULLY_CONNECTED to use MVM, (ignore)
+4. change in  svdf.cc use 
+
+•	Signal optimization using HIFI-3 (from NatureDSP HIFI-3)
+enabling REMOVE_TFLM_SIGNAL to removing tflite::tflite_signal namespace
+
+Signal/src/
+
+energy.cc
+filter_bank.cc
+filter_bank_spectral_subtraction.cc
+filter_bank_square_root.cc
+window.cc

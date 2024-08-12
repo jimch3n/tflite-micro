@@ -84,7 +84,7 @@ limitations under the License.
 
 
 // signal kernel optimization
-#define SIG_FB_LOG_OPT   // afloat 
+//#define SIG_FB_LOG_OPT   // afloat 
 #define SIG_FB_SQRT_OPT  // afloat
 #define SIG_ENERGY_OPT   // hifi only
 #define SIG_FB_SS_OPT    // hifi only 

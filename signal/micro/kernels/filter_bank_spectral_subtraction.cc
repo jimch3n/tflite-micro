@@ -46,11 +46,11 @@ constexpr int kSmoothingBitsIndex = 7;            // 'smoothing_bits'
 constexpr int kSpectralSubtractionBitsIndex = 8;  // 'spectral_subtraction_bits'
 
 struct TFLMSignalSpectralSubtractionParams {
-    #ifndef REMOVE_TFLM_SIGNAL
+#ifndef REMOVE_TFLM_SIGNAL
   tflm_signal::SpectralSubtractionConfig config;
-  #else
+#else
     SpectralSubtractionConfig config;
-  #endif
+#endif
   uint32_t* noise_estimate;
   size_t noise_estimate_size;
 };

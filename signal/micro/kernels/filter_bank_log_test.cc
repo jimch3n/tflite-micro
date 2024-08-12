@@ -94,8 +94,7 @@ TF_LITE_MICRO_TEST(FilterBankLogTest32Channel) {
           g_gen_data_size_filter_bank_log_scale_1600_correction_bits_3,
           output));
 }
-#if 0 // FIXME: need to verify overflow Log32 issue
-//https://github.com/tensorflow/tflite-micro/issues/2651
+
 TF_LITE_MICRO_TEST(FilterBankLogTest16Channel) {
   int input_shape[] = {1, 16};
   int output_shape[] = {1, 16};
@@ -113,5 +112,5 @@ TF_LITE_MICRO_TEST(FilterBankLogTest16Channel) {
           g_gen_data_size_filter_bank_log_scale_32768_correction_bits_5,
           output));
 }
-#endif
+
 TF_LITE_MICRO_TESTS_END

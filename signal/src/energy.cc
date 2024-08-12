@@ -14,38 +14,33 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/micro/ia8201/config.h"
 #if defined(XTENSA) || defined(HMD1A)
-  #include <xtensa/config/core-isa.h>
-  #include <xtensa/tie/xt_core.h>
-  #include <xtensa/tie/xt_misc.h>
-  #include <xtensa/tie/xt_hifi3.h>
+#include <xtensa/config/core-isa.h>
+#include <xtensa/tie/xt_core.h>
+#include <xtensa/tie/xt_hifi3.h>
+#include <xtensa/tie/xt_misc.h>
 #endif
-#include "signal/src/energy.h"
-
 #include "signal/src/complex.h"
-
+#include "signal/src/energy.h"
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
-//#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
-
 
 #ifndef REMOVE_TFLM_SIGNAL
 namespace tflite {
 namespace tflm_signal {
 #endif
-void SpectrumToEnergy(const Complex<int16_t>* input, int start_index,
-                      int end_index, uint32_t* output) {
-
+void SpectrumToEnergy(const Complex<int16_t> *input, int start_index,
+                      int end_index, uint32_t *output) {
 #if defined(SIG_ENERGY_OPT)
   int n;
-  int N = (end_index - start_index)<<1; //complex
-  //int rsh = 0;
-  //ae_f64      vaf;
-  ae_int64    vzi;
-  ae_int16x4  vxh;
-  ae_f24x2    vxf;
-  ae_int32x2  vxw, vzw, vzw0, vzw1;
-  ae_valign      x_align, y_align;
-  const ae_int16x4 * restrict px = (const ae_int16x4 *)&input[start_index];
-  ae_int32x2 *py = (ae_int32x2 *) &output[start_index];
+  int N = (end_index - start_index) << 1;  // complex
+  // int rsh = 0;
+  // ae_f64      vaf;
+  ae_int64 vzi;
+  ae_int16x4 vxh;
+  ae_f24x2 vxf;
+  ae_int32x2 vxw, vzw, vzw0, vzw1;
+  ae_valign x_align, y_align;
+  const ae_int16x4 *restrict px = (const ae_int16x4 *)&input[start_index];
+  ae_int32x2 *py = (ae_int32x2 *)&output[start_index];
 
   vzi = AE_ZERO64();
   vzw = AE_MOVINT32X2_FROMINT64(vzi);
@@ -55,36 +50,31 @@ void SpectrumToEnergy(const Complex<int16_t>* input, int start_index,
 
   AE_LA16X4_IP(vxh, x_align, px);
 
-  
-  for (n=0; n<N-3; n+=4)
-  {
+  for (n = 0; n < N - 3; n += 4) {
     vxw = AE_SEXT32X2D16_32(vxh);
     vxf = AE_MOVF24X2_FROMINT32X2(vxw);
-    vxw = AE_MULP24X2( vxf, vxf);
+    vxw = AE_MULP24X2(vxf, vxf);
     vzw0 = AE_ADD32_HL_LH(vxw, vxw);
     vxw = AE_SEXT32X2D16_10(vxh);
     vxf = AE_MOVF24X2_FROMINT32X2(vxw);
-    vxw = AE_MULP24X2( vxf, vxf);
+    vxw = AE_MULP24X2(vxf, vxf);
     vzw1 = AE_ADD32_HL_LH(vxw, vxw);
     vzw = AE_SEL32_LH(vzw0, vzw1);
     AE_SA32X2_IP(vzw, y_align, py);
- 
+
     AE_LA16X4_IP(vxh, x_align, px);
   }
-  AE_SA64POS_FP( y_align, py);
-  switch(N&3)
-  {
+  AE_SA64POS_FP(y_align, py);
+  switch (N & 3) {
+    case 2:
+      vxw = AE_SEXT32X2D16_32(vxh);
+      vxf = AE_MOVF24X2_FROMINT32X2(vxw);
+      vxw = AE_MULP24X2(vxf, vxf);
 
-  case 2:
-    vxw = AE_SEXT32X2D16_32(vxh);
-    vxf = AE_MOVF24X2_FROMINT32X2(vxw);
-    vxw = AE_MULP24X2( vxf, vxf);
-    
-    vzw = AE_ADD32_HL_LH(vxw, vxw);
-    AE_S32_L_I(vzw, py, 0);
+      vzw = AE_ADD32_HL_LH(vxw, vxw);
+      AE_S32_L_I(vzw, py, 0);
 
-    break;
-
+      break;
   }
 
 #else

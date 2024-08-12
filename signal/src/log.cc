@@ -12,11 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-//#define KN_DEBUG
+
 #include "signal/src/log.h"
 
 #include "signal/src/msb.h"
-
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
 
 #ifndef REMOVE_TFLM_SIGNAL
@@ -76,15 +75,13 @@ uint32_t Log32(uint32_t x, uint32_t out_scale) {
   const uint32_t integer = MostSignificantBit32(x) - 1;
   const uint32_t fraction = Log2FractionPart32(x, integer);
   const uint32_t log2 = (integer << kLogScaleLog2) + fraction;
-KN_PRINTD(integer);KN_PRINTD(fraction);
-  KN_PRINTX(log2);
   const uint32_t round = kLogScale / 2;
   const uint32_t loge =
       ((static_cast<uint64_t>(kLogCoeff)) * log2 + round) >> kLogScaleLog2;
   // Finally scale to our output scale
-   KN_PRINTX(loge);  KN_PRINTX(round);
-  const uint32_t loge_scaled = ((static_cast<uint64_t>(out_scale)) * loge + round) >> kLogScaleLog2;
-   KN_PRINTX(loge_scaled);
+  // FIXME: suppose to use int64 to mul const uint32_t loge_scaled =
+  // ((static_cast<uint64_t>(out_scale)) * loge + round) >> kLogScaleLog2;
+  const uint32_t loge_scaled = (out_scale * loge + round) >> kLogScaleLog2;
   return loge_scaled;
 }
 #ifndef REMOVE_TFLM_SIGNAL

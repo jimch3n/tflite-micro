@@ -39,18 +39,18 @@ limitations under the License.
 namespace tflite {
 
 TfLiteStatus XtensaEvalFullyConnectedQuantizedInt8(
-    TfLiteContext *context, TfLiteNode *node, const OpDataFullyConnected &data,
-    const TfLiteEvalTensor *input, const TfLiteEvalTensor *filter,
-    const TfLiteEvalTensor *bias, TfLiteEvalTensor *output) {
+    TfLiteContext* context, TfLiteNode* node, const OpDataFullyConnected& data,
+    const TfLiteEvalTensor* input, const TfLiteEvalTensor* filter,
+    const TfLiteEvalTensor* bias, TfLiteEvalTensor* output) {
 #if !defined(VISION_P6)
-  const int32_t *bias_data =
+  const int32_t* bias_data =
       tflite::micro::GetOptionalTensorData<int32_t>(bias);
 
   // P6 Vision will handle INT4 filters as a reference operation.
   // For all other architectures, unpack INT4 here.
-  const int8_t *filter_data = tflite::micro::GetTensorData<int8_t>(filter);
+  const int8_t* filter_data = tflite::micro::GetTensorData<int8_t>(filter);
   if (filter->type == kTfLiteInt4) {
-    int8_t *unpacked_filter_data = static_cast<int8_t *>(
+    int8_t* unpacked_filter_data = static_cast<int8_t*>(
         context->GetScratchBuffer(context, data.filter_buffer_index));
 
     tflite::tensor_utils::UnpackDenseInt4IntoInt8(
@@ -69,17 +69,13 @@ TfLiteStatus XtensaEvalFullyConnectedQuantizedInt8(
                              tflite::micro::GetTensorShape(output),
                              tflite::micro::GetTensorData<int8_t>(output));
 #elif defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
-  const RuntimeShape &output_shape = tflite::micro::GetTensorShape(output);
+  const RuntimeShape& output_shape = tflite::micro::GetTensorShape(output);
   const int num_batches =
       FlatSizeSkipDim(output_shape, output_shape.DimensionsCount() - 1);
   const int output_depth =
       output_shape.Dims(output_shape.DimensionsCount() - 1);
-  KN_PRINT_Q7_SIZE(input->data.int8, ElementCount(*input->dims));
-  KN_PRINT_Q7_SIZE(filter->data.int8, ElementCount(*filter->dims));
-  if (bias) {
-    KN_PRINT_Q31_SIZE(bias->data.int8, ElementCount(*bias->dims));
-  }
-  const RuntimeShape &filter_shape = tflite::micro::GetTensorShape(filter);
+
+  const RuntimeShape& filter_shape = tflite::micro::GetTensorShape(filter);
   const int filter_dim_count = filter_shape.DimensionsCount();
   const int accum_depth = filter_shape.Dims(filter_dim_count - 1);
 
@@ -97,24 +93,20 @@ TfLiteStatus XtensaEvalFullyConnectedQuantizedInt8(
         0);
   }
 
-  int8_t *output_arr = tflite::micro::GetTensorData<int8_t>(output);
+  int8_t* output_arr = tflite::micro::GetTensorData<int8_t>(output);
   TF_LITE_ENSURE_EQ(context,
                     xa_nn_vec_activation_min_max_8_8(
                         output_arr, output_arr, data.output_activation_min,
                         data.output_activation_max, num_batches * output_depth),
                     0);
-  KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
 #elif defined(VISION_P6)
-  const auto &params =
-      *(reinterpret_cast<TfLiteConvParams *>(node->builtin_data));
-  const auto &op_data =
-      *(reinterpret_cast<XtensaFullyConnectedOpData *>(node->user_data));
+  const auto& params =
+      *(reinterpret_cast<TfLiteConvParams*>(node->builtin_data));
+  const auto& op_data =
+      *(reinterpret_cast<XtensaFullyConnectedOpData*>(node->user_data));
   FullyConnectedEvalVision(context, node, params, op_data, input, filter, bias,
                            output);
 #else
-  KN_PRINT_Q7_SIZE(input->data.int8, ElementCount(*input->dims));
-  //    KN_PRINT_Q7_SIZE(filter->data.int8, ElementCount(*filter->dims));
-  KN_PRINT_Q31_SIZE(bias->data.int8, ElementCount(*bias->dims));
   reference_integer_ops::FullyConnected(
       FullyConnectedParamsQuantized(data), tflite::micro::GetTensorShape(input),
       tflite::micro::GetTensorData<int8_t>(input),
@@ -122,29 +114,27 @@ TfLiteStatus XtensaEvalFullyConnectedQuantizedInt8(
       tflite::micro::GetTensorShape(bias), bias_data,
       tflite::micro::GetTensorShape(output),
       tflite::micro::GetTensorData<int8_t>(output));
-  KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
 #endif  // defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
 
   return kTfLiteOk;
 }
 
-// only for INT8 Registeration
 namespace {
 
-TfLiteStatus EvalInt8(TfLiteContext *context, TfLiteNode *node) {
+TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
 #ifndef USE_HMD_MVM_OPT
-  const auto &data =
-      *(static_cast<const OpDataFullyConnected *>(node->user_data));
+  const auto& data =
+      *(static_cast<const OpDataFullyConnected*>(node->user_data));
 
-  const TfLiteEvalTensor *input =
+  const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kFullyConnectedInputTensor);
-  const TfLiteEvalTensor *filter =
+  const TfLiteEvalTensor* filter =
       tflite::micro::GetEvalInput(context, node, kFullyConnectedWeightsTensor);
-  const TfLiteEvalTensor *bias =
+  const TfLiteEvalTensor* bias =
       tflite::micro::GetEvalInput(context, node, kFullyConnectedBiasTensor);
 
-  TfLiteEvalTensor *output =
+  TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kFullyConnectedOutputTensor);
 
   return XtensaEvalFullyConnectedQuantizedInt8(context, node, data, input,

@@ -13,28 +13,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-//#define KN_DEBUG 
-#include "tensorflow/lite/micro/ia8201/config.h"
+//#define KN_DEBUG
 #include "signal/src/filter_bank.h"
+
+#include "tensorflow/lite/micro/ia8201/config.h"
 #if defined(XTENSA) || defined(HMD1A)
-  #include <xtensa/config/core-isa.h>
-  #include <xtensa/tie/xt_core.h>
-  #include <xtensa/tie/xt_misc.h> 
-  #include <xtensa/tie/xt_hifi3.h>
-  #include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#include <xtensa/config/core-isa.h>
+#include <xtensa/tie/xt_core.h>
+#include <xtensa/tie/xt_hifi3.h>
+#include <xtensa/tie/xt_misc.h>
+
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #endif
 #ifndef REMOVE_TFLM_SIGNAL
 namespace tflite {
 
 namespace tflm_signal {
-#endif 
+#endif
 void FilterbankAccumulateChannels(
- //#ifndef REMOVE_TFLM_SIGNAL
-  const FilterbankConfig* config,
-  //#else
- // const tflite::tflm_signal::FilterbankConfig* config,
- // #endif
-                                  const uint32_t* input, uint64_t* output) {
+    //#ifndef REMOVE_TFLM_SIGNAL
+    const FilterbankConfig *config,
+    //#else
+    // const tflite::tflm_signal::FilterbankConfig* config,
+    // #endif
+    const uint32_t *input, uint64_t *output) {
   // With a log mel filterbank, the energy at each frequency gets added to
   // two adjacent filterbank filters/channels.
   // For the first filter bank channel, its energy is first multiplied by
@@ -48,90 +50,78 @@ void FilterbankAccumulateChannels(
   // itself better to optimization, because input[freq_start + j] only needs
   // to be loaded once.
 #if defined(SIG_FB_OPT)
- 
+
   ae_int64 ae_w, ae_u;
   ae_w = ae_u = AE_ZERO64();
   for (int i = 0; i < config->num_channels + 1; i++) {
     KN_PRINTD(i);
     const int16_t freq_start = config->channel_frequency_starts[i];
     const int16_t weight_start = config->channel_weight_starts[i];
-  ae_int16x4 w0, w1;
-  ae_valign vw0, vw1, vx;
-  
- const ae_int16x4 *pw0 = (const ae_int16x4 *)&config->weights[weight_start] ;
- const ae_int16x4 *pw1 = (const ae_int16x4 *)&config->unweights[weight_start] ;
- const ae_int32x2 *px = (const ae_int32x2 *)&input[freq_start] ;
- 
-  int n = 0;
-  int N = config->channel_widths[i] ;
-   ae_int32x2 x0; //W, U;
+    ae_int16x4 w0, w1;
+    ae_valign vw0, vw1, vx;
 
-  vw0 = AE_LA64_PP(pw0);
-  vw1 = AE_LA64_PP(pw1);
-  vx = AE_LA64_PP(px);
+    const ae_int16x4 *pw0 = (const ae_int16x4 *)&config->weights[weight_start];
+    const ae_int16x4 *pw1 =
+        (const ae_int16x4 *)&config->unweights[weight_start];
+    const ae_int32x2 *px = (const ae_int32x2 *)&input[freq_start];
 
-  AE_LA32X2_IP(x0, vx, px);
-  AE_LA16X4_IP(w0, vw0, pw0);
-  AE_LA16X4_IP(w1, vw1, pw1);
+    int n = 0;
+    int N = config->channel_widths[i];
+    ae_int32x2 x0;  // W, U;
 
-  KN_PRINTX_AE32X2(x0);
-  KN_PRINTX_AE16X4(w0);
-  
-  KN_PRINTX_AE16X4(w1);
-  for (n=0; n<N-3; n+=4)
-  {
-    AE_MULAAD32X16_H3_L2(ae_w, x0, w0);
-     AE_MULAAD32X16_H3_L2(ae_u, x0, w1);
-       KN_PRINTX_INT64(ae_w);
-    KN_PRINTX_INT64(ae_u);
+    vw0 = AE_LA64_PP(pw0);
+    vw1 = AE_LA64_PP(pw1);
+    vx = AE_LA64_PP(px);
+
     AE_LA32X2_IP(x0, vx, px);
-   KN_PRINTX_AE32X2(x0);
-    AE_MULAAD32X16_H1_L0(ae_w, x0, w0);
-    AE_MULAAD32X16_H1_L0(ae_u, x0, w1);
-  KN_PRINTX_INT64(ae_w);
-    KN_PRINTX_INT64(ae_u);
-  AE_LA32X2_IP(x0, vx, px);
-  AE_LA16X4_IP(w0, vw0, pw0);
-  AE_LA16X4_IP(w1, vw1, pw1);
-  }
+    AE_LA16X4_IP(w0, vw0, pw0);
+    AE_LA16X4_IP(w1, vw1, pw1);
 
-  switch(N-n)
-  {
-  case 1:
-    AE_MULA32X16_H3(ae_w, x0, w0);
-    AE_MULA32X16_H3(ae_u, x0, w1);
-    KN_PRINTX_INT64(ae_w);
-    KN_PRINTX_INT64(ae_u);
-    break;
-  case 2:
-    AE_MULAAD32X16_H3_L2(ae_w, x0, w0);
-    AE_MULAAD32X16_H3_L2(ae_u, x0, w1);
-      KN_PRINTX_INT64(ae_w);
-    KN_PRINTX_INT64(ae_u);
-    break;
-  case 3:
-    AE_MULAAD32X16_H3_L2(ae_w, x0, w0);
-    AE_MULAAD32X16_H3_L2(ae_u, x0, w1);
-    AE_LA32X2_IP(x0, vx, px);
-  KN_PRINTX_INT64(ae_w);
-    KN_PRINTX_INT64(ae_u);
-    AE_MULA32X16_H1(ae_w, x0, w0);
-    AE_MULA32X16_H1(ae_u, x0, w1);
-      KN_PRINTX_INT64(ae_w);
-    KN_PRINTX_INT64(ae_u);
-    break;
-  default:
-    break;
-  }
- 
 
-    output[i] = ae_w; // weight_accumulator;
-    ae_w =  ae_u; //unweight_accumulator;
+
+    KN_PRINTX_AE16X4(w1);
+    for (n = 0; n < N - 3; n += 4) {
+      AE_MULAAD32X16_H3_L2(ae_w, x0, w0);
+      AE_MULAAD32X16_H3_L2(ae_u, x0, w1);
+
+      AE_LA32X2_IP(x0, vx, px);
+
+      AE_MULAAD32X16_H1_L0(ae_w, x0, w0);
+      AE_MULAAD32X16_H1_L0(ae_u, x0, w1);
+      AE_LA32X2_IP(x0, vx, px);
+      AE_LA16X4_IP(w0, vw0, pw0);
+      AE_LA16X4_IP(w1, vw1, pw1);
+    }
+
+    switch (N - n) {
+      case 1:
+        AE_MULA32X16_H3(ae_w, x0, w0);
+        AE_MULA32X16_H3(ae_u, x0, w1);
+
+        break;
+      case 2:
+        AE_MULAAD32X16_H3_L2(ae_w, x0, w0);
+        AE_MULAAD32X16_H3_L2(ae_u, x0, w1);
+
+        break;
+      case 3:
+        AE_MULAAD32X16_H3_L2(ae_w, x0, w0);
+        AE_MULAAD32X16_H3_L2(ae_u, x0, w1);
+        AE_LA32X2_IP(x0, vx, px);
+        AE_MULA32X16_H1(ae_w, x0, w0);
+        AE_MULA32X16_H1(ae_u, x0, w1);
+        break;
+      default:
+        break;
+    }
+
+    output[i] = ae_w;  // weight_accumulator;
+    ae_w = ae_u;       // unweight_accumulator;
 
     ae_u = 0;
   }
 #else
- uint64_t weight_accumulator = 0;
+  uint64_t weight_accumulator = 0;
   uint64_t unweight_accumulator = 0;
   for (int i = 0; i < config->num_channels + 1; i++) {
     const int16_t freq_start = config->channel_frequency_starts[i];
@@ -149,9 +139,9 @@ void FilterbankAccumulateChannels(
 
 #endif
 
- // KN_PRINT_Q63_SIZE(output, config->num_channels + 1);
+  // KN_PRINT_Q63_SIZE(output, config->num_channels + 1);
 }
-  #ifndef REMOVE_TFLM_SIGNAL
+#ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal
 
 }  // namespace tflite
