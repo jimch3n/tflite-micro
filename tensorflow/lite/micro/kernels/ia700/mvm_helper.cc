@@ -12,11 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include <stdint.h>
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 
 #include <math.h>
+#include <stdint.h>
+
 #include "tensorflow/lite/micro/ia700/config.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 
 #ifdef HEMILITE
 #define BLOCK_SIZE 8
@@ -44,364 +45,339 @@ limitations under the License.
 
 namespace tflite {
 #if defined(HEMILITE)
-   // convert to input 8 with exp and 
-int32_t MVMInt8ExpFloat32(const float* pInAfl, uint32_t inputLen)
-{
+// convert to input 8 with exp and
+int32_t MVMInt8ExpFloat32(const float *pInAfl, uint32_t inputLen) {
+  float *pIn = (float *)pInAfl;
+  int32_t exp_fxp = 0;
+  int32_t exp_x;
+  mir18 dummy;
+  uint32_t maxIdx;
+  vr64 VR_exp;
+  vr64 VR_max = vseta_vr(kConstTable_Zero, 0);
+  vr64 VR_x;
+  fr32 fr_max;
+  ulsr32 UR_In;
+  // Initialization
+  uint32_t nBlocks2 = inputLen >> 1;
 
-    float* pIn = (float*) pInAfl;
-    int32_t exp_fxp = 0;
-    int32_t exp_x;
-    mir18 dummy;
-    uint32_t maxIdx;
-    vr64 VR_exp;
-    vr64 VR_max = vseta_vr(kConstTable_Zero, 0);
-    vr64 VR_x;
-    fr32 fr_max;
-    ulsr32 UR_In;
-    // Initialization
-    uint32_t nBlocks2 = inputLen >> 1;
+  vmaxmin_init(VR_max, VR_max, dummy);
 
-
-    vmaxmin_init(VR_max, VR_max, dummy);
-
-    // Find maximum exponent
-    UR_In = align_32x2_load(pIn);
+  // Find maximum exponent
+  UR_In = align_32x2_load(pIn);
+  load_32x2_vr_a(VR_x, UR_In, pIn);
+  for (uint32_t i = 0; i < (nBlocks2); i++) {
+    convert_IEEE_float_to_32F_x2(VR_x);
+    VR_exp = afloat_exp_extract(VR_x);
+    VR_max = vmax(VR_max, VR_exp);
     load_32x2_vr_a(VR_x, UR_In, pIn);
-    for (uint32_t i = 0; i < (nBlocks2); i++)
-    {
-        convert_IEEE_float_to_32F_x2(VR_x);
-        VR_exp = afloat_exp_extract(VR_x);
-        VR_max = vmax(VR_max, VR_exp);
-        load_32x2_vr_a(VR_x, UR_In, pIn);
-    }
+  }
 
-    if (inputLen & 1)
-    {
-        pIn -= 2;
+  if (inputLen & 1) {
+    pIn -= 2;
 
-        load32x1_vr_postI(VR_x, pIn, INC1, VRL);
-        convert_IEEE_float_to_32F_x2(VR_x);
-        VR_exp = afloat_exp_extract(VR_x);
+    load32x1_vr_postI(VR_x, pIn, INC1, VRL);
+    convert_IEEE_float_to_32F_x2(VR_x);
+    VR_exp = afloat_exp_extract(VR_x);
 
-        fmax(VR_max, VRL, VR_max, VRL, VR_exp, VRL);
+    fmax(VR_max, VRL, VR_max, VRL, VR_exp, VRL);
+  }
+  rmax_idx(maxIdx, fr_max, VR_max, dummy);
 
-    }
-    rmax_idx(maxIdx, fr_max, VR_max, dummy);
-
-
-    exp_x = (int32_t)maxIdx; // This line is not required, just a temporary fix for linux build error
+  exp_x = (int32_t)maxIdx;  // This line is not required, just a temporary fix
+                            // for linux build error
 
 #ifdef __XTENSA__
-    exp_x = fr_max;
+  exp_x = fr_max;
 #else
-    exp_x = fr_max._[0];
+  exp_x = fr_max._[0];
 #endif
-    if (exp_x == 0) //prevent vector all zero return exp = -31 
-        exp_x = 0;
-    else
-        exp_x -= 31;
+  if (exp_x == 0)  // prevent vector all zero return exp = -31
+    exp_x = 0;
+  else
+    exp_x -= 31;
 
-    exp_fxp = exp_x;
+  exp_fxp = exp_x;
 
-    return exp_fxp;
+  return exp_fxp;
 }
-static void MVM_ConvertInput8(int32_t* in8b,
-    const float* pInAfl,
-    int32_t exp_fxp,
-    uint32_t inputLen)
-{
-    float* pIn = (float *)pInAfl;
+static void MVM_ConvertInput8(int32_t *in8b, const float *pInAfl,
+                              int32_t exp_fxp, uint32_t inputLen) {
+  float *pIn = (float *)pInAfl;
 
-    vr64 VR_x;
-    vr64 VR_y;
-    vr64 VR_z = vseta_vr(0, 0);
-    ulsr32 UR_In;
-    ulsr32 UR_Out;
+  vr64 VR_x;
+  vr64 VR_y;
+  vr64 VR_z = vseta_vr(0, 0);
+  ulsr32 UR_In;
+  ulsr32 UR_Out;
 
-    // Initialization
-    int32_t nBlocks2 = inputLen >> 1;
-    int32_t nBlocks8;
-    int32_t* pOutLocal = in8b;
-    // Perform conversion
-    nBlocks8 = nBlocks2 >> 2;
+  // Initialization
+  int32_t nBlocks2 = inputLen >> 1;
+  int32_t nBlocks8;
+  int32_t *pOutLocal = in8b;
+  // Perform conversion
+  nBlocks8 = nBlocks2 >> 2;
 
-    UR_In = align_32x2_load(pIn);
-    UR_Out = align_32x2_store(pOutLocal);
+  UR_In = align_32x2_load(pIn);
+  UR_Out = align_32x2_store(pOutLocal);
 
+  load_32x2_vr_a(VR_x, UR_In, pIn);
+  convert_IEEE_float_to_32F_x2(VR_x);
+  if (nBlocks8 > 0) {
+    for (int32_t i = 0; i < nBlocks8; i++) {
+      convert_32F_to_16I_x2(VR_x, exp_fxp, 0);
+
+      load_32x2_vr_a(VR_y, UR_In, pIn);
+      convert_IEEE_float_to_32F_x2(VR_y);
+      convert_32F_to_16I_x2(VR_y, exp_fxp, 0);
+      rnd_sat_pack(VR_z, VRL, VR_x, VR_y, 1);
+
+      load_32x2_vr_a(VR_x, UR_In, pIn);
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_32F_to_16I_x2(VR_x, exp_fxp, 0);
+
+      load_32x2_vr_a(VR_y, UR_In, pIn);
+      convert_IEEE_float_to_32F_x2(VR_y);
+      convert_32F_to_16I_x2(VR_y, exp_fxp, 0);
+      rnd_sat_pack(VR_z, VRQ1, VR_x, VR_y, 1);
+      load_32x2_vr_a(VR_x, UR_In, pIn);
+      convert_IEEE_float_to_32F_x2(VR_x);
+      store_32x2_vr_a(VR_z, UR_Out, pOutLocal);
+    }
+    flush_32x2(UR_Out, pOutLocal);
+  }
+  for (int32_t i = (nBlocks8 << 2); i < (nBlocks2); i++) {
+    convert_32F_to_16I_x2(VR_x, exp_fxp, 0);
+    rnd_sat_pack(VR_z, VRL, VR_x, VR_x, 1);
     load_32x2_vr_a(VR_x, UR_In, pIn);
+
+    store16x1_vr_postI(VR_z, pOutLocal, INC1, VRL);
+  }
+
+  if (inputLen & 1) {
+    pIn -= 2;
+    load32x1_vr_postI(VR_x, pIn, INC1, VRH);  // store 8 bit in MSB
     convert_IEEE_float_to_32F_x2(VR_x);
-    if (nBlocks8 > 0)
-    {
-        for (int32_t i = 0; i < nBlocks8; i++)
-        {
-
-            convert_32F_to_16I_x2(VR_x, exp_fxp, 0);
-
-            load_32x2_vr_a(VR_y, UR_In, pIn);
-            convert_IEEE_float_to_32F_x2(VR_y);
-            convert_32F_to_16I_x2(VR_y, exp_fxp, 0);
-            rnd_sat_pack(VR_z, VRL, VR_x, VR_y, 1);
-
-            load_32x2_vr_a(VR_x, UR_In, pIn);
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_32F_to_16I_x2(VR_x, exp_fxp, 0);
-
-            load_32x2_vr_a(VR_y, UR_In, pIn);
-            convert_IEEE_float_to_32F_x2(VR_y);
-            convert_32F_to_16I_x2(VR_y, exp_fxp, 0);
-            rnd_sat_pack(VR_z, VRQ1, VR_x, VR_y, 1);
-            load_32x2_vr_a(VR_x, UR_In, pIn);
-            convert_IEEE_float_to_32F_x2(VR_x);
-            store_32x2_vr_a(VR_z, UR_Out, pOutLocal);
-        }
-        flush_32x2(UR_Out, pOutLocal);
-    }
-    for (int32_t i = (nBlocks8 << 2); i < (nBlocks2); i++)
-    {
-        convert_32F_to_16I_x2(VR_x, exp_fxp, 0);
-        rnd_sat_pack(VR_z, VRL, VR_x, VR_x, 1);
-        load_32x2_vr_a(VR_x, UR_In, pIn);
-
-        store16x1_vr_postI(VR_z, pOutLocal, INC1, VRL);
-    }
-
-    if (inputLen & 1)
-    {
-        pIn -= 2;
-        load32x1_vr_postI(VR_x, pIn, INC1, VRH);// store 8 bit in MSB
-        convert_IEEE_float_to_32F_x2(VR_x);
-        convert_32F_to_16I_x1(VR_x, exp_fxp, 0, VRH);
-        rnd_sat_pack(VR_z, VRL, VR_x, VR_x, 1);
-        store8x1_vr_postI(VR_z, pOutLocal, INC1, VRL);
-
-    }
+    convert_32F_to_16I_x1(VR_x, exp_fxp, 0, VRH);
+    rnd_sat_pack(VR_z, VRL, VR_x, VR_x, 1);
+    store8x1_vr_postI(VR_z, pOutLocal, INC1, VRL);
+  }
 }
 
-int  MVMFloatInt8Kernel(float* y, const float* x, const int32_t* A, const float* bias,
-    int m, int n, int32_t* x_in_tmp, const AScalar& act_min,
-    const AScalar& act_max, const AScalar& scale, AScalar* scale_ptr) 
-{
+int MVMFloatInt8Kernel(float *y, const float *x, const int32_t *A,
+                       const float *bias, int m, int n, int32_t *x_in_tmp,
+                       const AScalar &act_min, const AScalar &act_max,
+                       const AScalar &scale, AScalar *scale_ptr) {
+  float *pY = y;
 
-    float* pY = y;
+  const int32_t *pA = A;
+  const int32_t *pX;
+  const int32_t *pB = (const int32_t *)bias;
+  int exp_fxp = 15 + 7;
+  // const int bias_exp = 17;
+  // const int output_offset_exp = 17;
+  int nBlockAligned2 = ((n + 1) >> 1);
+  int loopLimCol = (nBlockAligned2 >> 2);  // block 16
+  int loopLimRow = ((m + 3) >> 2);         // group 8 alignment
+  int processLastLoop = ((m & 3) != 0);
+  if (((unsigned int)x_in_tmp & 3) != 0 && loopLimCol != 0) {
+    loopLimCol = 0;
+  }
 
-    const int32_t* pA = A;
-    const int32_t* pX;
-    const int32_t* pB = (const int32_t*)bias;
-    int exp_fxp =  15+7; 
-    // const int bias_exp = 17;
-    // const int output_offset_exp = 17;
-    int nBlockAligned2 = ((n + 1) >> 1);
-    int loopLimCol = (nBlockAligned2 >> 2);  // block 16
-    int loopLimRow = ((m + 3) >> 2);         // group 8 alignment
-    int processLastLoop = ((m & 3) != 0);
-    if (((unsigned int)x_in_tmp & 3) != 0 && loopLimCol != 0)
-    {
-        loopLimCol = 0;
+  if (((unsigned int)x_in_tmp & 1) != 0) {
+    return -1;
+  }
+  vr64 VR_A;
+  vr64 VR_x;
+  vr64 VR_y;
+  vr64 VR_act_max, VR_act_min;
+  atbool signSpec = atbool(3);
+  replicate_ar(VR_act_max, 0x3, act_max.fr);
+  replicate_ar(VR_act_min, 0x3, act_min.fr);
+  vr64 VR_wScale;
+  // vr64 VR_outOffset;
+  AScalar *pScale = scale_ptr;
+  ulsr32 UR_scale;
+  if (pScale) {
+    UR_scale = align_32x2_load(pScale);
+  }
+  vr64 VR_b0 = vseta_vr(kConstTable_Zero, 0);
+  // replicate_ar(VR_outMult, 0x3, outMultiplerFr32.fr);
+  int inExp = MVMInt8ExpFloat32(x, n);
+
+  KN_PRINTD(inExp);
+  KN_PRINTAFLT(scale);
+  exp_fxp += inExp;
+  MVM_ConvertInput8(x_in_tmp, x, inExp, n);
+  // replicate_ar(VR_inScale, 0x3, scale.fr);
+  replicate_ar(VR_wScale, 0x3, scale.fr);
+  for (int i = 0; i < loopLimRow; i++) {
+    VR_y = vseta_vr(0, 0);
+    mov_AccExtend_vr(VR_y);
+    pX = x_in_tmp;
+    ulsr32 UR_A = align_32x2_load(pA);
+    ulsr32 UR_x = align_32x2_load(pX);
+    ulsr32 UR_y = align_32x2_store(pY);
+    ulsr32 UR_b;
+    load_32x2_vr_a(VR_A, UR_A, pA);
+
+    if (pB) {
+      UR_b = align_32x2_load(pB);
+      load_32x2_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
     }
 
-    if (((unsigned int)x_in_tmp & 1) != 0)
-    {
-        return -1;
-    }
-    vr64 VR_A;
-    vr64 VR_x;
-    vr64 VR_y;
-    vr64 VR_act_max, VR_act_min;
-    atbool signSpec = atbool(3);
-    replicate_ar(VR_act_max, 0x3, act_max.fr);
-    replicate_ar(VR_act_min, 0x3, act_min.fr);
-    vr64 VR_wScale;
-    //vr64 VR_outOffset;
-    AScalar* pScale = scale_ptr;
-    ulsr32 UR_scale;
-    if (pScale)
-    {
-        UR_scale = align_32x2_load(pScale);
-    }
-    vr64 VR_b0 = vseta_vr(kConstTable_Zero, 0);
-    //replicate_ar(VR_outMult, 0x3, outMultiplerFr32.fr);
-    int inExp=MVMInt8ExpFloat32(x, n);
+    for (int j = 0; j < loopLimCol; j++) {
+      load_32x2_vr_a(VR_x, UR_x, pX);
+      // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
+      WUR_MvmAux(0);
 
-    KN_PRINTD(inExp); KN_PRINTAFLT(scale);
-    exp_fxp += inExp;
-    MVM_ConvertInput8(x_in_tmp, x, inExp, n);
-    //replicate_ar(VR_inScale, 0x3, scale.fr);
-    replicate_ar(VR_wScale, 0x3, scale.fr);
-    for (int i = 0; i < loopLimRow; i++) {
-        VR_y = vseta_vr(0, 0);
-        mov_AccExtend_vr(VR_y);
-        pX = x_in_tmp;
-        ulsr32 UR_A = align_32x2_load(pA);
-        ulsr32 UR_x = align_32x2_load(pX);
-        ulsr32 UR_y = align_32x2_store(pY);
-        ulsr32 UR_b;
-        load_32x2_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+      load_32x2_vr_a(VR_A, UR_A, pA);
 
-        if (pB) {
-            UR_b = align_32x2_load(pB);
-            load_32x2_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
-        }
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+      load_32x2_vr_a(VR_A, UR_A, pA);
 
-        for (int j = 0; j < loopLimCol; j++) {
-            load_32x2_vr_a(VR_x, UR_x, pX);
-            //VR_x = vbool(VR_x, VR_inputOffset, 0x6);
-            WUR_MvmAux(0);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+      load_32x2_vr_a(VR_A, UR_A, pA);
 
-            mac8bx8b(VR_y, VR_A, VR_x, signSpec);
-            load_32x2_vr_a(VR_A, UR_A, pA);
-
-            mac8bx8b(VR_y, VR_A, VR_x, signSpec);
-            load_32x2_vr_a(VR_A, UR_A, pA);
-
-            mac8bx8b(VR_y, VR_A, VR_x, signSpec);
-            load_32x2_vr_a(VR_A, UR_A, pA);
-
-            mac8bx8b(VR_y, VR_A, VR_x, signSpec);
-            load_32x2_vr_a(VR_A, UR_A, pA);
-        }
-
-        for (int32_t j = (loopLimCol << 2); j < nBlockAligned2; j++) {
-            load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
-            //VR_x = vbool(VR_x, VR_inputOffset, 0x6);
-            WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
-            mac8bx8b(VR_y, VR_A, VR_x, signSpec);
-            load_32x2_vr_a(VR_A, UR_A, pA);
-        }
-
-        if (i != (loopLimRow - 1) || !processLastLoop) {
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
-
-            vr64 VR_out;
-
-            if (scale_ptr) {
-                load_32x2_vr_a(VR_wScale, UR_scale, pScale); //, INC1);
-            }
-            VR_y = vmuls(VR_y, VR_wScale, 0);
-
-            VR_out = vadds(VR_y, VR_b0, 0x0);
-            VR_out = vmax(VR_out, VR_act_min);
-            VR_out = vmin(VR_out, VR_act_max);
-            // VR_out = vexp_adji(VR_out, 8);
-            convert_32F_to_IEEE_float_x2(VR_out);//, (unsigned int)1 - 8, 0);
-            store_32x2_vr_a(VR_out, UR_y, pY);
-            if (pB) {
-                load_32x2_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
-            }
-            VR_y = mov_vr_AccExtend();
-
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
-            if (scale_ptr) {
-                load_32x2_vr_a(VR_wScale, UR_scale, pScale);//, INC1);
-            }
-            VR_y = vmuls(VR_y, VR_wScale, 0);
-            VR_out = vadds(VR_y, VR_b0, 0x0);
-
-            VR_out = vmax(VR_out, VR_act_min);
-            VR_out = vmin(VR_out, VR_act_max);
-
-            convert_32F_to_IEEE_float_x2(VR_out); //, (unsigned int)1 - 8, 0);
-
-
-            store_32x2_vr_a(VR_out, UR_y, pY);//, INC1);
-            flush_32x2(UR_y, pY);
-            // store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ1);
-        }
-        else {
-            // Convert and store outputs
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
-
-            //vr64 VR_q7_out;
-            if (scale_ptr) {
-                load_32x2_vr_a(VR_wScale, UR_scale, pScale);
-            }
-            vr64 VR_out;
-
-            VR_y = vmuls(VR_y, VR_wScale, 0);
-
-            VR_out = vadds(VR_y, VR_b0, 0x0);
-            VR_out = vmax(VR_out, VR_act_min);
-            VR_out = vmin(VR_out, VR_act_max);
-            convert_32F_to_IEEE_float_x2(VR_out);
-
-            VR_y = mov_vr_AccExtend();
-
-            if (pB) {
-                load_32x2_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
-            }
-
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
-            convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
-            if (scale_ptr) {
-                load_32x2_vr_a(VR_wScale, UR_scale, pScale);
-            }
-            vr64 VR_out2 = vadds(VR_y, VR_b0, 0x0);
-            VR_out2 = vmuls(VR_out2, VR_wScale, 0);
-            VR_out2 = vadds(VR_out2, VR_b0, 0);
-
-            VR_out2 = vmax(VR_out2, VR_act_min);
-            VR_out2 = vmin(VR_out2, VR_act_max);
-
-            convert_32F_to_IEEE_float_x2(VR_out2);
-            switch (m & 0x3) {
-            case 3:
-                store32x1_vr_postI(VR_out, pY, INC1, VRQ0);
-                store32x1_vr_postI(VR_out, pY, INC1, VRQ1);
-                store32x1_vr_postI(VR_out2, pY, INC1, VRQ0);
-                break;
-            case 2:
-                store32x1_vr_postI(VR_out, pY, INC1, VRQ0);
-                store32x1_vr_postI(VR_out, pY, INC1, VRQ1);
-                break;
-            case 1:
-                store32x1_vr_postI(VR_out, pY, INC1, VRQ0);
-                break;
-            }
-        }
-        // Adjust pointer to compensate for loop priming
-        pA -= 2;  // NOTE pointer type int8v4, => 16/4 = 4;
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+      load_32x2_vr_a(VR_A, UR_A, pA);
     }
 
-    KN_PRINT_FLOAT(y, m);
-    return 0;
+    for (int32_t j = (loopLimCol << 2); j < nBlockAligned2; j++) {
+      load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
+      // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
+      WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+      load_32x2_vr_a(VR_A, UR_A, pA);
+    }
+
+    if (i != (loopLimRow - 1) || !processLastLoop) {
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+
+      vr64 VR_out;
+
+      if (scale_ptr) {
+        load_32x2_vr_a(VR_wScale, UR_scale, pScale);  //, INC1);
+      }
+      VR_y = vmuls(VR_y, VR_wScale, 0);
+
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmax(VR_out, VR_act_min);
+      VR_out = vmin(VR_out, VR_act_max);
+      // VR_out = vexp_adji(VR_out, 8);
+      convert_32F_to_IEEE_float_x2(VR_out);  //, (unsigned int)1 - 8, 0);
+      store_32x2_vr_a(VR_out, UR_y, pY);
+      if (pB) {
+        load_32x2_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+      }
+      VR_y = mov_vr_AccExtend();
+
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      if (scale_ptr) {
+        load_32x2_vr_a(VR_wScale, UR_scale, pScale);  //, INC1);
+      }
+      VR_y = vmuls(VR_y, VR_wScale, 0);
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+
+      VR_out = vmax(VR_out, VR_act_min);
+      VR_out = vmin(VR_out, VR_act_max);
+
+      convert_32F_to_IEEE_float_x2(VR_out);  //, (unsigned int)1 - 8, 0);
+
+      store_32x2_vr_a(VR_out, UR_y, pY);  //, INC1);
+      flush_32x2(UR_y, pY);
+      // store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ1);
+    } else {
+      // Convert and store outputs
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+
+      // vr64 VR_q7_out;
+      if (scale_ptr) {
+        load_32x2_vr_a(VR_wScale, UR_scale, pScale);
+      }
+      vr64 VR_out;
+
+      VR_y = vmuls(VR_y, VR_wScale, 0);
+
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmax(VR_out, VR_act_min);
+      VR_out = vmin(VR_out, VR_act_max);
+      convert_32F_to_IEEE_float_x2(VR_out);
+
+      VR_y = mov_vr_AccExtend();
+
+      if (pB) {
+        load_32x2_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+      }
+
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      if (scale_ptr) {
+        load_32x2_vr_a(VR_wScale, UR_scale, pScale);
+      }
+      vr64 VR_out2 = vadds(VR_y, VR_b0, 0x0);
+      VR_out2 = vmuls(VR_out2, VR_wScale, 0);
+      VR_out2 = vadds(VR_out2, VR_b0, 0);
+
+      VR_out2 = vmax(VR_out2, VR_act_min);
+      VR_out2 = vmin(VR_out2, VR_act_max);
+
+      convert_32F_to_IEEE_float_x2(VR_out2);
+      switch (m & 0x3) {
+        case 3:
+          store32x1_vr_postI(VR_out, pY, INC1, VRQ0);
+          store32x1_vr_postI(VR_out, pY, INC1, VRQ1);
+          store32x1_vr_postI(VR_out2, pY, INC1, VRQ0);
+          break;
+        case 2:
+          store32x1_vr_postI(VR_out, pY, INC1, VRQ0);
+          store32x1_vr_postI(VR_out, pY, INC1, VRQ1);
+          break;
+        case 1:
+          store32x1_vr_postI(VR_out, pY, INC1, VRQ0);
+          break;
+      }
+    }
+    // Adjust pointer to compensate for loop priming
+    pA -= 2;  // NOTE pointer type int8v4, => 16/4 = 4;
+  }
+
+  KN_PRINT_FLOAT(y, m);
+  return 0;
 }
 
-//helper function for testing not for runtime
-void convert_ieee_float_to_int8_scale(const float* input, int8_t* out_int8, float* scale_out, int size)
-{
-    const float* pIn = input;
-    int8_t* pOut = out_int8;
+// helper function for testing not for runtime
+void convert_ieee_float_to_int8_scale(const float *input, int8_t *out_int8,
+                                      float *scale_out, int size) {
+  const float *pIn = input;
+  int8_t *pOut = out_int8;
 
+  // find maximum abs val
+  AScalar min = AScalar::MinAFloat();
+  float max_abs_val = min.to_float();
+  for (int ii = 0; ii < size; ii++) {
+    float absval = fabsf(input[ii]);
+    if (absval > max_abs_val) max_abs_val = absval;
+  }
+  AScalar scale = AScalar(max_abs_val).inverse();
+  AScalar fac = CONST_ASCALAR(127.0);
+  vr64 VR_scale;
+  replicate_ar(VR_scale, 0x3, (scale * fac).fr);
+  for (int ii = 0; ii < size; ii++) {
+    vr64 VR_flt, VR_rndq7;
+    load32x1_vr_postI(VR_flt, pIn, INC1, VRQ0);
+    convert_IEEE_float_to_32F_x2(VR_flt);
+    vr64 VR_out = vmuls(VR_flt, VR_scale, 0);
+    convert_32F_to_16I_x2(VR_out, 7, 1);
 
-    //find maximum abs val
-    AScalar min = AScalar::MinAFloat();
-    float max_abs_val = min.to_float();
-    for (int ii = 0; ii < size; ii++)
-    {
-        float absval = fabsf(input[ii]);
-        if (absval > max_abs_val)
-            max_abs_val = absval;
-    }
-    AScalar scale = AScalar(max_abs_val).inverse();
-    AScalar fac = CONST_ASCALAR(127.0);
-    vr64 VR_scale;
-    replicate_ar(VR_scale, 0x3, (scale * fac).fr);
-    for (int ii = 0; ii < size;ii++)
-    {
-        vr64 VR_flt, VR_rndq7;
-        load32x1_vr_postI(VR_flt, pIn, INC1, VRQ0);
-        convert_IEEE_float_to_32F_x2(VR_flt);
-        vr64 VR_out = vmuls(VR_flt, VR_scale, 0);
-        convert_32F_to_16I_x2(VR_out, 7, 1);
-
-        rnd_sat_pack(VR_rndq7, VRQ0, VR_out, VR_out, 1);
-        VR_out = shift32_arith(VR_rndq7, 24, 0);
-        store8x1_vr_postI(VR_out, pOut, INC1, VRQ0);
-    }
-    if (scale_out)
-        *scale_out = (CONST_ASCALAR(1.) / fac / scale).to_float();
+    rnd_sat_pack(VR_rndq7, VRQ0, VR_out, VR_out, 1);
+    VR_out = shift32_arith(VR_rndq7, 24, 0);
+    store8x1_vr_postI(VR_out, pOut, INC1, VRQ0);
+  }
+  if (scale_out) *scale_out = (CONST_ASCALAR(1.) / fac / scale).to_float();
 }
 
 void MVMInputOffsetPrepare(const int32_t *A, int32_t *output, int m, int n,
@@ -462,50 +438,49 @@ void MVMInputOffsetPrepare(const int32_t *A, int32_t *output, int m, int n,
   }
 }
 
-void block_copy_bytes(int8_t* pDes, const int8_t* pSrc,
-    int32_t nBytes) {
-    int32_t ii, loopLim;
-    const uint32_t* uint_Src;
-    uint32_t* uint_Des;
-    uint_Src = (const uint32_t*)pSrc;
-    uint_Des = (uint32_t*)pDes;
+void block_copy_bytes(int8_t *pDes, const int8_t *pSrc, int32_t nBytes) {
+  int32_t ii, loopLim;
+  const uint32_t *uint_Src;
+  uint32_t *uint_Des;
+  uint_Src = (const uint32_t *)pSrc;
+  uint_Des = (uint32_t *)pDes;
 
-    vr64 VR_S0;
-    ulsr32 UR_des;
-    ulsr32 UR_src;
-    if ((((uint32_t)pDes & 0x3) == 0) && ((uint32_t)pSrc & 0x3) == 0) {
-        uint_Src = (const uint32_t*)pSrc;
-        uint_Des = (uint32_t*)pDes;
-        // IMPORTANT: NOTE
-        // unalignment need to alignment 32x4 NEEDS: 4 byte alignment
-        UR_src = align_32x2_load(uint_Src);
-        UR_des = align_32x2_store(uint_Des);
+  vr64 VR_S0;
+  ulsr32 UR_des;
+  ulsr32 UR_src;
+  if ((((uint32_t)pDes & 0x3) == 0) && ((uint32_t)pSrc & 0x3) == 0) {
+    uint_Src = (const uint32_t *)pSrc;
+    uint_Des = (uint32_t *)pDes;
+    // IMPORTANT: NOTE
+    // unalignment need to alignment 32x4 NEEDS: 4 byte alignment
+    UR_src = align_32x2_load(uint_Src);
+    UR_des = align_32x2_store(uint_Des);
 
-        // 8 byte copy
-        loopLim = nBytes >> 3;
-        if (loopLim > 0) {
-            load_32x2_vr_a(VR_S0, UR_src, uint_Src);
-            for (ii = 0; ii < (loopLim - 1); ii++) {
-                store_32x2_vr_a(VR_S0, UR_des, uint_Des);
-                load_32x2_vr_a(VR_S0, UR_src, uint_Src);
-            }
-            store_32x2_vr_a(VR_S0, UR_des, uint_Des);
-            flush_32x2(UR_des, uint_Des);
-        }
-        for (int32_t i = loopLim << 3; i < nBytes; i++) {
-            load8x1_vr_postI(VR_S0, uint_Src, INC1, VRQ0);
-            store8x1_vr_postI(VR_S0, uint_Des, INC1, VRQ0);
-        }
+    // 8 byte copy
+    loopLim = nBytes >> 3;
+    if (loopLim > 0) {
+      load_32x2_vr_a(VR_S0, UR_src, uint_Src);
+      for (ii = 0; ii < (loopLim - 1); ii++) {
+        store_32x2_vr_a(VR_S0, UR_des, uint_Des);
+        load_32x2_vr_a(VR_S0, UR_src, uint_Src);
+      }
+      store_32x2_vr_a(VR_S0, UR_des, uint_Des);
+      flush_32x2(UR_des, uint_Des);
     }
-
-    else {
-        // byte copy
-
-        for (ii = 0; ii < (nBytes); ii++) {
-            load8x1_vr_postI(VR_S0, uint_Src, INC1, VRQ0);
-            store8x1_vr_postI(VR_S0, uint_Des, INC1, VRQ0);
-        }
+    for (int32_t i = loopLim << 3; i < nBytes; i++) {
+      load8x1_vr_postI(VR_S0, uint_Src, INC1, VRQ0);
+      store8x1_vr_postI(VR_S0, uint_Des, INC1, VRQ0);
     }
+  }
+
+  else {
+    // byte copy
+
+    for (ii = 0; ii < (nBytes); ii++) {
+      load8x1_vr_postI(VR_S0, uint_Src, INC1, VRQ0);
+      store8x1_vr_postI(VR_S0, uint_Des, INC1, VRQ0);
+    }
+  }
 }
 
 void ConvertQ15ToAfloat(const int16_t *input, AScalar *output, int size,
@@ -574,34 +549,32 @@ void ConvertQ31ToAfloat(const int32_t *input, AScalar *output, int size,
     }
   }
 }
-void ConvertIEEEFloatToAfloat(const float* input, AScalar* output, int size) {
-    int size2= size >> 1;
-    const float* pInput = input;
-    AScalar* pOutput = output;
-    if (size2 > 0) {
-        vr64 vr_data;
-        ulsr32 ur_in = align_32x2_load(pInput);
-        ulsr32 ur_out = align_32x2_store(pOutput);
-        load_32x2_vr_a(vr_data, ur_in, pInput);
-        for (int ii = 0; ii < size2 - 1; ii++) {
-            convert_IEEE_float_to_32F_x2(vr_data);
+void ConvertIEEEFloatToAfloat(const float *input, AScalar *output, int size) {
+  int size2 = size >> 1;
+  const float *pInput = input;
+  AScalar *pOutput = output;
+  if (size2 > 0) {
+    vr64 vr_data;
+    ulsr32 ur_in = align_32x2_load(pInput);
+    ulsr32 ur_out = align_32x2_store(pOutput);
+    load_32x2_vr_a(vr_data, ur_in, pInput);
+    for (int ii = 0; ii < size2 - 1; ii++) {
+      convert_IEEE_float_to_32F_x2(vr_data);
 
-            store_32x2_vr_a(vr_data, ur_out, pOutput);
-            load_32x2_vr_a(vr_data, ur_in, pInput);
-        }
-        convert_IEEE_float_to_32F_x2(vr_data);
-        store_32x2_vr_a(vr_data, ur_out, pOutput);
-        flush_32x2(ur_out, pOutput);
+      store_32x2_vr_a(vr_data, ur_out, pOutput);
+      load_32x2_vr_a(vr_data, ur_in, pInput);
     }
+    convert_IEEE_float_to_32F_x2(vr_data);
+    store_32x2_vr_a(vr_data, ur_out, pOutput);
+    flush_32x2(ur_out, pOutput);
+  }
 
-    
-    if (size & 1) {
-        vr64 vr_data;
-        load32x1_vr_postI(vr_data, pInput, INC1, VRQ0);
-        convert_IEEE_float_to_32F_x2(vr_data);
-        store32x1_vr_postI(vr_data, pOutput, INC1, VRQ0);
-    }
-    
+  if (size & 1) {
+    vr64 vr_data;
+    load32x1_vr_postI(vr_data, pInput, INC1, VRQ0);
+    convert_IEEE_float_to_32F_x2(vr_data);
+    store32x1_vr_postI(vr_data, pOutput, INC1, VRQ0);
+  }
 }
 
 void ConvertQ31ToAfloat(const int32_t *input, AScalar *output, int size,
@@ -747,19 +720,19 @@ int AddConstQuantizedInt8Fast128(int32_t *input, uint32_t *output, int size) {
   }
   return 0;
 }
-//TODO: move some where
-void convert_ieee_float_to_afloat16(const float* input, uint16_t* out_float16, int size)
-{
-    const float* pIn = input;
-    uint16_t* pOut = out_float16;
-    for (int ii = 0; ii < size;ii++)
-    {
-        vr64 VR_flt;
-        load32x1_vr_postI(VR_flt, pIn, INC1, VRQ0);
-        convert_IEEE_float_to_32F_x2(VR_flt);
-        convert_32F_to_16F_x2(VR_flt, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS, 1);
-        store16x1_vr_postI(VR_flt, pOut, INC1, VRQ0);
-    }
+// TODO: move some where
+void convert_ieee_float_to_afloat16(const float *input, uint16_t *out_float16,
+                                    int size) {
+  const float *pIn = input;
+  uint16_t *pOut = out_float16;
+  for (int ii = 0; ii < size; ii++) {
+    vr64 VR_flt;
+    load32x1_vr_postI(VR_flt, pIn, INC1, VRQ0);
+    convert_IEEE_float_to_32F_x2(VR_flt);
+    convert_32F_to_16F_x2(VR_flt, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS,
+                          1);
+    store16x1_vr_postI(VR_flt, pOut, INC1, VRQ0);
+  }
 }
 
 #endif
@@ -875,8 +848,6 @@ int DepthWiseConvMap8bitCoeffs(
   return mappedSize;
 }
 
-
-
 int ConvMap8bitCoeffs(int8_t *pMapped, int filter_height, int filter_width,
                       const int8_t *filter_data, int output_depth,
                       int input_depth) {
@@ -931,88 +902,90 @@ int ConvMap8bitCoeffs(int8_t *pMapped, int filter_height, int filter_width,
   return nFullRowGroups * nFullColBlocks * BLOCK_SIZE;
 }
 
-int ConvIm2ColIndex(const ds_conv2d_layer_t& conv2d, int i_out_x,
-    int i_out_y, im2col_idx* im2col_tab) 
-{
-    int i_out_y_beg = i_out_y * conv2d.stride_y - conv2d.padding_y;
-    int i_out_y_end = i_out_y * conv2d.stride_y - conv2d.padding_y + conv2d.ker_y * conv2d.dilation_y;
+int ConvIm2ColIndex(const ds_conv2d_layer_t &conv2d, int i_out_x, int i_out_y,
+                    im2col_idx *im2col_tab) {
+  int i_out_y_beg = i_out_y * conv2d.stride_y - conv2d.padding_y;
+  int i_out_y_end = i_out_y * conv2d.stride_y - conv2d.padding_y +
+                    conv2d.ker_y * conv2d.dilation_y;
 
-    int ker_y_start = XT_MAX(0, i_out_y_beg);
-    int ker_y_end = XT_MIN(conv2d.in_y, i_out_y_end);
+  int ker_y_start = XT_MAX(0, i_out_y_beg);
+  int ker_y_end = XT_MIN(conv2d.in_y, i_out_y_end);
 
-    int i_out_x_beg = i_out_x * conv2d.stride_x - conv2d.padding_x;
-    int i_out_x_end = i_out_x * conv2d.stride_x - conv2d.padding_x + conv2d.ker_x * conv2d.dilation_x;
+  int i_out_x_beg = i_out_x * conv2d.stride_x - conv2d.padding_x;
+  int i_out_x_end = i_out_x * conv2d.stride_x - conv2d.padding_x +
+                    conv2d.ker_x * conv2d.dilation_x;
 
+  int ker_x_start = XT_MAX(0, i_out_x_beg);
+  int ker_x_end = XT_MIN(conv2d.in_x, i_out_x_end);
 
-    int ker_x_start = XT_MAX(0, i_out_x_beg);
-    int ker_x_end = XT_MIN(conv2d.in_x, i_out_x_end);
+  int len_y = (ker_y_end - ker_y_start);
+  int len_x = (ker_x_end - ker_x_start);
 
-    int len_y = (ker_y_end - ker_y_start);
-    int len_x = (ker_x_end - ker_x_start);
+  int dst_y = 0;
+  if (i_out_y_beg < 0)
+    dst_y = (0 - i_out_y_beg);
+  else if (i_out_y_beg >= conv2d.in_y)
+    dst_y = (i_out_y_beg - conv2d.in_y);
 
-    int dst_y = 0; 
-    if (i_out_y_beg < 0)
-        dst_y = (0 - i_out_y_beg);
-    else if (i_out_y_beg >= conv2d.in_y)
-        dst_y = (i_out_y_beg - conv2d.in_y);
+  int dst_x = 0;
+  if (i_out_x_beg < 0)
+    dst_x = (0 - i_out_x_beg);
+  else if (i_out_x_beg >= conv2d.in_x)
+    dst_x = (i_out_x_beg - conv2d.in_x);
 
-    int dst_x = 0;
-    if (i_out_x_beg < 0)
-        dst_x = (0 - i_out_x_beg);
-    else if (i_out_x_beg >= conv2d.in_x)
-        dst_x = (i_out_x_beg - conv2d.in_x);
+  int offset_im_src_0 =
+      (ker_y_start * conv2d.in_x + ker_x_start) * conv2d.in_ch;
+  int offset_im_dst_0 =
+      (dst_y * conv2d.ker_x + dst_x) * conv2d.in_ch;  // + len_x;
 
-    int offset_im_src_0 =
-        (ker_y_start * conv2d.in_x + ker_x_start) * conv2d.in_ch;
-    int offset_im_dst_0 =
-        (dst_y * conv2d.ker_x + dst_x) * conv2d.in_ch;  // + len_x;
+  im2col_tab->im_dst_offset = offset_im_dst_0;
+  im2col_tab->cpy_len_x = len_x * conv2d.in_ch;
+  im2col_tab->cpy_len_y = len_y;
+  im2col_tab->im_src_offset = offset_im_src_0;
 
-    im2col_tab->im_dst_offset = offset_im_dst_0;
-    im2col_tab->cpy_len_x = len_x * conv2d.in_ch;
-    im2col_tab->cpy_len_y = len_y;
-    im2col_tab->im_src_offset = offset_im_src_0;
-
-    return (len_x == conv2d.ker_x * conv2d.dilation_x && len_y == conv2d.ker_y * conv2d.dilation_y);
+  return (len_x == conv2d.ker_x * conv2d.dilation_x &&
+          len_y == conv2d.ker_y * conv2d.dilation_y);
 }
 
-int ConvIm2ColIndex(const ds_conv2d_layer_t& conv2d, int i_out_x,
-    int i_out_y, im2col_ex_idx* im2col_tab) {
-    int i_out_y_beg = i_out_y * conv2d.stride_y - conv2d.padding_y;
-    int i_out_y_end = i_out_y * conv2d.stride_y - conv2d.padding_y + conv2d.ker_y * conv2d.dilation_y;
+int ConvIm2ColIndex(const ds_conv2d_layer_t &conv2d, int i_out_x, int i_out_y,
+                    im2col_ex_idx *im2col_tab) {
+  int i_out_y_beg = i_out_y * conv2d.stride_y - conv2d.padding_y;
+  int i_out_y_end = i_out_y * conv2d.stride_y - conv2d.padding_y +
+                    conv2d.ker_y * conv2d.dilation_y;
 
-    int ker_y_start = XT_MAX(0, i_out_y_beg);
-    int ker_y_end = XT_MIN(conv2d.in_y, i_out_y_end);
+  int ker_y_start = XT_MAX(0, i_out_y_beg);
+  int ker_y_end = XT_MIN(conv2d.in_y, i_out_y_end);
 
-    int i_out_x_beg = i_out_x * conv2d.stride_x - conv2d.padding_x;
-    int i_out_x_end = i_out_x * conv2d.stride_x - conv2d.padding_x + conv2d.ker_x * conv2d.dilation_x;
-    int ker_x_start = XT_MAX(0, i_out_x_beg);
-    int ker_x_end = XT_MIN(conv2d.in_x, i_out_x_end);
+  int i_out_x_beg = i_out_x * conv2d.stride_x - conv2d.padding_x;
+  int i_out_x_end = i_out_x * conv2d.stride_x - conv2d.padding_x +
+                    conv2d.ker_x * conv2d.dilation_x;
+  int ker_x_start = XT_MAX(0, i_out_x_beg);
+  int ker_x_end = XT_MIN(conv2d.in_x, i_out_x_end);
 
-    int len_y = (ker_y_end - ker_y_start);
-    int len_x = (ker_x_end - ker_x_start);
+  int len_y = (ker_y_end - ker_y_start);
+  int len_x = (ker_x_end - ker_x_start);
 
-    int dst_y = 0;
-    if (i_out_y_beg < 0)
-        dst_y = (0 - i_out_y_beg);
-    else if (i_out_y_beg >= conv2d.in_y)
-        dst_y = (i_out_y_beg - conv2d.in_y);
+  int dst_y = 0;
+  if (i_out_y_beg < 0)
+    dst_y = (0 - i_out_y_beg);
+  else if (i_out_y_beg >= conv2d.in_y)
+    dst_y = (i_out_y_beg - conv2d.in_y);
 
-    int dst_x = 0;
-    if (i_out_x_beg < 0)
-        dst_x = (0 - i_out_x_beg);
-    else if (i_out_x_beg >= conv2d.in_x)
-        dst_x = (i_out_x_beg - conv2d.in_x);
+  int dst_x = 0;
+  if (i_out_x_beg < 0)
+    dst_x = (0 - i_out_x_beg);
+  else if (i_out_x_beg >= conv2d.in_x)
+    dst_x = (i_out_x_beg - conv2d.in_x);
 
-    im2col_tab->cpy_len_y = len_y;
-    //im2col_tab->im_src_offset = offset_im_src_0;
+  im2col_tab->cpy_len_y = len_y;
+  // im2col_tab->im_src_offset = offset_im_src_0;
 
-    im2col_tab->src_offset_wo_ch = (ker_y_start * conv2d.in_x + ker_x_start);
-    im2col_tab->dst_offset_wo_ch = (dst_y * conv2d.ker_x + dst_x);
-    im2col_tab->len_wo_ch = len_x;
-    return (len_x == conv2d.ker_x * conv2d.dilation_x && len_y == conv2d.ker_y * conv2d.dilation_y);
+  im2col_tab->src_offset_wo_ch = (ker_y_start * conv2d.in_x + ker_x_start);
+  im2col_tab->dst_offset_wo_ch = (dst_y * conv2d.ker_x + dst_x);
+  im2col_tab->len_wo_ch = len_x;
+  return (len_x == conv2d.ker_x * conv2d.dilation_x &&
+          len_y == conv2d.ker_y * conv2d.dilation_y);
 }
-
-
 
 // for afloat
 void CalculateActivationRangeAflt(TfLiteFusedActivation activation,

@@ -12,13 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/lite/micro/ia700/config.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/ia700/config.h"
 //#include "tensorflow/lite/micro/kernels/softmax.h"
 #include "tensorflow/lite/micro/micro_context.h"
 #if defined(KN_TFLITE_AFLOAT)
@@ -30,7 +30,7 @@ namespace {
 // Softmax parameter data that persists in user_data
 const int kInt16LUTArraySize = LUTSize<int16_t>();
 
-  } //namespace
+}  // namespace
 TfLiteStatus CalculateSoftmaxParams(TfLiteContext* context,
                                     const TfLiteTensor* input,
                                     TfLiteTensor* output,
@@ -42,7 +42,6 @@ void* SoftmaxInit(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(SoftmaxParams));
 }
 TfLiteStatus SoftmaxPrepareInt8(TfLiteContext* context, TfLiteNode* node) {
-
   MicroContext* micro_context = GetMicroContext(context);
 
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -58,11 +57,11 @@ TfLiteStatus SoftmaxPrepareInt8(TfLiteContext* context, TfLiteNode* node) {
   SoftmaxParams* op_data = static_cast<SoftmaxParams*>(node->user_data);
   // Only allocate LUTs for KTfLiteInt16 data type
 
-    TF_LITE_ENSURE_EQ(context, input->type, output->type);
- 
+  TF_LITE_ENSURE_EQ(context, input->type, output->type);
 
   auto* params = static_cast<TfLiteSoftmaxParams*>(node->builtin_data);
-  auto ret_val = CalculateSoftmaxParams(context, input, output, params, op_data);
+  auto ret_val =
+      CalculateSoftmaxParams(context, input, output, params, op_data);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
 
@@ -70,7 +69,6 @@ TfLiteStatus SoftmaxPrepareInt8(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteStatus SoftmaxPrepare(TfLiteContext* context, TfLiteNode* node) {
-
   MicroContext* micro_context = GetMicroContext(context);
 
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
@@ -124,9 +122,9 @@ TfLiteStatus SoftmaxPrepare(TfLiteContext* context, TfLiteNode* node) {
     op_data->scale = output->params.scale;
   }
 
-
   auto* params = static_cast<TfLiteSoftmaxParams*>(node->builtin_data);
-  auto ret_val = CalculateSoftmaxParams(context, input, output, params, op_data);
+  auto ret_val =
+      CalculateSoftmaxParams(context, input, output, params, op_data);
 
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
@@ -140,51 +138,49 @@ TfLiteStatus CalculateSoftmaxParams(TfLiteContext* context,
                                     SoftmaxParams* op_data) {
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     if (input->type == kTfLiteInt16) {
-        #if defined(KN_TFLITE_AFLOAT)
+#if defined(KN_TFLITE_AFLOAT)
 
-        AScalar inv_32768 = AScalar(32768).inverse();
+      AScalar inv_32768 = AScalar(32768).inverse();
       TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
-      TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale), inv_32768,
-                          CONST_ASCALAR(0.001f)*inv_32768);
-      
+      TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale),
+                                 inv_32768, CONST_ASCALAR(0.001f) * inv_32768);
 
-        #else
+#else
       TF_LITE_ENSURE_EQ(context, output->params.zero_point, 0);
       TF_LITE_ENSURE_NEAR(context, output->params.scale, 1.f / 32768,
                           (0.001f * 1.f / 32768));
 
-      #endif
+#endif
     } else {  // input->type == kTfLiteInt8
       TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteInt8);
       if (output->type == kTfLiteInt16) {
- TF_LITE_ENSURE_EQ(context, output->params.zero_point, -32768);
-        #if defined(KN_TFLITE_AFLOAT)
+        TF_LITE_ENSURE_EQ(context, output->params.zero_point, -32768);
+#if defined(KN_TFLITE_AFLOAT)
 
         AScalar inv_65536 = AScalar(65536.0f).inverse();
-TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale), inv_65536,
-                            CONST_ASCALAR(0.001f) * inv_65536);
+        TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale),
+                                   inv_65536,
+                                   CONST_ASCALAR(0.001f) * inv_65536);
 
-        #else
-       
+#else
+
         TF_LITE_ENSURE_NEAR(context, output->params.scale, 1.f / 65536,
                             (0.001f * 1.f / 65536));
 
 #endif
-        
+
       } else {  // output->type == kTfLiteint8
         TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteInt8);
 
-
-        
         TF_LITE_ENSURE_EQ(context, output->params.zero_point, -128);
 
-      #if defined(KN_TFLITE_AFLOAT)
-              AScalar   inv_256 = AScalar(256.f).inverse();
-                
+#if defined(KN_TFLITE_AFLOAT)
+        AScalar inv_256 = AScalar(256.f).inverse();
+
         TF_LITE_ENSURE(context, output->params.scale == inv_256.to_float());
-        #else
+#else
         TF_LITE_ENSURE(context, output->params.scale == 1.f / 256);
-        #endif
+#endif
       }
     }
 
@@ -192,16 +188,15 @@ TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale), inv_65536,
 #if defined(KN_TFLITE_AFLOAT)
 
     if (input->type == kTfLiteInt16) {
-        
       int input_left_shift;
-      
+
       AScalar input_scale_beta_rescale =
-          AScalar(input->params.scale) *
-          AScalar(params->beta) /
-         CONST_ASCALAR (10.0 / 65535.0);  // scale the input_diff such that [-65535, 0]
-                             // correspond to [-10.0, 0.0]
-      QuantizeMultiplier(input_scale_beta_rescale.to_double(), &op_data->input_multiplier,
-                         &input_left_shift);
+          AScalar(input->params.scale) * AScalar(params->beta) /
+          CONST_ASCALAR(10.0 /
+                        65535.0);  // scale the input_diff such that [-65535, 0]
+                                   // correspond to [-10.0, 0.0]
+      QuantizeMultiplier(input_scale_beta_rescale.to_double(),
+                         &op_data->input_multiplier, &input_left_shift);
       op_data->input_left_shift = input_left_shift;
     } else {
       int input_left_shift;
@@ -217,7 +212,6 @@ TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale), inv_65536,
 #else
     // Calculate input_multiplier and input_left_shift
     if (input->type == kTfLiteInt16) {
-        
       int input_left_shift;
       double input_scale_beta_rescale =
           static_cast<double>(input->params.scale) *
@@ -238,16 +232,16 @@ TF_LITE_ENSURE_NEAR_AFLOAT(context, AScalar(output->params.scale), inv_65536,
           -1.0 * tflite::CalculateInputRadius(kScaledDiffIntegerBits,
                                               op_data->input_left_shift);
     }
-    #endif
+#endif
   } else {
     TF_LITE_ENSURE_TYPES_EQ(context, input->type, kTfLiteFloat32);
     TF_LITE_ENSURE_TYPES_EQ(context, output->type, kTfLiteFloat32);
-    #if defined(KN_TFLITE_AFLOAT)
+#if defined(KN_TFLITE_AFLOAT)
 
     op_data->beta = AScalar(params->beta).to_double();
-    #else
+#else
     op_data->beta = static_cast<double>(params->beta);
-    #endif
+#endif
   }
   return kTfLiteOk;
 }

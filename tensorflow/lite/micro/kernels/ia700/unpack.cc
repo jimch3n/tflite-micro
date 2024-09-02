@@ -12,14 +12,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/lite/micro/ia700/config.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 namespace tflite {
 
 namespace {
@@ -66,7 +66,8 @@ TfLiteStatus UnpackImpl(TfLiteContext* context, TfLiteNode* node,
       int loc = k * output_count * copy_size + i * copy_size;
       const T* input_ptr = input_data + loc;
 #if defined(HEMILITE_UNPACK_OPT)
-	  block_copy_bytes((int8_t*)output_ptr, (int8_t*)input_ptr, copy_size * sizeof(T));
+      block_copy_bytes((int8_t*)output_ptr, (int8_t*)input_ptr,
+                       copy_size * sizeof(T));
 #else
       for (int j = 0; j < copy_size; ++j) output_ptr[j] = input_ptr[j];
 #endif

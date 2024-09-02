@@ -48,6 +48,7 @@ from schema_py_generated import FullyConnectedOptionsT
 from schema_py_generated import DepthwiseConv2DOptionsT
 from schema_py_generated import Conv2DOptionsT
 from schema_py_generated import SVDFOptionsT
+from schema_py_generated import UnidirectionalSequenceLSTMOptionsT
 #from tflite.FullyConnectedOptionsWeightsFormat import FullyConnectedOptionsWeightsFormat
 
 import argparse
@@ -519,6 +520,32 @@ def model_mapping_by_operators(model, enable_map_op,subgraph_idx=0, FLAGS=None):
             if verbose:
                 print("fc tensor idx: {} \naligned( {} {})".format(tensor_idx, blkAlgined,grpAligned))
             ops_mapped  += str(opidx)+'.'
+        if 'lstm' in enable_map_op.keys() and \
+          isinstance(operator.builtinOptions, UnidirectionalSequenceLSTMOptionsT) and \
+          len(operator.inputs) == 24:  # tensor input type is int8
+            ### input to forget weight #... weights
+            # input to forget W 2 , recurrent to forget 6
+            # input to input W 1, recurrent to input 5
+            # input to cell W 3,  recurrent to cell 7
+            # input to output 4, recurrent to cell 8
+            lstm_remap_tensor_idx = [2, 6, 1, 5, 3, 7, 4, 8]
+
+            for wi in lstm_remap_tensor_idx:
+              tensor_idx = operator.inputs[wi]  # fixed index weight put
+              tensor = msg.tensors[tensor_idx]
+              buf_idx = tensor.buffer
+              if verbose:
+                print("lstm idx: {} tensor name: {} dim: {}".format(buf_idx, tensor.name, tensor.shape.size))
+              weight = np.array(model.buffers[buf_idx].data).reshape((tensor.shape[0], tensor.shape[1])).astype(np.int8)
+              mapW, grpAligned, blkAlgined = map_fc_weights(weight.flatten(),
+                                                            weight.shape[1], weight.shape[0], FLAGS.arch)
+              model.buffers[buf_idx].data = copy.deepcopy(mapW.flatten())
+              # tensor.shape[0] = grpAligned
+              # tensor.shape[1] = blkAlgined
+              # operator.builtinOptions.weightsFormat=FullyConnectedOptionsWeightsFormat.SHUFFLED4x16INT8
+              if verbose:
+                print("lstm tensor idx: {} tensor:{} \naligned( {} {})".format(tensor_idx, wi, blkAlgined, grpAligned))
+            ops_mapped += str(opidx) + '.'
         if 'svdf' in enable_map_op.keys()  and \
             isinstance(operator.builtinOptions, SVDFOptionsT) and\
             msg.tensors[operator.inputs[0]].type == 9: #tensor input type is int8
@@ -822,6 +849,7 @@ def model_float_coeff_to_8bit(model, enable_map_op, subgraph_idx = 0, FLAGS=None
                                                           weight.shape[1], weight.shape[0], FLAGS.arch)
             model.buffers[buf_idx].data = copy.deepcopy(mapW.flatten())
             ops_mapped += str(opidx)+'.'
+
         elif 'conv' in enable_map_op.keys()  and \
                 isinstance(operator.builtinOptions, Conv2DOptionsT) and \
                 msg.tensors[operator.inputs[1]].type == 0: #integer-8 only
@@ -1049,7 +1077,7 @@ if __name__ == '__main__':
        # action="count",
         type=str,
         nargs="+",
-        default=['fc'],
+        default=['svdf', 'fc', 'lstm'], #conv, ds_conv
         help="mapping coefficients op"
     )
     parser.add_argument('-q',

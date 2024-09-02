@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/lite/micro/ia700/config.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/tanh.h"
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -23,14 +22,14 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"
-
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 namespace tflite {
-//namespace ops {
-//namespace micro {
-//namespace activations {
+// namespace ops {
+// namespace micro {
+// namespace activations {
 namespace {
 constexpr int kInputTensor = 0;
 constexpr int kOutputTensor = 0;
@@ -77,22 +76,22 @@ TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
     data->input_range_radius =
         CalculateInputRadius(kInputIntegerBits, data->input_left_shift, 31);
 
-	// int32_t kInputIntegerBits = 4;
-	// Q7(input) * multipler(31-left_shift) >> conQ4.x
-	// 7+(X-left_shift) = 31-4 = 27
-	//
-	tflite::ConvertQ31ToAfloat(
-		data->input_multiplier, data->inputMultipler,
-		data->input_left_shift -
-		20);  // Q7* Qx() >> 31-shift32- op_data.input_left_shift-5
-	tflite::ConvertQ31ToAfloat(data->input_range_radius, data->inputRangeRadius,
-		24);  // Q31 compare to input Q7
-	tflite::ConvertQ31ToAfloat(data->input_zero_point, data->inputZeroPoint,
-		24);  //  Q31 compare to input Q7
-	KN_PRINTAFLT(data->inputRangeRadius);
-	KN_PRINTAFLT(data->inputZeroPoint);
+    // int32_t kInputIntegerBits = 4;
+    // Q7(input) * multipler(31-left_shift) >> conQ4.x
+    // 7+(X-left_shift) = 31-4 = 27
+    //
+    tflite::ConvertQ31ToAfloat(
+        data->input_multiplier, data->inputMultipler,
+        data->input_left_shift -
+            20);  // Q7* Qx() >> 31-shift32- op_data.input_left_shift-5
+    tflite::ConvertQ31ToAfloat(data->input_range_radius, data->inputRangeRadius,
+                               24);  // Q31 compare to input Q7
+    tflite::ConvertQ31ToAfloat(data->input_zero_point, data->inputZeroPoint,
+                               24);  //  Q31 compare to input Q7
+    KN_PRINTAFLT(data->inputRangeRadius);
+    KN_PRINTAFLT(data->inputZeroPoint);
 
-	KN_PRINTAFLT(data->inputMultipler);
+    KN_PRINTAFLT(data->inputMultipler);
   }
   if (input->type == kTfLiteInt16) {
     static constexpr int kInputIntegerBits = 3;
@@ -146,7 +145,7 @@ TfLiteStatus CalculateArithmeticOpData(TfLiteContext* context, TfLiteNode* node,
     TF_LITE_ENSURE_EQ(context, output_scale_log2_rounded,
                       -kOutputFractionalBits);
   }
-  
+
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(output);
 
@@ -296,154 +295,144 @@ void TanhV(float* y, const float* x, int n) {
   }
   WUR_JammingBit(jammingBit);
 }
-void TanhQuantizedInt8(
-	const OpData* data,  // const AScalar &inputMultipler,
-	int8_t* y, const int8_t* x, int depth) {
-	int loopLim = depth >> 2;  // Includes loop unrolling count of 2
-	int remain = depth & 3;
-	//ulsr32 UR_x;
+void TanhQuantizedInt8(const OpData* data,  // const AScalar &inputMultipler,
+                       int8_t* y, const int8_t* x, int depth) {
+  int loopLim = depth >> 2;  // Includes loop unrolling count of 2
+  int remain = depth & 3;
+  // ulsr32 UR_x;
 
-	vr64 VR_fac = vseta_vr(kConstTable_Log2_Of_e,  0);
-	vr64 VR_x0;
-	vr64 VR_y0;
-	vr64 VR_z0, VR_n0;
-	vr64 VR_one = vseta_vr(kConstTable_One, 0);
-	vr64 VR_two = vseta_vr(kConstTable_Two, 0);
-	// vr128 VR_two = vseta_vr(kConstTable_Two, 0, 0);
-	vr64 VR_inputMulti, VR_outputZP;
-	vr64 VR_q7_out, VR_out;
-	vr64 VR_inputRadiusMax, VR_inputRadiusMin;
-	vr64 VR_inputRadiusMaxQ7, VR_inputRadiusMinQ7;
-	vr64 VR_inputZeroPoint;
-	// vr128 VR_tmp ;
-	int8_t* xLocal;
-	int8_t* yLocal = y;
-	atbool xt_inOutRangeMax;
-	atbool xt_inOutRangeMin;
-	const int32_t kOutputZeroPoint =
-		0x80808080;  // output zero point, align to logistic.h
+  vr64 VR_fac = vseta_vr(kConstTable_Log2_Of_e, 0);
+  vr64 VR_x0;
+  vr64 VR_y0;
+  vr64 VR_z0, VR_n0;
+  vr64 VR_one = vseta_vr(kConstTable_One, 0);
+  vr64 VR_two = vseta_vr(kConstTable_Two, 0);
+  // vr128 VR_two = vseta_vr(kConstTable_Two, 0, 0);
+  vr64 VR_inputMulti, VR_outputZP;
+  vr64 VR_q7_out, VR_out;
+  vr64 VR_inputRadiusMax, VR_inputRadiusMin;
+  vr64 VR_inputRadiusMaxQ7, VR_inputRadiusMinQ7;
+  vr64 VR_inputZeroPoint;
+  // vr128 VR_tmp ;
+  int8_t* xLocal;
+  int8_t* yLocal = y;
+  atbool xt_inOutRangeMax;
+  atbool xt_inOutRangeMin;
+  const int32_t kOutputZeroPoint =
+      0x80808080;  // output zero point, align to logistic.h
 
-	replicate_ar(VR_inputRadiusMaxQ7, 0x3, 0x7f7f7f7f);
-	replicate_ar(VR_inputRadiusMinQ7, 0x3, kOutputZeroPoint);
+  replicate_ar(VR_inputRadiusMaxQ7, 0x3, 0x7f7f7f7f);
+  replicate_ar(VR_inputRadiusMinQ7, 0x3, kOutputZeroPoint);
 
+  replicate_ar(VR_outputZP, 0x3, kOutputZeroPoint);
+  replicate_ar(VR_inputRadiusMax, 0x3, data->inputRangeRadius.fr);
+  VR_inputRadiusMin = s_vneg(VR_inputRadiusMax);
 
-	replicate_ar(VR_outputZP, 0x3, kOutputZeroPoint);
-	replicate_ar(VR_inputRadiusMax, 0x3, data->inputRangeRadius.fr);
-	VR_inputRadiusMin = s_vneg(VR_inputRadiusMax);
+  replicate_ar(VR_inputZeroPoint, 0x3, data->inputZeroPoint.fr);
 
-	replicate_ar(VR_inputZeroPoint, 0x3, data->inputZeroPoint.fr);
+  replicate_ar(VR_inputMulti, 0x3, data->inputMultipler.fr);
 
-	replicate_ar(VR_inputMulti, 0x3, data->inputMultipler.fr);
+  loopLim = depth >> 1;
 
-	loopLim = depth >> 1;
+  // xLocal = (int8_t *)tmpAR; // This line is not required, just a temporary
+  // fix for linux build error
+  xLocal = (int8_t*)x;
 
-	// xLocal = (int8_t *)tmpAR; // This line is not required, just a temporary
-	// fix for linux build error
-	xLocal = (int8_t*)x;
+  // UR_x = align_8x4_load(xLocal);
+  VR_fac = vmuls(VR_two, VR_fac, 0);
+  if (loopLim > 0) {
+    for (int i = 0; i < loopLim; i++) {
+      // load8x2_vr_postI(VR_x0,  xLocal, INC1);
+      load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
+      load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ1);
 
-	//UR_x = align_8x4_load(xLocal);
-	VR_fac = vmuls(VR_two, VR_fac, 0);
-	if (loopLim > 0) {
+      convert_16I_to_32F_x2(VR_x0, 0);
+      // input data[i] - input_zero_point
+      VR_x0 = vadds(VR_x0, VR_inputZeroPoint, 0xa);
 
+      // compare range radius
+      xt_inOutRangeMin = vle(VR_x0, VR_inputRadiusMin);
+      xt_inOutRangeMax = vge(VR_x0, VR_inputRadiusMax);
+      // input_data * mulitplier
+      VR_x0 = vmuls(VR_x0, VR_inputMulti, 0);
+      /// tanh start
 
-		for (int i = 0; i < loopLim; i++) {
-			//load8x2_vr_postI(VR_x0,  xLocal, INC1);
-			load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
-			load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ1);
+      VR_y0 = vmuls(VR_fac, VR_x0, 0);
+      set_VRL(VR_z0, pow2(get_VRL(VR_y0)));
+      set_VRH(VR_z0, pow2(get_VRH(VR_y0)));
 
-			convert_16I_to_32F_x2(VR_x0, 0);
-			// input data[i] - input_zero_point
-			VR_x0 = vadds(VR_x0, VR_inputZeroPoint, 0xa);
+      VR_n0 = vadds(VR_one, VR_z0, 0x5);  // 1- exp
+      VR_z0 = vadds(VR_one, VR_z0, 0x0);
 
-			// compare range radius
-			xt_inOutRangeMin = vle(VR_x0, VR_inputRadiusMin);
-			xt_inOutRangeMax = vge(VR_x0, VR_inputRadiusMax);
-			// input_data * mulitplier
-			VR_x0 = vmuls(VR_x0, VR_inputMulti, 0);
-			/// tanh start
+      set_VRL(VR_y0, inv(get_VRL(VR_z0)));
+      set_VRH(VR_y0, inv(get_VRH(VR_z0)));
 
+      // Newton unnecssary for qunzation
 
-			VR_y0 = vmuls(VR_fac, VR_x0, 0);
-			set_VRL(VR_z0, pow2(get_VRL(VR_y0)));
-			set_VRH(VR_z0, pow2(get_VRH(VR_y0)));
+      VR_y0 = vmuls(VR_n0, VR_y0, 0);
 
+      //	vr128 VR_tmp  = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
+      //	 VR_y0 = vmuls(VR_tmp, VR_y0, 0);
 
-			VR_n0 = vadds(VR_one, VR_z0, 0x5);// 1- exp
-			VR_z0 = vadds(VR_one, VR_z0, 0x0);
+      // convert to uint8_t [ 0~ 1]
 
-			set_VRL(VR_y0, inv(get_VRL(VR_z0)));
-			set_VRH(VR_y0, inv(get_VRH(VR_z0)));
+      convert_32F_to_16I_x2(VR_y0, 0, 0);  // output_in_q0
 
+      rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_y0, 1);
+      // VR_q7_out = vbool(VR_outputZP, VR_q7_out, 0x6);  // XOR 0x80 to
+      // subtract
+      // -128
+      VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
+      // VR_out = vexp_adji(VR_y0, 0);
+      VR_out = vsel(VR_inputRadiusMinQ7, VR_out, xt_inOutRangeMin);
+      VR_out = vsel(VR_inputRadiusMaxQ7, VR_out, xt_inOutRangeMax);
 
-			// Newton unnecssary for qunzation
+      store8x1_vr_postI(VR_out, yLocal, INC1, VRQ0);
+      store8x1_vr_postI(VR_out, yLocal, INC1, VRQ1);
+    }
+  }
+  if (remain) {
+    load8x1_vr_postI(VR_x0, xLocal, INC1, VRQ0);
 
-			VR_y0 = vmuls(VR_n0, VR_y0, 0);
+    convert_16I_to_32F_x2(VR_x0, 0);
+    // input data[i] - input_zero_point
+    VR_x0 = vadds(VR_x0, VR_inputZeroPoint, 0xa);
 
-			//	vr128 VR_tmp  = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
-			//	 VR_y0 = vmuls(VR_tmp, VR_y0, 0);
+    // compare range radius
+    xt_inOutRangeMin = vle(VR_x0, VR_inputRadiusMin);
+    xt_inOutRangeMax = vge(VR_x0, VR_inputRadiusMax);
+    // input_data * mulitplier
+    VR_x0 = vmuls(VR_x0, VR_inputMulti, 0);
+    /// tanh start
 
-			// convert to uint8_t [ 0~ 1]
+    VR_y0 = vmuls(VR_fac, VR_x0, 0);
 
-			convert_32F_to_16I_x2(VR_y0, 0, 0);  // output_in_q0
+    set_VRL(VR_z0, pow2(get_VRL(VR_y0)));
 
-			rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_y0, 1);
-			//VR_q7_out = vbool(VR_outputZP, VR_q7_out, 0x6);  // XOR 0x80 to subtract
-			// -128
-			VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
-			//VR_out = vexp_adji(VR_y0, 0);
-			VR_out = vsel(VR_inputRadiusMinQ7, VR_out, xt_inOutRangeMin);
-			VR_out = vsel(VR_inputRadiusMaxQ7, VR_out, xt_inOutRangeMax);
+    VR_n0 = vadds(VR_one, VR_z0, 0x5);  // 1- exp
+    VR_z0 = vadds(VR_one, VR_z0, 0x0);
 
-			store8x1_vr_postI(VR_out, yLocal, INC1, VRQ0);
-			store8x1_vr_postI(VR_out, yLocal, INC1, VRQ1);
-		}
+    set_VRL(VR_y0, inv(get_VRL(VR_z0)));
 
-	}
-	if (remain) {
-		load8x1_vr_postI(VR_x0,  xLocal, INC1, VRQ0);
+    VR_y0 = vmuls(VR_n0, VR_y0, 0);
 
-		convert_16I_to_32F_x2(VR_x0, 0);
-		// input data[i] - input_zero_point
-		VR_x0 = vadds(VR_x0, VR_inputZeroPoint, 0xa);
+    // VR_tmp  = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
+    // VR_y0 = vmuls(VR_tmp, VR_y0, 0);
 
-		// compare range radius
-		xt_inOutRangeMin = vle(VR_x0, VR_inputRadiusMin);
-		xt_inOutRangeMax = vge(VR_x0, VR_inputRadiusMax);
-		// input_data * mulitplier
-		VR_x0 = vmuls(VR_x0, VR_inputMulti, 0);
-		/// tanh start
+    // convert to uint8_t [ 0~ 1]
 
-		VR_y0 = vmuls(VR_fac, VR_x0, 0);
+    convert_32F_to_16I_x2(VR_y0, 0, 0);  // output_in_q0
+                                         // VR_out = vexp_adji(VR_y0, 0);
+    rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_y0, 1);
+    // VR_q7_out = vbool(VR_outputZP, VR_q7_out, 0x6);  // XOR 0x80 to subtract
+    // -128
+    VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
 
-		set_VRL(VR_z0, pow2(get_VRL(VR_y0)));
+    VR_out = vsel(VR_inputRadiusMinQ7, VR_out, xt_inOutRangeMin);
+    VR_out = vsel(VR_inputRadiusMaxQ7, VR_out, xt_inOutRangeMax);
 
-		VR_n0 = vadds(VR_one, VR_z0, 0x5);// 1- exp
-		VR_z0 = vadds(VR_one, VR_z0, 0x0);
-
-		set_VRL(VR_y0, inv(get_VRL(VR_z0)));
-
-		VR_y0 = vmuls(VR_n0, VR_y0, 0);
-
-		// VR_tmp  = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
-		// VR_y0 = vmuls(VR_tmp, VR_y0, 0);
-
-		// convert to uint8_t [ 0~ 1]
-
-		convert_32F_to_16I_x2(VR_y0, 0, 0);  // output_in_q0
-											 //VR_out = vexp_adji(VR_y0, 0);
-		rnd_sat_pack(VR_q7_out, VRQ0, VR_y0, VR_y0, 1);
-		//VR_q7_out = vbool(VR_outputZP, VR_q7_out, 0x6);  // XOR 0x80 to subtract
-		// -128
-		VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
-
-		VR_out = vsel(VR_inputRadiusMinQ7, VR_out, xt_inOutRangeMin);
-		VR_out = vsel(VR_inputRadiusMaxQ7, VR_out, xt_inOutRangeMax);
-
-
-		store8x1_vr_postI(VR_out, yLocal, INC1, VRQ0);
-
-		
-	}
+    store8x1_vr_postI(VR_out, yLocal, INC1, VRQ0);
+  }
 }
 
 #endif
@@ -495,16 +484,14 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
       return kTfLiteOk;
     } break;
     case kTfLiteInt8: {
-		 KN_PRINT_Q7_SIZE( tflite::micro::GetTensorData<int8_t>(input),
-			ElementCount(*input->dims));
+      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
+                       ElementCount(*input->dims));
 #if defined(HEMILITE_TANH_OPT)
-		{
-			 TanhQuantizedInt8(&data,
-				 tflite::micro::GetTensorData<int8_t>(output),
-				 tflite::micro::GetTensorData<int8_t>(input),
-				 NumElements(input->dims));
-			
-		}
+      {
+        TanhQuantizedInt8(&data, tflite::micro::GetTensorData<int8_t>(output),
+                          tflite::micro::GetTensorData<int8_t>(input),
+                          NumElements(input->dims));
+      }
 #else
       reference_integer_ops::Tanh(
           data.input_zero_point, data.input_range_radius, data.input_multiplier,
@@ -514,8 +501,8 @@ TfLiteStatus TanhEval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int8_t>(output));
 #endif
 
-		 KN_PRINT_Q7_SIZE( tflite::micro::GetTensorData<int8_t>(output),
-			ElementCount(*output->dims));
+      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
+                       ElementCount(*output->dims));
       return kTfLiteOk;
     } break;
     default:

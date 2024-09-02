@@ -15,18 +15,19 @@ limitations under the License.
 
 //#define KN_DEBUG
 
-#include "tensorflow/lite/micro/ia8201/config.h"
+
 // afloat opt for both core
 
 #include "signal/src/filter_bank_square_root.h"
 #include "signal/src/square_root.h"
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
 #if defined(XTENSA) || defined(HMD1A)
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
-
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 #endif
 

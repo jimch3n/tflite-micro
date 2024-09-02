@@ -361,7 +361,7 @@ limitations under the License.
   } while (0)
 #define KN_PRINTS(S)    \
   do {                  \
-    printf("%s \n", S); \
+    printf("%s:%5d [%s]\n", __FUNCTION__, __LINE__, S); \
   } while (0)
 
 #else

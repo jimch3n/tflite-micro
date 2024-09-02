@@ -29,21 +29,20 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/sub.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 namespace tflite {
-//namespace ops {
-//namespace micro {
-//namespace sub {
+// namespace ops {
+// namespace micro {
+// namespace sub {
 
-//constexpr int kSubInputTensor1 = 0;
-//constexpr int kSubInputTensor2 = 1;
-//constexpr int kSubOutputTensor = 0;
+// constexpr int kSubInputTensor1 = 0;
+// constexpr int kSubInputTensor2 = 1;
+// constexpr int kSubOutputTensor = 0;
 
 struct OpData {
-
   OpDataSub SubOp;
 
   AScalar input1_multiplier_fr32;
@@ -62,7 +61,7 @@ TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
                              const TfLiteTensor* input1,
                              const TfLiteTensor* input2, TfLiteTensor* output,
                              OpData* data_ex) {
-  OpDataSub* data = static_cast<OpDataSub *>(&data_ex->SubOp);
+  OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
   data->requires_broadcast = !HaveSameShapes(input1, input2);
 
   if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
@@ -158,202 +157,195 @@ static void SubFloatConstI(float* output, const float* input1,
     store_32x2_vr_a(VR_out, UR_output, output);
     flush_32x2(UR_output, output);
   }
-  if( remain) {
-		load32x1_vr_postI(VR_input1, input1, INC1, VRQ0);
+  if (remain) {
+    load32x1_vr_postI(VR_input1, input1, INC1, VRQ0);
 
-		convert_IEEE_float_to_32F_x2(VR_input1);
+    convert_IEEE_float_to_32F_x2(VR_input1);
 
-		VR_out = vadds(VR_input1, VR_input2, 0xa);
-		VR_out = vmin(VR_max, VR_out);
-		VR_out = vmax(VR_min, VR_out);
-		convert_32F_to_IEEE_float_x2(VR_out);
-		store32x1_vr_postI(VR_out, output, INC1, VRQ0);
+    VR_out = vadds(VR_input1, VR_input2, 0xa);
+    VR_out = vmin(VR_max, VR_out);
+    VR_out = vmax(VR_min, VR_out);
+    convert_32F_to_IEEE_float_x2(VR_out);
+    store32x1_vr_postI(VR_out, output, INC1, VRQ0);
   }
 }
 
-static void SubQuantizedInt8ConstI1(const OpData* data, int8_t* output, const int8_t* input1,
-	const int8_t *input2, int n) {
-	vr64 vr_input1, vr_input2;
-	int loopLim = n >> 1;
-	//
-	// ulsr128 ur_input1, ur_input2;
+static void SubQuantizedInt8ConstI1(const OpData* data, int8_t* output,
+                                    const int8_t* input1, const int8_t* input2,
+                                    int n) {
+  vr64 vr_input1, vr_input2;
+  int loopLim = n >> 1;
+  //
+  // ulsr128 ur_input1, ur_input2;
 
-	vr64 vr_offset1, vr_offset2;
-	vr64 vr_multiplier_input1, vr_multiplier_input2;
-	vr64 vr_multiplier_output;
-	vr64 vr_output_offset, vr_out;
-	vr64 vr_shift_input1, vr_shift_input2;
-	vr64 vr_raw_sum, vr_output, vr_q7_out;
-	int8_t *pOut = output;
-	//ulsr128 UR_out = align_8x4_store(pOut);
-	replicate_ar(vr_offset1, 0x3, data->input1_offset_fr32.fr);  // Afloat
-	replicate_ar(vr_offset2, 0x3, data->input2_offset_fr32.fr);
-	replicate_ar(vr_output_offset, 0x3, data->output_offset_fr32.fr);
-	replicate_ar(vr_multiplier_input1, 0x3, data->input1_multiplier_fr32.fr);
-	replicate_ar(vr_multiplier_input2, 0x3, data->input2_multiplier_fr32.fr);
+  vr64 vr_offset1, vr_offset2;
+  vr64 vr_multiplier_input1, vr_multiplier_input2;
+  vr64 vr_multiplier_output;
+  vr64 vr_output_offset, vr_out;
+  vr64 vr_shift_input1, vr_shift_input2;
+  vr64 vr_raw_sum, vr_output, vr_q7_out;
+  int8_t* pOut = output;
+  // ulsr128 UR_out = align_8x4_store(pOut);
+  replicate_ar(vr_offset1, 0x3, data->input1_offset_fr32.fr);  // Afloat
+  replicate_ar(vr_offset2, 0x3, data->input2_offset_fr32.fr);
+  replicate_ar(vr_output_offset, 0x3, data->output_offset_fr32.fr);
+  replicate_ar(vr_multiplier_input1, 0x3, data->input1_multiplier_fr32.fr);
+  replicate_ar(vr_multiplier_input2, 0x3, data->input2_multiplier_fr32.fr);
 
-	replicate_ar(vr_multiplier_output, 0x3, data->output_multiplier_fr32.fr);
+  replicate_ar(vr_multiplier_output, 0x3, data->output_multiplier_fr32.fr);
 
-	load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
-	vr_input1 = vreplicate(vr_input1, VRQ0);
+  load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
+  vr_input1 = vreplicate(vr_input1, VRQ0);
 
-	load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
-	load8x1_vr_postI(vr_input2, input2, INC1, VRQ1);
+  load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+  load8x1_vr_postI(vr_input2, input2, INC1, VRQ1);
 
-	convert_16I_to_32F_x2(vr_input1, 0);
+  convert_16I_to_32F_x2(vr_input1, 0);
 
-	// const 
-	vr_shift_input1 =
-		vexp_adj(vadds(vr_input1, vr_offset1, 0x0), 31 - 8 - data->SubOp.left_shift);
-	vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
-	
-	if (loopLim > 0)
-	{
-		for (int ii = 0; ii < loopLim - 1; ii++) {
-			// q7*1<<left
-			convert_16I_to_32F_x2(vr_input2, 0);
+  // const
+  vr_shift_input1 = vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
+                             31 - 8 - data->SubOp.left_shift);
+  vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
 
-			vr_shift_input2 =
-                            vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
-                                     31 - 8 - data->SubOp.left_shift);
+  if (loopLim > 0) {
+    for (int ii = 0; ii < loopLim - 1; ii++) {
+      // q7*1<<left
+      convert_16I_to_32F_x2(vr_input2, 0);
 
-			vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+      vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
+                                 31 - 8 - data->SubOp.left_shift);
 
-			vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
+      vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
 
-			vr_output =
-				vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
 
-			// convert to 8 bit rndsat-back
-			convert_32F_to_16I_x2(vr_output, 0, 0);
+      vr_output =
+          vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
 
-			rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
-			vr_out = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
-			store8x1_vr_postI(vr_out, pOut, INC1, VRQ0);
-			store8x1_vr_postI(vr_out, pOut, INC1, VRQ1);
-			//load8x4_vr_postI(vr_input1, input1, INC1);
-			load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
-			load8x1_vr_postI(vr_input2, input2, INC1, VRQ1);
+      // convert to 8 bit rndsat-back
+      convert_32F_to_16I_x2(vr_output, 0, 0);
 
-		}
-		convert_16I_to_32F_x2(vr_input2, 0);
-		// add offset each input
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      vr_out = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+      store8x1_vr_postI(vr_out, pOut, INC1, VRQ0);
+      store8x1_vr_postI(vr_out, pOut, INC1, VRQ1);
+      // load8x4_vr_postI(vr_input1, input1, INC1);
+      load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+      load8x1_vr_postI(vr_input2, input2, INC1, VRQ1);
+    }
+    convert_16I_to_32F_x2(vr_input2, 0);
+    // add offset each input
 
-		// q7*1<<left
-		vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
-                                           31 - 8 - data->SubOp.left_shift);
+    // q7*1<<left
+    vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
+                               31 - 8 - data->SubOp.left_shift);
 
-		vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+    vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
 
-		vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
+    vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
 
-		vr_output =
-			vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+    vr_output = vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
 
-		// convert to 8 bit rndsat-back
-		convert_32F_to_16I_x2(vr_output, 0, 0);
-		rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
-		vr_out = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
-		store8x1_vr_postI(vr_out, pOut, INC1, VRQ0);
-		store8x1_vr_postI(vr_out, pOut, INC1, VRQ1);
-	}
-	// reminder
-	if (n & 1) {
-		//load8x4_vr_postI(vr_input1, input1, INC1);
-		load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
-		convert_16I_to_32F_x2(vr_input2, 0);
+    // convert to 8 bit rndsat-back
+    convert_32F_to_16I_x2(vr_output, 0, 0);
+    rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+    vr_out = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+    store8x1_vr_postI(vr_out, pOut, INC1, VRQ0);
+    store8x1_vr_postI(vr_out, pOut, INC1, VRQ1);
+  }
+  // reminder
+  if (n & 1) {
+    // load8x4_vr_postI(vr_input1, input1, INC1);
+    load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+    convert_16I_to_32F_x2(vr_input2, 0);
 
-		vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
-                                           31 - 8 - data->SubOp.left_shift);
+    vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
+                               31 - 8 - data->SubOp.left_shift);
 
+    vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
 
-		vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+    vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
 
-		vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
+    vr_output = vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
 
-		vr_output =
-			vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+    // convert to 8 bit rndsat-back
+    convert_32F_to_16I_x2(vr_output, 0, 0);
+    // store 1 byt one
+    rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+    vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
 
-		// convert to 8 bit rndsat-back
-		convert_32F_to_16I_x2(vr_output, 0, 0);
-		// store 1 byt one
-		rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
-		vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
-
-
-		store8x1_vr_postI(vr_output, pOut, INC1, VRQ0);
-	
-	}
+    store8x1_vr_postI(vr_output, pOut, INC1, VRQ0);
+  }
 }
 
 // input 1 is constant
 static void SubFloatConstI1(float* output, const AScalar& input1,
-	const float *input2, const AScalar& act_min,
-	const AScalar& act_max, int size) {
-	//  const int size =
-	// MatchingElementsSize( tflite::micro::GetTensorShape(input1),
-	// tflite::micro::GetTensorShape(input2),
-	// tflite::micro::GetTensorShape(output));
+                            const float* input2, const AScalar& act_min,
+                            const AScalar& act_max, int size) {
+  //  const int size =
+  // MatchingElementsSize( tflite::micro::GetTensorShape(input1),
+  // tflite::micro::GetTensorShape(input2),
+  // tflite::micro::GetTensorShape(output));
 
-	int loopLim = size >> 1;
-	int remain = (size & 1);
-	vr64 VR_input1, VR_input2;
-	vr64 VR_min, VR_max;
+  int loopLim = size >> 1;
+  int remain = (size & 1);
+  vr64 VR_input1, VR_input2;
+  vr64 VR_min, VR_max;
 
-	ulsr32 UR_input2;  //, UR_input2;
-	vr64 VR_out;
-	UR_input2 = align_32x2_load(input2);
-	// UR_input2 = align_32x2_load(input2);
-	ulsr32 UR_output = align_32x2_store(output);
+  ulsr32 UR_input2;  //, UR_input2;
+  vr64 VR_out;
+  UR_input2 = align_32x2_load(input2);
+  // UR_input2 = align_32x2_load(input2);
+  ulsr32 UR_output = align_32x2_store(output);
 
-	replicate_ar(VR_min, 0x3, act_min.fr);
-	replicate_ar(VR_max, 0x3, act_max.fr);
-	replicate_ar(VR_input1, 0x3, input1.fr);
+  replicate_ar(VR_min, 0x3, act_min.fr);
+  replicate_ar(VR_max, 0x3, act_max.fr);
+  replicate_ar(VR_input1, 0x3, input1.fr);
 
-	//  UR_input1 = algn_32x2_load();
-	KN_PRINTD(size);
-	KN_PRINTD(loopLim);
-	KN_PRINTD(remain);
-	if (loopLim > 0) {
-		load_32x2_vr_a(VR_input2, UR_input2, input2);
-		//  load_32x2_vr_a(VR_input2, UR_input2, input2);
-		for (int ii = 0; ii < loopLim - 1; ii++) {
-			convert_IEEE_float_to_32F_x2(VR_input2);
+  //  UR_input1 = algn_32x2_load();
+  KN_PRINTD(size);
+  KN_PRINTD(loopLim);
+  KN_PRINTD(remain);
+  if (loopLim > 0) {
+    load_32x2_vr_a(VR_input2, UR_input2, input2);
+    //  load_32x2_vr_a(VR_input2, UR_input2, input2);
+    for (int ii = 0; ii < loopLim - 1; ii++) {
+      convert_IEEE_float_to_32F_x2(VR_input2);
 
-			VR_out = vadds(VR_input1, VR_input2, 0xa);
+      VR_out = vadds(VR_input1, VR_input2, 0xa);
 
-			load_32x2_vr_a(VR_input2, UR_input2, input2);
+      load_32x2_vr_a(VR_input2, UR_input2, input2);
 
-			VR_out = vmin(VR_max, VR_out);
-			VR_out = vmax(VR_min, VR_out);
-			convert_32F_to_IEEE_float_x2(VR_out);
+      VR_out = vmin(VR_max, VR_out);
+      VR_out = vmax(VR_min, VR_out);
+      convert_32F_to_IEEE_float_x2(VR_out);
 
-			store_32x2_vr_a(VR_out, UR_output, output);
-		}
-		convert_IEEE_float_to_32F_x2(VR_input2);
+      store_32x2_vr_a(VR_out, UR_output, output);
+    }
+    convert_IEEE_float_to_32F_x2(VR_input2);
 
-		VR_out = vadds(VR_input1, VR_input2, 0xa);
-		VR_out = vmin(VR_max, VR_out);
-		VR_out = vmax(VR_min, VR_out);
+    VR_out = vadds(VR_input1, VR_input2, 0xa);
+    VR_out = vmin(VR_max, VR_out);
+    VR_out = vmax(VR_min, VR_out);
 
-		convert_32F_to_IEEE_float_x2(VR_out);
+    convert_32F_to_IEEE_float_x2(VR_out);
 
-		store_32x2_vr_a(VR_out, UR_output, output);
-		flush_32x2(UR_output, output);
-	}
-	if(remain) {
-		load32x1_vr_postI(VR_input2, input2, INC1, VRQ0);
+    store_32x2_vr_a(VR_out, UR_output, output);
+    flush_32x2(UR_output, output);
+  }
+  if (remain) {
+    load32x1_vr_postI(VR_input2, input2, INC1, VRQ0);
 
-		convert_IEEE_float_to_32F_x2(VR_input2);
+    convert_IEEE_float_to_32F_x2(VR_input2);
 
-		//fadds(VR_out, VRQ0, VR_input1, VRQ0, VR_input2, VRQ0, 0x10);
-		fr32 fr_out = fadds(get_VRL(VR_input1), get_VRL(VR_input2), 0x2);
-		set_VRL(VR_out, fr_out);
-		VR_out = vmin(VR_max, VR_out);
-		VR_out = vmax(VR_min, VR_out);
-		convert_32F_to_IEEE_float_x2(VR_out);
-		store32x1_vr_postI(VR_out, output, INC1, VRQ0);
-	}
+    // fadds(VR_out, VRQ0, VR_input1, VRQ0, VR_input2, VRQ0, 0x10);
+    fr32 fr_out = fadds(get_VRL(VR_input1), get_VRL(VR_input2), 0x2);
+    set_VRL(VR_out, fr_out);
+    VR_out = vmin(VR_max, VR_out);
+    VR_out = vmax(VR_min, VR_out);
+    convert_32F_to_IEEE_float_x2(VR_out);
+    store32x1_vr_postI(VR_out, output, INC1, VRQ0);
+  }
 }
 static void SubFloat(float* output, const float* input1, const float* input2,
                      const AScalar& act_min, const AScalar& act_max, int size) {
@@ -405,136 +397,130 @@ static void SubFloat(float* output, const float* input1, const float* input2,
     store_32x2_vr_a(VR_out, UR_output, output);
     flush_32x2(UR_output, output);
   }
-  if(remain) {
+  if (remain) {
     load32x1_vr_postI(VR_input1, input1, INC1, VRQ0);
     load32x1_vr_postI(VR_input2, input2, INC1, VRQ0);
     convert_IEEE_float_to_32F_x2(VR_input1);
     convert_IEEE_float_to_32F_x2(VR_input2);
-   // fadds(VR_out, VRQ0, VR_input1, VRQ0, VR_input2, VRQ0, 0x10);
-    
-	fr32 fr_out = fadds(get_VRL(VR_input1), get_VRL(VR_input2), 0x2);
-	set_VRL(VR_out, fr_out);
-	VR_out = vmin(VR_max, VR_out);
+    // fadds(VR_out, VRQ0, VR_input1, VRQ0, VR_input2, VRQ0, 0x10);
+
+    fr32 fr_out = fadds(get_VRL(VR_input1), get_VRL(VR_input2), 0x2);
+    set_VRL(VR_out, fr_out);
+    VR_out = vmin(VR_max, VR_out);
     VR_out = vmax(VR_min, VR_out);
     convert_32F_to_IEEE_float_x2(VR_out);
     store32x1_vr_postI(VR_out, output, INC1, VRQ0);
   }
 }
 
-static TfLiteStatus  SubQuantizedInt8Sat(const OpData* data, const int8_t* input1,
-	const int8_t* input2, int8_t* output, int n) {
-	vr64 vr_input1, vr_input2;
-	int loopLim = n >> 1;
-	//
-	// ulsr128 ur_input1, ur_input2;
+static TfLiteStatus SubQuantizedInt8Sat(const OpData* data,
+                                        const int8_t* input1,
+                                        const int8_t* input2, int8_t* output,
+                                        int n) {
+  vr64 vr_input1, vr_input2;
+  int loopLim = n >> 1;
+  //
+  // ulsr128 ur_input1, ur_input2;
 
-	vr64 vr_offset1, vr_offset2;
-	vr64 vr_multiplier_input1, vr_multiplier_input2;
-	vr64 vr_multiplier_output;
-	vr64 vr_output_offset;
-	vr64 vr_shift_input1, vr_shift_input2;
-	vr64 vr_raw_sum, vr_output, vr_q7_out;
+  vr64 vr_offset1, vr_offset2;
+  vr64 vr_multiplier_input1, vr_multiplier_input2;
+  vr64 vr_multiplier_output;
+  vr64 vr_output_offset;
+  vr64 vr_shift_input1, vr_shift_input2;
+  vr64 vr_raw_sum, vr_output, vr_q7_out;
 
-	replicate_ar(vr_offset1, 0x3, data->input1_offset_fr32.fr);  // Afloat
-	replicate_ar(vr_offset2, 0x3, data->input2_offset_fr32.fr);
-	replicate_ar(vr_output_offset, 0x3, data->output_offset_fr32.fr);
-	replicate_ar(vr_multiplier_input1, 0x3, data->input1_multiplier_fr32.fr);
-	replicate_ar(vr_multiplier_input2, 0x3, data->input2_multiplier_fr32.fr);
+  replicate_ar(vr_offset1, 0x3, data->input1_offset_fr32.fr);  // Afloat
+  replicate_ar(vr_offset2, 0x3, data->input2_offset_fr32.fr);
+  replicate_ar(vr_output_offset, 0x3, data->output_offset_fr32.fr);
+  replicate_ar(vr_multiplier_input1, 0x3, data->input1_multiplier_fr32.fr);
+  replicate_ar(vr_multiplier_input2, 0x3, data->input2_multiplier_fr32.fr);
 
-	replicate_ar(vr_multiplier_output, 0x3, data->output_multiplier_fr32.fr);
+  replicate_ar(vr_multiplier_output, 0x3, data->output_multiplier_fr32.fr);
 
+  if (loopLim > 0) {
+    load8x2_vr_postI(vr_input1, input1, INC1);
+    load8x2_vr_postI(vr_input2, input2, INC1);
 
-	if (loopLim > 0)
-	{
-		load8x2_vr_postI(vr_input1, input1, INC1);
-		load8x2_vr_postI(vr_input2, input2, INC1);
+    convert_16I_to_32F_x2(vr_input1, 0);
+    for (int ii = 0; ii < loopLim - 1; ii++) {
+      // q7*1<<left
+      convert_16I_to_32F_x2(vr_input2, 0);
+      vr_shift_input1 = vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
+                                 31 - 8 - data->SubOp.left_shift);
+      vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
+                                 31 - 8 - data->SubOp.left_shift);
 
-		convert_16I_to_32F_x2(vr_input1, 0);
-		for (int ii = 0; ii < loopLim - 1; ii++) {
-			// q7*1<<left
-			convert_16I_to_32F_x2(vr_input2, 0);
-			vr_shift_input1 =
-                            vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
-                                     31 - 8 - data->SubOp.left_shift);
-			vr_shift_input2 =
-                            vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
-                                     31 - 8 - data->SubOp.left_shift);
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+      vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
 
-			vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
-			vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
 
-			vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
+      vr_output =
+          vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
 
-			vr_output =
-				vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+      // convert to 8 bit rndsat-back
+      convert_32F_to_16I_x2(vr_output, 0, 0);
 
-			// convert to 8 bit rndsat-back
-			convert_32F_to_16I_x2(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+      store8x1_vr_postI(vr_output, output, INC1, VRQ0);
+      store8x1_vr_postI(vr_output, output, INC1, VRQ1);
+      load8x2_vr_postI(vr_input1, input1, INC1);
+      load8x2_vr_postI(vr_input2, input2, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
+    }
+    convert_16I_to_32F_x2(vr_input2, 0);
+    // add offset each input
 
-			rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
-			vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
-			store8x1_vr_postI(vr_output, output, INC1, VRQ0);
-			store8x1_vr_postI(vr_output, output, INC1, VRQ1);
-			load8x2_vr_postI(vr_input1, input1, INC1);
-			load8x2_vr_postI(vr_input2, input2, INC1);
-			convert_16I_to_32F_x2(vr_input1, 0);
-		}
-		convert_16I_to_32F_x2(vr_input2, 0);
-		// add offset each input
+    // q7*1<<left
+    vr_shift_input1 = vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
+                               31 - 8 - data->SubOp.left_shift);
+    vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
+                               31 - 8 - data->SubOp.left_shift);
 
-		// q7*1<<left
-		vr_shift_input1 = vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
-                                           31 - 8 - data->SubOp.left_shift);
-		vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
-                                           31 - 8 - data->SubOp.left_shift);
+    vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+    vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
 
-		vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
-		vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+    vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
 
-		vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
+    vr_output = vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
 
-		vr_output =
-			vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+    // convert to 8 bit rndsat-back
+    convert_32F_to_16I_x2(vr_output, 0, 0);
 
-		// convert to 8 bit rndsat-back
-		convert_32F_to_16I_x2(vr_output, 0, 0);
+    rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+    vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+    store8x1_vr_postI(vr_output, output, INC1, VRQ0);
+    store8x1_vr_postI(vr_output, output, INC1, VRQ1);
+  }
+  // reminder
+  if (n & 1) {
+    load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
+    load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
 
-		rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
-		vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
-		store8x1_vr_postI(vr_output, output, INC1, VRQ0);
-		store8x1_vr_postI(vr_output, output, INC1, VRQ1);
-	}
-	// reminder
-	if (n & 1) {
-		load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
-		load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+    convert_16I_to_32F_x2(vr_input1, 0);
+    convert_16I_to_32F_x2(vr_input2, 0);
+    vr_shift_input1 = vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
+                               31 - 8 - data->SubOp.left_shift);
+    vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
+                               31 - 8 - data->SubOp.left_shift);
 
-		convert_16I_to_32F_x2(vr_input1, 0);
-		convert_16I_to_32F_x2(vr_input2, 0);
-		vr_shift_input1 = vexp_adj(vadds(vr_input1, vr_offset1, 0x0),
-                                           31 - 8 - data->SubOp.left_shift);
-		vr_shift_input2 = vexp_adj(vadds(vr_input2, vr_offset2, 0x0),
-                                           31 - 8 - data->SubOp.left_shift);
+    vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+    vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
 
-		vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
-		vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+    vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
 
-		vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0xa);  // Q24
+    vr_output = vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
 
-		vr_output =
-			vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+    // convert to 8 bit rndsat-back
+    convert_32F_to_16I_x2(vr_output, 0, 1);
+    // store 1 byt one
+    rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+    vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
 
-		// convert to 8 bit rndsat-back
-		convert_32F_to_16I_x2(vr_output, 0, 1);
-		// store 1 byt one
-		rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
-		vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
-
-
-		store8x1_vr_postI(vr_output, output, INC1, VRQ0);
-
-	}
-	return kTfLiteOk;
+    store8x1_vr_postI(vr_output, output, INC1, VRQ0);
+  }
+  return kTfLiteOk;
 }
 
 #endif
@@ -552,7 +538,6 @@ TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
   OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
 
   auto* params = reinterpret_cast<TfLiteSubParams*>(node->builtin_data);
-   
 
   MicroContext* micro_context = GetMicroContext(context);
 
@@ -571,89 +556,74 @@ TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
 
   data_ex->opt_constraint = 0;
   data_ex->opt_constraint_float = 0;
-#if defined(HEMILITE_SUB_OPT) 
+#if defined(HEMILITE_SUB_OPT)
   int input1_count = ElementCount(*input1->dims);
   int input2_count = ElementCount(*input2->dims);
   int output_count = ElementCount(*output->dims);
   KN_PRINTD(input1_count);
   KN_PRINTD(input2_count);
   KN_PRINTD(output_count);
-  //data->opt_constraint = 0;
+  // data->opt_constraint = 0;
   if ((output->type == kTfLiteInt8) && (data->output_activation_min == -128 &&
-	  data->output_activation_max == 127))
-  {
-	  KN_PRINTD(data->requires_broadcast);
-	  if (0 == data->requires_broadcast) data_ex->opt_constraint = 1;
+                                        data->output_activation_max == 127)) {
+    KN_PRINTD(data->requires_broadcast);
+    if (0 == data->requires_broadcast) data_ex->opt_constraint = 1;
 
-	  // type 2 optimizaition
+      // type 2 optimizaition
 #if 1
-	  // determine input 2 is match the latest one
-	  {
-		  // int input2_count = tflite::micro::GetTensorShape(input2).FlatSize()
-		  int input_shape0 = input1->dims->data[input1->dims->size - 1]; // Dims(0);
-		  if (input_shape0 == input2_count &&
-			  output_count == input1_count &&
-			  (input_shape0 & 3) == 0)
-                    data_ex->opt_constraint = 2;  // 
+    // determine input 2 is match the latest one
+    {
+      // int input2_count = tflite::micro::GetTensorShape(input2).FlatSize()
+      int input_shape0 =
+          input1->dims->data[input1->dims->size - 1];  // Dims(0);
+      if (input_shape0 == input2_count && output_count == input1_count &&
+          (input_shape0 & 3) == 0)
+        data_ex->opt_constraint = 2;  //
 
-		  else if (input2_count == output_count &&
-			  input1_count == 1) { //type 3: rnnoise GRU input 2 size = output size, and input 1 size is const 1
-                    data_ex->opt_constraint = 3;  // 
-		  }
-	  }
-#endif 
+      else if (input2_count == output_count &&
+               input1_count == 1) {  // type 3: rnnoise GRU input 2 size =
+                                     // output size, and input 1 size is const 1
+        data_ex->opt_constraint = 3;  //
+      }
+    }
+#endif
   }
   if (data_ex->opt_constraint) {
-	  tflite::ConvertQ31ToAfloat(data->input1_multiplier,
+    tflite::ConvertQ31ToAfloat(data->input1_multiplier,
                                data_ex->input1_multiplier_fr32,
-		  data->input1_shift);
-	  tflite::ConvertQ31ToAfloat(data->input2_multiplier,
-                                     data_ex->input2_multiplier_fr32,
-		  data->input2_shift);
-	  tflite::ConvertQ31ToAfloat(data->output_multiplier,
-                                     data_ex->output_multiplier_fr32,
-		  31 - 14 + data->output_shift);  //-19
+                               data->input1_shift);
+    tflite::ConvertQ31ToAfloat(data->input2_multiplier,
+                               data_ex->input2_multiplier_fr32,
+                               data->input2_shift);
+    tflite::ConvertQ31ToAfloat(data->output_multiplier,
+                               data_ex->output_multiplier_fr32,
+                               31 - 14 + data->output_shift);  //-19
 
-	  tflite::ConvertQ31ToAfloat(data->input1_offset,
-                                     data_ex->input1_offset_fr32,
-		  31 - 7);
-          tflite::ConvertQ31ToAfloat(data->input2_offset,
-                                     data_ex->input2_offset_fr32,
-		  31 - 7);
-          tflite::ConvertQ31ToAfloat(data->output_offset,
-                                     data_ex->output_offset_fr32,
-		  31 - 7);
+    tflite::ConvertQ31ToAfloat(data->input1_offset, data_ex->input1_offset_fr32,
+                               31 - 7);
+    tflite::ConvertQ31ToAfloat(data->input2_offset, data_ex->input2_offset_fr32,
+                               31 - 7);
+    tflite::ConvertQ31ToAfloat(data->output_offset, data_ex->output_offset_fr32,
+                               31 - 7);
   }
   // only min = -128 and max=127 acceptable for rnd_sat_pack
 
-  if (output->type == kTfLiteFloat32)
-  {
+  if (output->type == kTfLiteFloat32) {
+    // runtime change ?
+    // TODO: compare each dims in input1 and output;
+    // input2 only 1
 
-
-
-	  // runtime change ?
-	  // TODO: compare each dims in input1 and output;
-	  // input2 only 1
-
-	  // determine input 2 is match the latest one
-	  if ((input1_count == input2_count) &&
-		  (input2_count == output_count))
-	  {
-            data_ex->opt_constraint_float = 1;
-		}
-	  else if (1 == input2_count && output_count == input1_count)
-	  {
-            data_ex->opt_constraint_float = 2;  // FloatAddWithScalarBroadcast
-	  }
-	  else if (input2_count == output_count &&  input1_count != 1 &&
-		  input1_count != input2_count) //FIXME
-	  {
-		  
-		  data_ex->opt_constraint_float = 3;
-	  }
-	  else if (input2_count == output_count &&
-		  input1_count == 1)
-            data_ex->opt_constraint_float = 4;
+    // determine input 2 is match the latest one
+    if ((input1_count == input2_count) && (input2_count == output_count)) {
+      data_ex->opt_constraint_float = 1;
+    } else if (1 == input2_count && output_count == input1_count) {
+      data_ex->opt_constraint_float = 2;  // FloatAddWithScalarBroadcast
+    } else if (input2_count == output_count && input1_count != 1 &&
+               input1_count != input2_count)  // FIXME
+    {
+      data_ex->opt_constraint_float = 3;
+    } else if (input2_count == output_count && input1_count == 1)
+      data_ex->opt_constraint_float = 4;
   }
   KN_PRINTD(data->output_activation_min);
   KN_PRINTD(data->output_activation_max);
@@ -669,9 +639,10 @@ TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
 }
 
 #ifndef REMOVE_REFOP_SUPPORT
-void EvalSubFloat(TfLiteContext* context, TfLiteNode* node, TfLiteSubParams* params,
-              OpData* data_ex, const TfLiteEvalTensor* input1,
-             const TfLiteEvalTensor* input2, TfLiteEvalTensor* output) {
+void EvalSubFloat(TfLiteContext* context, TfLiteNode* node,
+                  TfLiteSubParams* params, OpData* data_ex,
+                  const TfLiteEvalTensor* input1,
+                  const TfLiteEvalTensor* input2, TfLiteEvalTensor* output) {
   float output_activation_min, output_activation_max;
 
   const OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
@@ -794,8 +765,7 @@ TfLiteStatus EvalSubQuantized(TfLiteContext* context, TfLiteNode* node,
         tflite::micro::GetTensorShape(input1),
         tflite::micro::GetTensorShape(input2), &op_params);
 
-  switch (output->type) {
-
+    switch (output->type) {
       case kTfLiteInt8: {
         if (need_broadcast) {
           tflite::reference_ops::BroadcastQuantSubSlow(
@@ -838,103 +808,96 @@ TfLiteStatus EvalSubQuantized(TfLiteContext* context, TfLiteNode* node,
       }
 
       default:
-       TF_LITE_KERNEL_LOG(context, "Quantized type %s not currently supported.",
-                    TfLiteTypeGetName(output->type));
+        TF_LITE_KERNEL_LOG(context,
+                           "Quantized type %s not currently supported.",
+                           TfLiteTypeGetName(output->type));
         return kTfLiteError;
     }
-    
   }
-  #else
-  {
-	  return kTfLiteError;
-  }
+#else
+  { return kTfLiteError; }
 
-  #endif
+#endif
   return kTfLiteOk;
 }
 
-TfLiteStatus EvalSubFloat32(TfLiteContext* context, TfLiteNode* node, TfLiteSubParams* params,
-              OpData* data_ex, const TfLiteEvalTensor* input1,
-             const TfLiteEvalTensor* input2, TfLiteEvalTensor* output) {
+TfLiteStatus EvalSubFloat32(TfLiteContext* context, TfLiteNode* node,
+                            TfLiteSubParams* params, OpData* data_ex,
+                            const TfLiteEvalTensor* input1,
+                            const TfLiteEvalTensor* input2,
+                            TfLiteEvalTensor* output) {
   float output_activation_min, output_activation_max;
 
-  //const OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
+  // const OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
   CalculateActivationRange(params->activation, &output_activation_min,
                            &output_activation_max);
   tflite::ArithmeticParams op_params;
   SetActivationParams(output_activation_min, output_activation_max, &op_params);
-#if defined(HEMILITE_SUB_OPT) 
+#if defined(HEMILITE_SUB_OPT)
   AScalar act_min, act_max;
   CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
 
   if (data_ex->opt_constraint_float == 1) {
-	  const int flat_size =
-		  MatchingElementsSize(tflite::micro::GetTensorShape(input1),
-			  tflite::micro::GetTensorShape(input2),
-			  tflite::micro::GetTensorShape(output));
-	  SubFloat(tflite::micro::GetTensorData<float>(output),
-		  tflite::micro::GetTensorData<float>(input1),
-		  tflite::micro::GetTensorData<float>(input2), act_min, act_max,
-		  flat_size);
-	  //      KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
-	  //      flat_size);
-  } 
-  else if (data_ex->opt_constraint_float == 2) {
-	  AScalar input2Element;
-	  const int flat_size =
-		  MatchingElementsSize(tflite::micro::GetTensorShape(input1),
-			  tflite::micro::GetTensorShape(output));
+    const int flat_size =
+        MatchingElementsSize(tflite::micro::GetTensorShape(input1),
+                             tflite::micro::GetTensorShape(input2),
+                             tflite::micro::GetTensorShape(output));
+    SubFloat(tflite::micro::GetTensorData<float>(output),
+             tflite::micro::GetTensorData<float>(input1),
+             tflite::micro::GetTensorData<float>(input2), act_min, act_max,
+             flat_size);
+    //      KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+    //      flat_size);
+  } else if (data_ex->opt_constraint_float == 2) {
+    AScalar input2Element;
+    const int flat_size =
+        MatchingElementsSize(tflite::micro::GetTensorShape(input1),
+                             tflite::micro::GetTensorShape(output));
 
-	  const float* input2Flt = tflite::micro::GetTensorData<float>(input2);
-	  KN_PRINTF(input2Flt[0]);
-	  input2Element = AScalar(input2Flt[0]);
-	  KN_PRINTAFLT(input2Element);
-	  SubFloatConstI(tflite::micro::GetTensorData<float>(output),
-		  tflite::micro::GetTensorData<float>(input1), input2Element,
-		  act_min, act_max, flat_size);
+    const float* input2Flt = tflite::micro::GetTensorData<float>(input2);
+    KN_PRINTF(input2Flt[0]);
+    input2Element = AScalar(input2Flt[0]);
+    KN_PRINTAFLT(input2Element);
+    SubFloatConstI(tflite::micro::GetTensorData<float>(output),
+                   tflite::micro::GetTensorData<float>(input1), input2Element,
+                   act_min, act_max, flat_size);
   } else if (data_ex->opt_constraint_float == 3) {
-	 // AScalar input2Element;
-	    MatchingElementsSize(tflite::micro::GetTensorShape(input2),
-			  tflite::micro::GetTensorShape(output));
+    // AScalar input2Element;
+    MatchingElementsSize(tflite::micro::GetTensorShape(input2),
+                         tflite::micro::GetTensorShape(output));
 
-	  const float* input1Flt = tflite::micro::GetTensorData<float>(input1);
-	  const float* input2Flt = tflite::micro::GetTensorData<float>(input2);
-	  float *out = tflite::micro::GetTensorData<float>(output);
-	//  KN_PRINTF(input2Flt[0]);
-	 // input2Element = AScalar(input2Flt[0]);
-	 // KN_PRINTAFLT(input2Element);
-	  //A [1,32,1]
-	  //B [1,32,5]
-	  //C [1,32,5]
-	  int outSize = tflite::micro::GetTensorShape(input2).Dims(1);
-	  int inSize = tflite::micro::GetTensorShape(input2).Dims(2);
-	  
-	  for (int ii = 0; ii < outSize; ii++)
-	  {
-		  AScalar input1Element = AScalar(input1Flt[ii]);
-		  SubFloatConstI1(out,
-			  input1Element,
-			  input2Flt,
-			  act_min, act_max,
-			  inSize);
-		  out += inSize;
-		  input2Flt += inSize;
-	  }
+    const float* input1Flt = tflite::micro::GetTensorData<float>(input1);
+    const float* input2Flt = tflite::micro::GetTensorData<float>(input2);
+    float* out = tflite::micro::GetTensorData<float>(output);
+    //  KN_PRINTF(input2Flt[0]);
+    // input2Element = AScalar(input2Flt[0]);
+    // KN_PRINTAFLT(input2Element);
+    // A [1,32,1]
+    // B [1,32,5]
+    // C [1,32,5]
+    int outSize = tflite::micro::GetTensorShape(input2).Dims(1);
+    int inSize = tflite::micro::GetTensorShape(input2).Dims(2);
+
+    for (int ii = 0; ii < outSize; ii++) {
+      AScalar input1Element = AScalar(input1Flt[ii]);
+      SubFloatConstI1(out, input1Element, input2Flt, act_min, act_max, inSize);
+      out += inSize;
+      input2Flt += inSize;
+    }
   } else if (data_ex->opt_constraint_float == 4) {
-	  AScalar input1Element;
-	  const int flat_size =
-		  MatchingElementsSize(tflite::micro::GetTensorShape(input2),
-			  tflite::micro::GetTensorShape(output));
+    AScalar input1Element;
+    const int flat_size =
+        MatchingElementsSize(tflite::micro::GetTensorShape(input2),
+                             tflite::micro::GetTensorShape(output));
 
-	  const float* input1Flt = tflite::micro::GetTensorData<float>(input1);
-	  KN_PRINTF(input2Flt[0]);
-	  input1Element = AScalar(input1Flt[0]);
-	  KN_PRINTAFLT(input2Element);
-	  SubFloatConstI1(tflite::micro::GetTensorData<float>(output),
-		input1Element, tflite::micro::GetTensorData<float>(input2),
-		  act_min, act_max, flat_size);
-  }
-  else
+    const float* input1Flt = tflite::micro::GetTensorData<float>(input1);
+    KN_PRINTF(input2Flt[0]);
+    input1Element = AScalar(input1Flt[0]);
+    KN_PRINTAFLT(input2Element);
+    SubFloatConstI1(tflite::micro::GetTensorData<float>(output), input1Element,
+                    tflite::micro::GetTensorData<float>(input2), act_min,
+                    act_max, flat_size);
+  } else
 #endif
   {
 #ifndef REMOVE_REFOP_SUPPORT
@@ -942,19 +905,21 @@ TfLiteStatus EvalSubFloat32(TfLiteContext* context, TfLiteNode* node, TfLiteSubP
     if (output->type == kTfLiteFloat32) {
       EvalSubFloat(context, node, params, data_ex, input1, input2, output);
     } else if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
-      TF_LITE_ENSURE_OK(context, EvalSubQuantized(context, node, params, data_ex,
-                                                  input1, input2, output));
+      TF_LITE_ENSURE_OK(context,
+                        EvalSubQuantized(context, node, params, data_ex, input1,
+                                         input2, output));
     } else {
       TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-                  TfLiteTypeGetName(output->type), output->type);
+                         TfLiteTypeGetName(output->type), output->type);
       return kTfLiteError;
     }
 #else
-	  return kTfLiteError;
+    return kTfLiteError;
 #endif
   }
 
-  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), ElementCount(*output->dims));
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                 ElementCount(*output->dims));
   return kTfLiteOk;
 }
 
@@ -969,17 +934,15 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-   OpData& data = *(static_cast<OpData*>(node->user_data));
+  OpData& data = *(static_cast<OpData*>(node->user_data));
 
   if (output->type == kTfLiteFloat32) {
     EvalSubFloat32(context, node, params, &data, input1, input2, output);
   } else if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
-
     TF_LITE_ENSURE_OK(context, EvalSubQuantized(context, node, params, &data,
                                                 input1, input2, output));
 
-  } else 
-{
+  } else {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(output->type), output->type);
     return kTfLiteError;
@@ -988,31 +951,27 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
-	auto* params = reinterpret_cast<TfLiteSubParams*>(node->builtin_data);
+  auto* params = reinterpret_cast<TfLiteSubParams*>(node->builtin_data);
 
-	const TfLiteEvalTensor* input1 =
-		tflite::micro::GetEvalInput(context, node, kSubInputTensor1);
-	const TfLiteEvalTensor* input2 =
-		tflite::micro::GetEvalInput(context, node, kSubInputTensor2);
-	TfLiteEvalTensor* output =
-		tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
+  const TfLiteEvalTensor* input1 =
+      tflite::micro::GetEvalInput(context, node, kSubInputTensor1);
+  const TfLiteEvalTensor* input2 =
+      tflite::micro::GetEvalInput(context, node, kSubInputTensor2);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
 
-	TFLITE_DCHECK(node->user_data != nullptr);
-	 OpData& data = *(static_cast<OpData*>(node->user_data));
-	if (output->type != kTfLiteFloat32)
-	{
-		TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-			TfLiteTypeGetName(output->type), output->type);
-		return kTfLiteError;
-	}
-	EvalSubFloat32(context, node, params, &data, input1, input2, output);
-	
+  TFLITE_DCHECK(node->user_data != nullptr);
+  OpData& data = *(static_cast<OpData*>(node->user_data));
+  if (output->type != kTfLiteFloat32) {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
+                       TfLiteTypeGetName(output->type), output->type);
+    return kTfLiteError;
+  }
+  EvalSubFloat32(context, node, params, &data, input1, input2, output);
 
-
-	return kTfLiteOk;
+  return kTfLiteOk;
 }
 //}  // namespace sub
-
 
 TFLMRegistration Register_SUB() {
   return tflite::micro::RegisterOp(InitSub,

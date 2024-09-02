@@ -110,7 +110,7 @@ build_hml()
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1 -j4 install
 	else
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=release OPTIMIZED_KERNEL_DIR=$TG -j3  $target
-	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG $target 
+	 make  -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG $target 
 	fi
 	cd -
 	#done

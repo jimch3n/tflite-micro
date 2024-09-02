@@ -67,6 +67,11 @@ typedef enum _DEPTHWISE_OPT_TYPE {
 #define COLS_PER_BLOCK_FLT (1 << LOG2_COLS_PER_BLOCK_FLT)
 
 #endif
+#ifndef ALIGN_COEFF_SIZE
+#define ALIGN_COEFF_SIZE(IN_SIZE, OUT_SIZE) \
+     ((((IN_SIZE + COLS_PER_BLOCK - 1) >> LOG2_COLS_PER_BLOCK)   << LOG2_COLS_PER_BLOCK) * \
+      (((OUT_SIZE + ROWS_PER_GROUP - 1) >> LOG2_ROWS_PER_GROUP)  << LOG2_ROWS_PER_GROUP))
+#endif
 // move this to somewhere header
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #include "tensorflow/lite/micro/ia8201/platform.h"

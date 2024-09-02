@@ -35,27 +35,6 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/lstm_shared.h"
 namespace tflite {
 
-// extension struct
-struct OpDataLSTMEx {
-  struct OpDataLSTM OpLSTM;
-
-  // If the lstm is layer norm.
-  bool use_layer_norm;
-  // The scratch tensor index.
-  int scratch_tensor_index;
-  bool compute_row_sums = false;
-  // IntegerLstmParameter integer_lstm_param;
-
-  int opt_constraint;
-  int8_t* mapped_i2i_w;
-  int8_t* mapped_i2f_w;
-  int8_t* mapped_i2c_w;
-  int8_t* mapped_i2o_w;
-  int8_t* mapped_r2i_w;
-  int8_t* mapped_r2f_w;
-  int8_t* mapped_r2c_w;
-  int8_t* mapped_r2o_w;
-};
 
 // Interface to access all the TempTfLiteTensors of the LSTM kernel during the
 // preparation phase. Can only be constructed through the constructor to avoid
@@ -81,6 +60,18 @@ class LstmTensors {
     return internal_tensors_[tensor_index];
   }
 
+  // get internal tensor
+  unsigned int GetTensorIndex(const TfLiteTensor* tensor) const {
+    unsigned int tensor_idx = 0;
+    for(; tensor_idx < sizeof(internal_tensors_)/sizeof(TfLiteTensor*); tensor_idx++) 
+    {
+        if(tensor == internal_tensors_[tensor_idx])
+        {
+            break;
+        }
+    }
+    return tensor_idx;
+  }
   const TfLiteTensor* HiddenStateTensor() const {
     return internal_tensors_[kLstmOutputStateTensor];
   }
@@ -159,6 +150,7 @@ TfLiteStatus PrepareGateParametersFloat(TfLiteContext* context,
                                         OpDataLSTM* op_data_lstm);
 
 TfLiteStatus PrepareGateParametersInteger(TfLiteContext* context,
+                                          TfLiteNode* node,
                                           const LstmTensors& lstm_tensors,
                                           OpDataLSTM* op_data_lstm);
 
@@ -179,7 +171,7 @@ LSTMBuffers<CellType> CreateLSTMBuffers(TfLiteContext* context,
       context->GetScratchBuffer(context, buffer_indices[3]));
   return buffers;
 }
-
+ 
 // Since LSTM includes multiple intermediate stages, introducing the internal
 // namespace to expose them for testing
 namespace lstm_internal {
@@ -298,7 +290,7 @@ class LstmStepManager {
   int OutputOffset() const { return output_offset_; }
   int HiddenStateOffset() const { return hidden_state_offset_; }
   int CellStateOffset() const { return cell_state_offset_; }
-#if defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
+#if defined(DMX1A_LSTM_OPT)
   int time_major() const { return size_info_.time_major; }
 
   int batch_size() const { return size_info_.batch_size; }
@@ -346,7 +338,7 @@ void CalculateLstmGate(
   TFLITE_DCHECK_LE(
       step_info.HiddenStateOffset() + step_info.StateShape().FlatSize(),
       tflite::micro::GetTensorShape(recurrent).FlatSize());
-
+    KN_PRINTS("REF");
   // Input FC
   FullyConnected(gate_params.input_fc_params, step_info.InputShape(),
                  tflite::micro::GetTensorData<ActivationType>(input) +
@@ -448,9 +440,13 @@ void CalculateLstmGate(
     // Output
     CellType* gate_output,
     // Scratch arrays
-    CellType* fc_output_buffer, const TfLiteFusedActivation activation,
-    const int num_batches, const int input_dimension,
-    const int state_dimension) {
+    CellType* fc_output_buffer, const TfLiteFusedActivation activation) {
+
+  int time_major = step_info.time_major();
+  int num_batches = time_major == 0 ? 1 : step_info.batch_size();
+  int input_dimension = step_info.input_dimension();
+  int state_dimension = step_info.state_dimension();
+
   // RuntimeShape step_input_shape = step_info.InputShape();
   // RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
   // RuntimeShape step_state_shape = step_info.StateShape();
@@ -464,40 +460,53 @@ void CalculateLstmGate(
   // step_info.HiddenStateOffset() + step_state_shape.FlatSize(),
   // recurrent_shape.FlatSize());
 
+    KN_PRINTS("OPT input FC");
   // Input FC
+
   FullyConnected(gate_params.input_fc_params,
                  tflite::micro::GetTensorData<ActivationType>(input) +
                      step_info.InputOffset(),
                  tflite::micro::GetTensorData<WeightType>(input_weight),
+              
                  tflite::micro::GetOptionalTensorData<BiasType>(input_bias),
                  gate_output, num_batches, state_dimension, input_dimension);
-
+    KN_PRINTS("OPT recurrent FC");
   // Recurrent FC
+  KN_PRINTX(gate_params.recurrent_fc_params.mapped_filter);
+  KN_PRINTX(recurrent_bias);
   FullyConnected(gate_params.recurrent_fc_params,
                  tflite::micro::GetTensorData<ActivationType>(recurrent) +
                      step_info.HiddenStateOffset(),
                  tflite::micro::GetTensorData<WeightType>(recurrent_weight),
+      //static_cast<WeightType*>(gate_params.recurrent_fc_params.mapped_filter),
+              
                  tflite::micro::GetOptionalTensorData<BiasType>(recurrent_bias),
                  fc_output_buffer, num_batches, state_dimension,
                  state_dimension);
-
+    KN_PRINTS("OPT ADD Element");
   AddElementWise(gate_output, fc_output_buffer,
                  /*n_batch=*/num_batches,
                  /*n_state=*/state_dimension, gate_output);
   // Apply activation
+  KN_PRINTD(activation);
   switch (activation) {
     case kTfLiteActSigmoid:
+      KN_PRINTS("sigmoid");
       Sigmoid(gate_output, num_batches * state_dimension);
       break;
     case kTfLiteActTanh: {
+      KN_PRINTS("tanh");
       // Set the scale power to -12 to avoid shift
       Tanh(/*cell_state_scale_power=*/-12, gate_output, gate_output,
            num_batches * state_dimension);
     } break;
     default:
       // Only Sigmoid or Tanh is used.
+      KN_PRINTS("ERROR");
+
       TFLITE_ASSERT_FALSE;
   }
+  KN_PRINT_Q15_SIZE(gate_output, num_batches*state_dimension);
 }
 
 // Update the cell state using the output from the forget gate, input gate, and
@@ -549,25 +558,35 @@ void UpdateLstmHidden(const LstmStepManager& step_info,
       tflite::micro::GetTensorData<CellType>(cell_state) +
       step_info.CellStateOffset();
   // Tanh(cell_state)
-#if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
+  //int32_t cell_state_size = 
+#if !defined(DMX1A_LSTM_OPT)
   Tanh(cell_state_scale_power, cell_state_shape, cell_state_data,
        cell_state_shape, buffer);
+  KN_PRINT_Q15_SIZE(buffer, cell_state_shape.FlatSize());
   // Update the hidden state
   Mul(cell_state_shape, mul_params, buffer, output_gate_output,
       tflite::micro::GetTensorData<ActivationType>(hidden_state) +
           step_info.HiddenStateOffset());
 #else
-  int32_t cell_state_size = cell_state_shape.FlatSize();
-  Tanh(cell_state_scale_power, cell_state_data, buffer, cell_state_size);
+
+  Tanh(cell_state_scale_power, cell_state_data, buffer,
+       cell_state_shape.FlatSize());
   // Update the hidden state
+  KN_PRINT_Q15_SIZE(buffer, cell_state_shape.FlatSize());
   Mul(mul_params, buffer, output_gate_output,
       tflite::micro::GetTensorData<ActivationType>(hidden_state) +
           step_info.HiddenStateOffset(),
-      cell_state_size);
+      cell_state_shape.FlatSize());
+#endif
+#ifdef KN_DEBUG
+  ActivationType* hidden_state_data =
+      tflite::micro::GetTensorData<ActivationType>(hidden_state) +
+      step_info.HiddenStateOffset();
+  KN_PRINT_Q7_SIZE(hidden_state_data, cell_state_shape.FlatSize());
 #endif
 }
 
-#if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
+#if !defined(DMX1A_LSTM_OPT)
 template <typename ActivationType, typename WeightType, typename CellType,
           typename BiasType>
 void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
@@ -576,6 +595,8 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
   /*Step1: Calculate gate outputs to prepare cell state update*/
   CellType* gate_internal_buffer = buffers.buffer3;
   CellType* forget_gate_output = buffers.buffer0;
+
+  KN_PRINTS("LstmStep ");
   CalculateLstmGate<ActivationType, WeightType, CellType, BiasType>(
       step_info, op_data.forget_gate_parameters,
       // Input FC
@@ -679,7 +700,7 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
                   step_info.HiddenStateOffset(),
               step_info.StateShape().FlatSize() * sizeof(ActivationType));
 
-  KN_PRINT_Q15_SIZE(tflite::micro::GetTensorData<ActivationType>(hidden_state) +
+  KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<ActivationType>(hidden_state) +
                         step_info.HiddenStateOffset(),
                     step_info.StateShape().FlatSize());
 }
@@ -692,11 +713,19 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
   const TfLiteEvalTensor* input =
       kernel_content.GetInternalTensor(tflite::kLstmInputTensor);
   TfLiteEvalTensor* recurrent = kernel_content.HiddenStateTensor();
-
+  //const OpDataLSTM& op_data = op_data_ex.OpLSTM;
   int time_major = step_info.time_major();
   int num_batches = time_major == 0 ? 1 : step_info.batch_size();
   int input_dimension = step_info.input_dimension();
   int state_dimension = step_info.state_dimension();
+  KN_PRINTS("LstmStep ");
+  KN_PRINTX(&op_data);
+  KN_PRINTX(op_data.input_gate_parameters.input_fc_params.mapped_filter);
+    KN_PRINTX(op_data.forget_gate_parameters.input_fc_params.mapped_filter);
+    KN_PRINTX(op_data.cell_gate_parameters.input_fc_params.mapped_filter);
+KN_PRINTX(op_data.output_gate_parameters.input_fc_params.mapped_filter);
+
+
 
   // Check offset validity to avoid memory overflow
   TFLITE_DCHECK_LE(step_info.InputOffset() + num_batches * input_dimension,
@@ -722,9 +751,8 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
       // Output
       forget_gate_output,
       // Scratch arrays
-      gate_internal_buffer, kTfLiteActSigmoid, num_batches, input_dimension,
-      state_dimension);
-
+      gate_internal_buffer, kTfLiteActSigmoid);
+  KN_PRINT_Q15_SIZE(forget_gate_output, state_dimension);
   // Input Gate calculation;
   CellType* input_gate_output = buffers.buffer1;
   CalculateLstmGate<ActivationType, WeightType, CellType, BiasType>(
@@ -741,9 +769,8 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
       // Output
       input_gate_output,
       // Scratch arrays
-      gate_internal_buffer, kTfLiteActSigmoid, num_batches, input_dimension,
-      state_dimension);
-
+      gate_internal_buffer, kTfLiteActSigmoid);
+  KN_PRINT_Q15_SIZE(input_gate_output, state_dimension);
   // Cell Gate calculation
   CellType* cell_gate_output = buffers.buffer2;
   CalculateLstmGate<ActivationType, WeightType, CellType, BiasType>(
@@ -760,19 +787,22 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
       // Output
       cell_gate_output,
       // Scratch arrays
-      gate_internal_buffer, op_data.cell_gate_nonlinear_type, num_batches,
-      input_dimension, state_dimension);
-
+      gate_internal_buffer, op_data.cell_gate_nonlinear_type);
+  KN_PRINT_Q15_SIZE(cell_gate_output, state_dimension);
   /*Step2: update the cell state */
   const InterGateParameters& inter_gate_params = op_data.inter_gate_parameters;
   CellType* updated_input_buffer = buffers.buffer1;  // reuse buffer
-
+  KN_PRINTS("update lstm cell");
   UpdateLstmCell(step_info, kernel_content.CellStateTensor(),
                  forget_gate_output, input_gate_output, cell_gate_output,
                  inter_gate_params.forget_cell_mul_params,
                  inter_gate_params.input_mul_params, op_data.cell_state_info,
                  updated_input_buffer);
-
+//  CellType* cell_state =
+     // tflite::micro::GetTensorData<int16_t>
+//      tflite::micro::GetTensorData<CellType>(
+ //                    kernel_content.CellStateTensor());
+ // KN_PRINT_Q15_SIZE(cell_state, state_dimension);
   /*Step3: update the hidden state */
   CellType* output_gate_output = buffers.buffer1;  // reuse buffer
   CalculateLstmGate<ActivationType, WeightType, CellType, BiasType>(
@@ -789,9 +819,8 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
       // Output
       output_gate_output,
       // Scratch arrays
-      gate_internal_buffer, kTfLiteActSigmoid, num_batches, input_dimension,
-      state_dimension);
-
+      gate_internal_buffer, kTfLiteActSigmoid);
+  KN_PRINT_Q15_SIZE(output_gate_output, state_dimension);
   CellType* tanh_activated_cell_buffer = buffers.buffer0;  // reuse buffer
   tflite::lstm_internal::UpdateLstmHidden<CellType, ActivationType>(
       step_info, kernel_content.CellStateTensor(), recurrent,
@@ -799,7 +828,7 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
       inter_gate_params.output_mul_params,
       op_data.cell_state_info.cell_state_scale_power,
       tanh_activated_cell_buffer);
-
+  KN_PRINT_Q15_SIZE(output_gate_output, state_dimension);
   /*Step4: copy the update the hidden state to output*/
   // Check offset validity to avoid memory overflow
   TFLITE_DCHECK_LE(
@@ -813,6 +842,12 @@ void LstmStep(const LstmStepManager& step_info, const OpDataLSTM& op_data,
               tflite::micro::GetTensorData<ActivationType>(recurrent) +
                   step_info.HiddenStateOffset(),
               step_info.StateShape().FlatSize() * sizeof(ActivationType));
+
+    KN_PRINT_Q7_SIZE(output_ptr + step_info.OutputOffset(),
+                    step_info.StateShape().FlatSize());
+  KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<ActivationType>(recurrent) +
+                        step_info.HiddenStateOffset(),
+                    step_info.StateShape().FlatSize());
 }
 #endif  // #if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
 
@@ -828,6 +863,11 @@ TfLiteStatus EvalLstm(const OpDataLSTM& op_data,
   lstm_internal::LstmStepManager step_info(&op_data.size_info);
   const auto& size_info = op_data.size_info;
   // time is the first dimention, enable batch computation
+
+  KN_PRINTD(size_info.time_major);
+  
+  KN_PRINTD(size_info.batch_size);
+  KN_PRINTD(size_info.time_steps);
   if (size_info.time_major) {
     for (int t = 0; t < size_info.time_steps; t++) {
       lstm_internal::LstmStep<ActivationType, WeightType, CellType, BiasType>(

@@ -798,6 +798,17 @@ struct FullyConnectedParams {
   // Mark the operands as cacheable if they are unchanging, e.g. weights.
   bool lhs_cacheable;
   bool rhs_cacheable;
+#if 1 //defined(IA8201)
+  int32_t *mapped_filter; //int8x8 remap address
+  uint32_t input_offset_int8; // int 0ffset
+  int32_t *inputOffsetWithW; // offset * weight- and load at out
+  uint32_t outputMultipler;
+  uint32_t outputOffset;
+
+  uint32_t* bias_aflt;
+
+  uint8_t opt_constraint;
+#endif
   FullyConnectedWeightsFormat weights_format;
 };
 

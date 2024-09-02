@@ -51,14 +51,13 @@ FullyConnectedParams FullyConnectedParamsFloat(
                            &op_params.float_activation_max);
   return op_params;
 }
-# if 1
+#if 1
 TfLiteStatus CalculateOpDataFullyConnected(
     TfLiteContext* context, TfLiteFusedActivation activation,
     TfLiteType data_type, const TfLiteTensor* input, const TfLiteTensor* filter,
     const TfLiteTensor* bias, TfLiteTensor* output,
     OpDataFullyConnected* data) {
-
-    //OpDataFullyConnected* data_ex = data_e
+  // OpDataFullyConnected* data_ex = data_e
   if (data_type != kTfLiteFloat32) {
     double real_multiplier = 0.0;
     TF_LITE_ENSURE_STATUS(GetQuantizedConvolutionMultipler(

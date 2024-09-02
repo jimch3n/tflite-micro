@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-//#define KN_DEBUG 
+//#define KN_DEBUG
 #include "tensorflow/lite/micro/ia700/config.h"
 
 #ifndef REMOVE_REFOP_SUPPORT
@@ -27,13 +27,13 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 namespace tflite {
 namespace {
-//namespace micro {
-//namespace strided_slice {
+// namespace micro {
+// namespace strided_slice {
 
 constexpr int kInputTensor = 0;
 constexpr int kBeginTensor = 1;
@@ -69,19 +69,18 @@ struct StridedSliceContext {
   int dims;
 };
 struct StridedSliceOpData {
-    tflite::StridedSliceParams op_params;
-    int opt_constraint;
-    int src_offset;
-   // uint16_t* srcIdx;
+  tflite::StridedSliceParams op_params;
+  int opt_constraint;
+  int src_offset;
+  // uint16_t* srcIdx;
 };
 // This Op only supports 1-4D cases and since we use the reference 4D
 // implementation, the 1-3D tensors are mapped to 4D.
 const int kMaxDim = 4;
 // input 1x10x40 -> output -> 1x7x40
 template <typename T>
-static void SlicedCopyOptOffset(const T* src, T* dst, int nElement)
-{
-    block_copy_bytes((int8_t*)dst, (int8_t*)src, sizeof(T) * nElement);
+static void SlicedCopyOptOffset(const T* src, T* dst, int nElement) {
+  block_copy_bytes((int8_t*)dst, (int8_t*)src, sizeof(T) * nElement);
 }
 tflite::StridedSliceParams BuildStridedSliceParams(
     StridedSliceContext* op_context) {
@@ -105,8 +104,8 @@ tflite::StridedSliceParams BuildStridedSliceParams(
 }
 #ifndef REMOVE_REFOP_SUPPORT
 // Processes the indexing tensors (begin, end and strides) to resize the
-// output tensor. This function is callable from both PrepareStridedSlice() and Eval() as
-// long as the caller ensures the indexing tensors are present.
+// output tensor. This function is callable from both PrepareStridedSlice() and
+// Eval() as long as the caller ensures the indexing tensors are present.
 TfLiteStatus CheckOutputSize(TfLiteContext* context,
                              StridedSliceContext* op_context) {
   using ::tflite::strided_slice::StartForAxis;
@@ -144,15 +143,15 @@ TfLiteStatus CheckOutputSize(TfLiteContext* context,
 #endif
 void* Init(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof( StridedSliceOpData));
+  return context->AllocatePersistentBuffer(context, sizeof(StridedSliceOpData));
 }
 
 TfLiteStatus PrepareStridedSlice(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   StridedSliceOpData* op_data =
       static_cast<StridedSliceOpData*>(node->user_data);
- 
-  //pOpStridedSliceData->op_params = op_params;
+
+  // pOpStridedSliceData->op_params = op_params;
   TF_LITE_ENSURE_EQ(context, NumInputs(node), 4);
   TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
   StridedSliceContext op_context(context, node);
@@ -163,93 +162,93 @@ TfLiteStatus PrepareStridedSlice(TfLiteContext* context, TfLiteNode* node) {
   // allocate persist op data to store opt_context
 
 #if defined(HEMILITE_STRIDED_SLICE_OPT)
-  
 
   // check special case begin 0, x, 0,
   //                    end  0, 0, 0
   //                    strides 1, 1, 1
   // CROP case from source at 2 dim.
 
-      // able to satisfied optimization condition
+  // able to satisfied optimization condition
   auto input_shape = GetTensorShape(op_context.input);
   auto output_shape = GetTensorShape(op_context.output);
-  //int output_size = ElementCount(*op_context.output->dims);
+  // int output_size = ElementCount(*op_context.output->dims);
 
   op_data->opt_constraint = 0;
-  //op_data->srcIdx = NULL;
+  // op_data->srcIdx = NULL;
 
   int all_strides_one = 1;
-  for (int ii = 0; ii < params.strides_count; ii++)
-  {
-      if (1 != params.strides[ii])
-      {
-          all_strides_one = 0; break;
-      }
+  for (int ii = 0; ii < params.strides_count; ii++) {
+    if (1 != params.strides[ii]) {
+      all_strides_one = 0;
+      break;
+    }
   }
   // linear copy: FIXME to a generic copy and fast
-  if (all_strides_one)
-  {
-      // type 1: dim = 3,
-      // begin: 0, x, 0 , x < 0
-      // end: 0, 0, 0
-      if (params.start_indices_count == 3 && params.stop_indices_count == 3 &&
-          (params.stop_indices[0] == 0  && params.stop_indices[1] == 0 && params.stop_indices[2]  == 0 &&
-           params.start_indices[0] == 0 && params.start_indices[1] < 0 && params.start_indices[2] == 0))
-      {
-          op_data->opt_constraint = 1;
-          op_data->src_offset = (input_shape.Dims(1) + params.start_indices[1]) * input_shape.Dims(2);
+  if (all_strides_one) {
+    // type 1: dim = 3,
+    // begin: 0, x, 0 , x < 0
+    // end: 0, 0, 0
+    if (params.start_indices_count == 3 && params.stop_indices_count == 3 &&
+        (params.stop_indices[0] == 0 && params.stop_indices[1] == 0 &&
+         params.stop_indices[2] == 0 && params.start_indices[0] == 0 &&
+         params.start_indices[1] < 0 && params.start_indices[2] == 0)) {
+      op_data->opt_constraint = 1;
+      op_data->src_offset =
+          (input_shape.Dims(1) + params.start_indices[1]) * input_shape.Dims(2);
 
-      }
-      // type 2: dim = 3,
-      // begin: 0, x, 0
-      // end:   0, y, 0
-      else if (params.start_indices_count == 3 && params.stop_indices_count == 3 &&
-              (params.stop_indices[0] == 0 && params.stop_indices[2] == 0 &&
-              params.start_indices[0] == 0 && params.start_indices[2] == 0))
-      {
-          op_data->opt_constraint = 2;
-          op_data->src_offset = (params.start_indices[1]) * input_shape.Dims(2);
-      }
-      // type 3: dim = 4,
-      // begin: 0, x, 0, 0
-      // end:   0, y, 0, y
-      #if 1
-      else if (params.start_indices_count == 4 && params.stop_indices_count == 4 &&
-              (params.stop_indices[0] == 0  && params.stop_indices[2] == 0 &&
-               params.start_indices[0] == 0 && params.start_indices[2] == 0 && params.start_indices[3] == 0))
-      {
-          op_data->opt_constraint =3;
-          op_data->src_offset = ( params.start_indices[1]) * input_shape.Dims(3);
-      }
-      #endif
+    }
+    // type 2: dim = 3,
+    // begin: 0, x, 0
+    // end:   0, y, 0
+    else if (params.start_indices_count == 3 &&
+             params.stop_indices_count == 3 &&
+             (params.stop_indices[0] == 0 && params.stop_indices[2] == 0 &&
+              params.start_indices[0] == 0 && params.start_indices[2] == 0)) {
+      op_data->opt_constraint = 2;
+      op_data->src_offset = (params.start_indices[1]) * input_shape.Dims(2);
+    }
+// type 3: dim = 4,
+// begin: 0, x, 0, 0
+// end:   0, y, 0, y
+#if 1
+    else if (params.start_indices_count == 4 &&
+             params.stop_indices_count == 4 &&
+             (params.stop_indices[0] == 0 && params.stop_indices[2] == 0 &&
+              params.start_indices[0] == 0 && params.start_indices[2] == 0 &&
+              params.start_indices[3] == 0)) {
+      op_data->opt_constraint = 3;
+      op_data->src_offset = (params.start_indices[1]) * input_shape.Dims(3);
+    }
+#endif
   }
   KN_PRINTD(op_data->opt_constraint);
   KN_PRINTD(op_data->src_offset);
 
-  // TODO: type 3 begin 0,0,0,0 
+  // TODO: type 3 begin 0,0,0,0
   //         end 0 1, 0, 1
   //         stride 1, 1, 1, 1
-  //else 
-//#endif
+  // else
+  //#endif
   //{
   //    op_data->srcIdx = (uint16_t*)context->AllocatePersistentBuffer(context,
   //        sizeof(uint16_t) * output_size);
- // }
+  // }
 #endif
-  #ifndef REMOVE_REFOP_SUPPORT
+#ifndef REMOVE_REFOP_SUPPORT
   return CheckOutputSize(context, &op_context);
-  #else
+#else
   return kTfLiteOk;
-  #endif
+#endif
 }
 
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
-  const StridedSliceOpData * op_data = (static_cast<const StridedSliceOpData*>(node->user_data));
-  #ifndef REMOVE_REFOP_SUPPORT
+  const StridedSliceOpData* op_data =
+      (static_cast<const StridedSliceOpData*>(node->user_data));
+#ifndef REMOVE_REFOP_SUPPORT
   const StridedSliceParams& op_params = op_data->op_params;
-  //    *(static_cast<const StridedSliceParams*>(node->user_data));
-  #endif
+//    *(static_cast<const StridedSliceParams*>(node->user_data));
+#endif
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kInputTensor);
   TfLiteEvalTensor* output =
@@ -257,32 +256,32 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   switch (output->type) {
     case kTfLiteFloat32:
 #if defined(HEMILITE_STRIDED_SLICE_OPT)
-        KN_PRINTD(op_data->opt_constraint);
-        if (op_data->opt_constraint > 0)
-        {
-            const float* Src = tflite::micro::GetTensorData<float>(input) + op_data->src_offset;
-            int nElement = ElementCount(*output->dims);
-            float* Dst = tflite::micro::GetTensorData<float>(output) ;
-            SlicedCopyOptOffset<float>(Src, Dst, nElement);
-        }
-        /*else {
-            SlicedCopyFloat(tflite::micro::GetTensorData<float>(input),
-                op_data->srcIdx, tflite::micro::GetTensorData<float>(output),
-                ElementCount(*output->dims));
-        }*/
-        else
+      KN_PRINTD(op_data->opt_constraint);
+      if (op_data->opt_constraint > 0) {
+        const float* Src =
+            tflite::micro::GetTensorData<float>(input) + op_data->src_offset;
+        int nElement = ElementCount(*output->dims);
+        float* Dst = tflite::micro::GetTensorData<float>(output);
+        SlicedCopyOptOffset<float>(Src, Dst, nElement);
+      }
+      /*else {
+          SlicedCopyFloat(tflite::micro::GetTensorData<float>(input),
+              op_data->srcIdx, tflite::micro::GetTensorData<float>(output),
+              ElementCount(*output->dims));
+      }*/
+      else
 #endif
-        {
+      {
 #ifndef REMOVE_REFOP_SUPPORT
-          reference_ops::StridedSlice(
-              op_params, tflite::micro::GetTensorShape(input),
-              tflite::micro::GetTensorData<float>(input),
-              tflite::micro::GetTensorShape(output),
-              tflite::micro::GetTensorData<float>(output));
-          #else
+        reference_ops::StridedSlice(
+            op_params, tflite::micro::GetTensorShape(input),
+            tflite::micro::GetTensorData<float>(input),
+            tflite::micro::GetTensorShape(output),
+            tflite::micro::GetTensorData<float>(output));
+#else
       return kTfLiteError;
-            #endif
-        }
+#endif
+      }
       break;
       // REMOVE SAVE CODE SIZE
 #if !defined(HEMILITE_STRIDED_SLICE_OPT)
@@ -295,37 +294,38 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       break;
 #endif
     case kTfLiteInt8:
-		
-		KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input), ElementCount(*input->dims));
-#if defined(HEMILITE_STRIDED_SLICE_OPT)
-        
-        if (op_data->opt_constraint > 0)
-        {
-            const int8_t* Src = tflite::micro::GetTensorData<int8_t>(input) + op_data->src_offset;
-            int nElement = ElementCount(*output->dims);
-            int8_t* Dst = tflite::micro::GetTensorData<int8_t>(output);
-            SlicedCopyOptOffset<int8_t>(Src, Dst, nElement);
-        }
-       /* else {
-            SlicedStrideCopyInt8(tflite::micro::GetTensorData<int8_t>(input),
-                op_data->srcIdx, tflite::micro::GetTensorData<int8_t>(output),
-                ElementCount(*output->dims));
-        }*/
-        else
 
+      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
+                       ElementCount(*input->dims));
+#if defined(HEMILITE_STRIDED_SLICE_OPT)
+
+      if (op_data->opt_constraint > 0) {
+        const int8_t* Src =
+            tflite::micro::GetTensorData<int8_t>(input) + op_data->src_offset;
+        int nElement = ElementCount(*output->dims);
+        int8_t* Dst = tflite::micro::GetTensorData<int8_t>(output);
+        SlicedCopyOptOffset<int8_t>(Src, Dst, nElement);
+      }
+      /* else {
+           SlicedStrideCopyInt8(tflite::micro::GetTensorData<int8_t>(input),
+               op_data->srcIdx, tflite::micro::GetTensorData<int8_t>(output),
+               ElementCount(*output->dims));
+       }*/
+      else
 #endif
-		{
+      {
 #ifndef REMOVE_REFOP_SUPPORT
-			reference_ops::StridedSlice(op_params,
-				tflite::micro::GetTensorShape(input),
-				tflite::micro::GetTensorData<int8_t>(input),
-				tflite::micro::GetTensorShape(output),
-				tflite::micro::GetTensorData<int8_t>(output));
-            #else
-                  return kTfLiteError;
-            #endif
-		}
-	  KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
+        reference_ops::StridedSlice(
+            op_params, tflite::micro::GetTensorShape(input),
+            tflite::micro::GetTensorData<int8_t>(input),
+            tflite::micro::GetTensorShape(output),
+            tflite::micro::GetTensorData<int8_t>(output));
+#else
+        return kTfLiteError;
+#endif
+      }
+      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
+                       ElementCount(*output->dims));
       break;
 #ifndef REMOVE_REFOP_SUPPORT
     case kTfLiteInt16:
@@ -350,7 +350,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                                   tflite::micro::GetTensorData<bool>(output));
       break;
 
-      #endif
+#endif
     default:
       TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                          TfLiteTypeGetName(input->type), input->type);
@@ -362,63 +362,61 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 // since template cost around 3k for each type
 
 TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
+  const StridedSliceOpData* op_data =
+      (static_cast<const StridedSliceOpData*>(node->user_data));
 
-   
-   const StridedSliceOpData* op_data = (static_cast<const StridedSliceOpData*>(node->user_data));
+  // const StridedSliceParams& op_params = op_data->op_params;
+  //    *(static_cast<const StridedSliceParams*>(node->user_data));
 
-   //const StridedSliceParams& op_params = op_data->op_params;
-   //    *(static_cast<const StridedSliceParams*>(node->user_data));
+  const TfLiteEvalTensor* input =
+      tflite::micro::GetEvalInput(context, node, kInputTensor);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
 
-   const TfLiteEvalTensor* input =
-       tflite::micro::GetEvalInput(context, node, kInputTensor);
-   TfLiteEvalTensor* output =
-       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
-
-   if (output->type != kTfLiteFloat32)
-   {
-       TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-           TfLiteTypeGetName(input->type), input->type);
-       return kTfLiteError;
-   }
-       // KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input), ElementCount(*input->dims));
+  if (output->type != kTfLiteFloat32) {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
+                       TfLiteTypeGetName(input->type), input->type);
+    return kTfLiteError;
+  }
+  // KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input),
+  // ElementCount(*input->dims));
 #if defined(HEMILITE_STRIDED_SLICE_OPT)
-       KN_PRINTD(op_data->opt_constraint);
-       if (op_data->opt_constraint > 0)
-       {
-           const float* Src = tflite::micro::GetTensorData<float>(input) + op_data->src_offset;
-           int nElement = ElementCount(*output->dims);
-           float* Dst = tflite::micro::GetTensorData<float>(output);
-           SlicedCopyOptOffset<float>(Src, Dst, nElement);
-       }
-       else 
+  KN_PRINTD(op_data->opt_constraint);
+  if (op_data->opt_constraint > 0) {
+    const float* Src =
+        tflite::micro::GetTensorData<float>(input) + op_data->src_offset;
+    int nElement = ElementCount(*output->dims);
+    float* Dst = tflite::micro::GetTensorData<float>(output);
+    SlicedCopyOptOffset<float>(Src, Dst, nElement);
+  } else
 #endif
-       {
-           //  else {
-            //     SlicedCopyFloat(tflite::micro::GetTensorData<float>(input),
-              //       op_data->srcIdx, tflite::micro::GetTensorData<float>(output),
-              //       ElementCount(*output->dims));
-            // }
-           #ifndef REMOVE_REFOP_SUPPORT
-           const StridedSliceParams& op_params = op_data->op_params;
-           
-           reference_ops::StridedSlice(op_params,
-               tflite::micro::GetTensorShape(input),
-               tflite::micro::GetTensorData<float>(input),
-               tflite::micro::GetTensorShape(output),
-               tflite::micro::GetTensorData<float>(output));
-           #else
-           return kTfLiteError;
-           #endif
-       }
+  {
+    //  else {
+    //     SlicedCopyFloat(tflite::micro::GetTensorData<float>(input),
+    //       op_data->srcIdx, tflite::micro::GetTensorData<float>(output),
+    //       ElementCount(*output->dims));
+    // }
+#ifndef REMOVE_REFOP_SUPPORT
+    const StridedSliceParams& op_params = op_data->op_params;
 
-   KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), ElementCount(*output->dims));
+    reference_ops::StridedSlice(op_params, tflite::micro::GetTensorShape(input),
+                                tflite::micro::GetTensorData<float>(input),
+                                tflite::micro::GetTensorShape(output),
+                                tflite::micro::GetTensorData<float>(output));
+#else
+    return kTfLiteError;
+#endif
+  }
+
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                 ElementCount(*output->dims));
 
   return kTfLiteOk;
 }
 #if defined(HEMILITE_STRIDED_SLICE_OPT)
 TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
-  #ifndef REMOVE_REFOP_SUPPORT
+#ifndef REMOVE_REFOP_SUPPORT
   const StridedSliceParams& op_params =
       *(static_cast<const StridedSliceParams*>(node->user_data));
 
@@ -427,24 +425,22 @@ TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
 #endif
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
-   if (output->type !=kTfLiteInt8)
-    {
-          TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-                        TfLiteTypeGetName(output->type), output->type);
-      return kTfLiteError;
-    }
+  if (output->type != kTfLiteInt8) {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
+                       TfLiteTypeGetName(output->type), output->type);
+    return kTfLiteError;
+  }
 #ifndef REMOVE_REFOP_SUPPORT
-      reference_ops::StridedSlice(op_params,
-                                  tflite::micro::GetTensorShape(input),
-                                  tflite::micro::GetTensorData<int8_t>(input),
-                                  tflite::micro::GetTensorShape(output),
-                                  tflite::micro::GetTensorData<int8_t>(output));
+  reference_ops::StridedSlice(op_params, tflite::micro::GetTensorShape(input),
+                              tflite::micro::GetTensorData<int8_t>(input),
+                              tflite::micro::GetTensorShape(output),
+                              tflite::micro::GetTensorData<int8_t>(output));
 
   return kTfLiteOk;
-  #else
+#else
 
-   return kTfLiteError;
-   #endif
+  return kTfLiteError;
+#endif
 }
 
 TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
@@ -455,28 +451,26 @@ TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
 
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kInputTensor);
-  #endif
+#endif
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
-   if (output->type !=kTfLiteInt16)
-    {
-          TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-                        TfLiteTypeGetName(output->type), output->type);
-      return kTfLiteError;
-    }
-   #ifndef REMOVE_REFOP_SUPPORT
-      reference_ops::StridedSlice(
-          op_params, tflite::micro::GetTensorShape(input),
-          tflite::micro::GetTensorData<int16_t>(input),
-          tflite::micro::GetTensorShape(output),
-          tflite::micro::GetTensorData<int16_t>(output));
-  return kTfLiteOk;
-  #else
+  if (output->type != kTfLiteInt16) {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
+                       TfLiteTypeGetName(output->type), output->type);
     return kTfLiteError;
-   #endif
+  }
+#ifndef REMOVE_REFOP_SUPPORT
+  reference_ops::StridedSlice(op_params, tflite::micro::GetTensorShape(input),
+                              tflite::micro::GetTensorData<int16_t>(input),
+                              tflite::micro::GetTensorShape(output),
+                              tflite::micro::GetTensorData<int16_t>(output));
+  return kTfLiteOk;
+#else
+  return kTfLiteError;
+#endif
 }
 #endif
-}  // namespace strided_slice
+}  // namespace
 
 TFLMRegistration Register_STRIDED_SLICE() {
   return tflite::micro::RegisterOp(Init,

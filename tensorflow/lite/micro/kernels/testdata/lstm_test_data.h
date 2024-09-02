@@ -247,7 +247,7 @@ class LstmNodeContent {
     if (valid_index < 0) {
       return nullptr;
     }
-    return &eval_tensors_[tensor_index];
+    return &(eval_tensors_[tensor_index]);
   }
 
   TfLiteTensor* GetTensors() { return tensors_; }

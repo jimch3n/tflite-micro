@@ -13,23 +13,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
-#include "tensorflow/lite/micro/ia700/config.h"
-
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/portable_tensor.h"
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/l2normalization.h"
 #include "tensorflow/lite/kernels/internal/reference/l2normalization.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/kernel_util.h"
-
+#include "tensorflow/lite/micro/ia700/config.h"
 #include "tensorflow/lite/micro/ia700/debug_helper.h"
 #include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+#include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {
-//namespace ops {
-//namespace micro {
-//namespace l2norm {
+// namespace ops {
+// namespace micro {
+// namespace l2norm {
 
 namespace {
 
@@ -91,101 +89,93 @@ void* InitL2Norm(TfLiteContext* context, const char* buffer, size_t length) {
 }
 
 #ifdef HEMILITE_L2NORM_OPT
-void
-L2NormEval(const tflite::L2NormalizationParams& op_params,
-	const RuntimeShape& input_shape,
-	const float* input_data,
-	const RuntimeShape& output_shape,
-	float* output_data, float epsilon = 1e-6)
-{
-	const int trailing_dim = input_shape.DimensionsCount() - 1;
-	const int outer_size =
-		MatchingFlatSizeSkipDim(input_shape, trailing_dim, output_shape);
-	const int depth =
-		MatchingDim(input_shape, trailing_dim, output_shape, trailing_dim);
-	int loopDepth2 = depth >> 1;
+void L2NormEval(const tflite::L2NormalizationParams& op_params,
+                const RuntimeShape& input_shape, const float* input_data,
+                const RuntimeShape& output_shape, float* output_data,
+                float epsilon = 1e-6) {
+  const int trailing_dim = input_shape.DimensionsCount() - 1;
+  const int outer_size =
+      MatchingFlatSizeSkipDim(input_shape, trailing_dim, output_shape);
+  const int depth =
+      MatchingDim(input_shape, trailing_dim, output_shape, trailing_dim);
+  int loopDepth2 = depth >> 1;
 
-	
-	float *output = (float *)output_data;
-	vr64 VR_epsilon;
-	replicate_ar(VR_epsilon, 0x3, AScalar(epsilon).fr);
-	for (int i = 0; i < outer_size; ++i) {
-		//AScalar squared_l2_norm = CONST_ASCALAR(0);
-		float *input = (float *)&input_data[depth*i];
-		vr64 VR_input;
-		vr64 VR_acc = vseta_vr(kConstTable_Zero,  0);
-		if (loopDepth2 > 0)
-		{
-			ulsr32 UR_input = align_32x2_load(input);
-			load_32x2_vr_a(VR_input, UR_input, input);
-			for (int c = 0; c < loopDepth2 - 1; ++c) {
-				convert_IEEE_float_to_32F_x2(VR_input);
+  float* output = (float*)output_data;
+  vr64 VR_epsilon;
+  replicate_ar(VR_epsilon, 0x3, AScalar(epsilon).fr);
+  for (int i = 0; i < outer_size; ++i) {
+    // AScalar squared_l2_norm = CONST_ASCALAR(0);
+    float* input = (float*)&input_data[depth * i];
+    vr64 VR_input;
+    vr64 VR_acc = vseta_vr(kConstTable_Zero, 0);
+    if (loopDepth2 > 0) {
+      ulsr32 UR_input = align_32x2_load(input);
+      load_32x2_vr_a(VR_input, UR_input, input);
+      for (int c = 0; c < loopDepth2 - 1; ++c) {
+        convert_IEEE_float_to_32F_x2(VR_input);
 
-				//	const float val = input_data[depth * i + c];
-				//	squared_l2_norm += val * val;
-				//affine_adj_L(VR_acc, VR_input, VR_input, 0, 0);
-				VR_acc = vblend_add(VR_acc, VR_input, VR_input, VB_ZERO, VB_YHXH_YLXL, 0, 0, 0, 0);
-				load_32x2_vr_a(VR_input, UR_input, input);
-			}
-			//float l2_norm = std::sqrt(squared_l2_norm);
-			convert_IEEE_float_to_32F_x2(VR_input);
-			//affine_adj_L(VR_acc, VR_input, VR_input, 0, 0);
-			VR_acc = vblend_add(VR_acc, VR_input, VR_input, VB_ZERO, VB_YHXH_YLXL, 0, 0, 0, 0);
-		}
-		if(depth & 1)
-		{
-			fr32 fr_input;
-			load_fr_postI(fr_input, input, INC1);
-			convert_IEEE_float_to_32F_x2(VR_input);
-			//VR_acc = vblend_add(VR_acc, VR_input, VR_input, VB_ZERO, VB_YHXH_YLXL, 0, 0, 0, 0);
-			fr32 fr_acc = fmacs(get_VRL(VR_acc), fr_input, fr_input, 0);
-			set_VRL(VR_acc, fr_acc);
-			//fmacs(VR_acc, VRQ0, VR_input, VRQ0, VR_input, VRQ0, 0);
-			//VR_acc = vmacs_adj(VR_acc, VR_input, VR_input, 0, 0);
+        //	const float val = input_data[depth * i + c];
+        //	squared_l2_norm += val * val;
+        // affine_adj_L(VR_acc, VR_input, VR_input, 0, 0);
+        VR_acc = vblend_add(VR_acc, VR_input, VR_input, VB_ZERO, VB_YHXH_YLXL,
+                            0, 0, 0, 0);
+        load_32x2_vr_a(VR_input, UR_input, input);
+      }
+      // float l2_norm = std::sqrt(squared_l2_norm);
+      convert_IEEE_float_to_32F_x2(VR_input);
+      // affine_adj_L(VR_acc, VR_input, VR_input, 0, 0);
+      VR_acc = vblend_add(VR_acc, VR_input, VR_input, VB_ZERO, VB_YHXH_YLXL, 0,
+                          0, 0, 0);
+    }
+    if (depth & 1) {
+      fr32 fr_input;
+      load_fr_postI(fr_input, input, INC1);
+      convert_IEEE_float_to_32F_x2(VR_input);
+      // VR_acc = vblend_add(VR_acc, VR_input, VR_input, VB_ZERO, VB_YHXH_YLXL,
+      // 0, 0, 0, 0);
+      fr32 fr_acc = fmacs(get_VRL(VR_acc), fr_input, fr_input, 0);
+      set_VRL(VR_acc, fr_acc);
+      // fmacs(VR_acc, VRQ0, VR_input, VRQ0, VR_input, VRQ0, 0);
+      // VR_acc = vmacs_adj(VR_acc, VR_input, VR_input, 0, 0);
+    }
+    // VR_acc = vadd_perm(VR_acc, VR_acc, VSEL_YL_XH, VSEL_YL_XH, 0, 0);
+    // dsums_L(VR_acc, VR_acc, 0, 0);
+    // l2_norm = std::max(l2_norm, epsilon);
+    vr64 VR_l2norm;  // = vmax(VR_epsilon, VR_l2norm);
+    AScalar l2_norm;
+    l2_norm.fr = move32_ar_vr_idx(VR_acc, VRQ0);
 
-		}
-		//VR_acc = vadd_perm(VR_acc, VR_acc, VSEL_YL_XH, VSEL_YL_XH, 0, 0);
-		//dsums_L(VR_acc, VR_acc, 0, 0);
-		//l2_norm = std::max(l2_norm, epsilon);
-		vr64 VR_l2norm;// = vmax(VR_epsilon, VR_l2norm);
-		AScalar l2_norm;
-		l2_norm.fr = move32_ar_vr_idx(VR_acc, VRQ0);
+    replicate_ar(VR_l2norm, 0x3, l2_norm.f_sqrt().inverse().fr);
+    VR_l2norm = vmax(VR_epsilon, VR_l2norm);
+    vr64 VR_out;
+    ulsr32 UR_out = align_32x2_store(output);
+    input = (float*)&input_data[depth * i];
 
-		replicate_ar(VR_l2norm, 0x3, l2_norm.f_sqrt().inverse().fr);
-		VR_l2norm = vmax(VR_epsilon, VR_l2norm);
-		vr64 VR_out;
-		ulsr32 UR_out = align_32x2_store(output);
-		input = (float *)&input_data[depth*i];
-		
-		if (loopDepth2 > 0)
-		{
-			ulsr32 UR_input = align_32x2_load(input);
-			load_32x2_vr_a(VR_input, UR_input, input);
-			for (int c = 0; c < loopDepth2 - 1; ++c) {
-				convert_IEEE_float_to_32F_x2(VR_input);
-				//output_data[depth * i + c] = input_data[depth * i + c] / l2_norm;
-				VR_out = vmuls(VR_input, VR_l2norm, 0);
-				load_32x2_vr_a(VR_input, UR_input, input);
-				convert_32F_to_IEEE_float_x2(VR_out);
-				store_32x2_vr_a(VR_out, UR_out, output);
-				
-			}
-			convert_IEEE_float_to_32F_x2(VR_input);
-			VR_out = vmuls(VR_input, VR_l2norm, 0);
-			convert_32F_to_IEEE_float_x2(VR_out);
-			store_32x2_vr_a(VR_out, UR_out, output);
-			flush_32x2(UR_out, output);
-
-		}
-		if(depth & 1)
-		{
-			load32x1_vr_postI(VR_input, input, INC1, VRQ0);
-			convert_IEEE_float_to_32F_x2(VR_input);
-			VR_out = vmuls(VR_input, VR_l2norm, 0);
-			convert_32F_to_IEEE_float_x2(VR_out);
-			store32x1_vr_postI(VR_out, output, INC1, VRQ0);
-		}
-	}
+    if (loopDepth2 > 0) {
+      ulsr32 UR_input = align_32x2_load(input);
+      load_32x2_vr_a(VR_input, UR_input, input);
+      for (int c = 0; c < loopDepth2 - 1; ++c) {
+        convert_IEEE_float_to_32F_x2(VR_input);
+        // output_data[depth * i + c] = input_data[depth * i + c] / l2_norm;
+        VR_out = vmuls(VR_input, VR_l2norm, 0);
+        load_32x2_vr_a(VR_input, UR_input, input);
+        convert_32F_to_IEEE_float_x2(VR_out);
+        store_32x2_vr_a(VR_out, UR_out, output);
+      }
+      convert_IEEE_float_to_32F_x2(VR_input);
+      VR_out = vmuls(VR_input, VR_l2norm, 0);
+      convert_32F_to_IEEE_float_x2(VR_out);
+      store_32x2_vr_a(VR_out, UR_out, output);
+      flush_32x2(UR_out, output);
+    }
+    if (depth & 1) {
+      load32x1_vr_postI(VR_input, input, INC1, VRQ0);
+      convert_IEEE_float_to_32F_x2(VR_input);
+      VR_out = vmuls(VR_input, VR_l2norm, 0);
+      convert_32F_to_IEEE_float_x2(VR_out);
+      store32x1_vr_postI(VR_out, output, INC1, VRQ0);
+    }
+  }
 }
 #endif
 TfLiteStatus EvalL2Norm(TfLiteContext* context, TfLiteNode* node) {
@@ -197,7 +187,7 @@ TfLiteStatus EvalL2Norm(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalInput(context, node, kInputTensor);
   TfLiteEvalTensor* output =
       tflite::micro::GetEvalOutput(context, node, kOutputTensor);
-	//return kTfLiteOk;
+  // return kTfLiteOk;
   // TODO(b/143912164): instead of hardcode the epsilon here, we should read it
   // from tensorflow, i.e., adding a params.
   // We don't compute epsilon for quantized kernel:
@@ -214,11 +204,10 @@ TfLiteStatus EvalL2Norm(TfLiteContext* context, TfLiteNode* node) {
   const float epsilon = 1e-6f;
   if (output->type == kTfLiteFloat32) {
 #ifdef HEMILITE_L2NORM_OPT
-	  L2NormEval(data, tflite::micro::GetTensorShape(input),
-		  tflite::micro::GetTensorData<float>(input),
-		  tflite::micro::GetTensorShape(output),
-		  tflite::micro::GetTensorData<float>(output),
-		  epsilon);
+    L2NormEval(data, tflite::micro::GetTensorShape(input),
+               tflite::micro::GetTensorData<float>(input),
+               tflite::micro::GetTensorShape(output),
+               tflite::micro::GetTensorData<float>(output), epsilon);
 #else
     reference_ops::L2Normalization(data, tflite::micro::GetTensorShape(input),
                                    tflite::micro::GetTensorData<float>(input),
@@ -227,7 +216,8 @@ TfLiteStatus EvalL2Norm(TfLiteContext* context, TfLiteNode* node) {
                                    epsilon);
 
 #endif
-	KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), ElementCount(*output->dims));
+    KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                   ElementCount(*output->dims));
 
   } else if (output->type == kTfLiteUInt8) {
     reference_ops::L2Normalization(
@@ -257,7 +247,6 @@ TfLiteStatus EvalL2Norm(TfLiteContext* context, TfLiteNode* node) {
 }
 
 //}  // namespace l2norm
-
 
 TFLMRegistration Register_L2NORM_REF() {
   return tflite::micro::RegisterOp(InitL2Norm,

@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
+
 #include "tensorflow/lite/micro/ia8201/config.h"
 #ifndef REMOVE_REFOP_SUPPORT
 #include "tensorflow/lite/kernels/internal/reference/fully_connected.h"
@@ -26,81 +27,15 @@ limitations under the License.
 #endif
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/fully_connected.h"
+
 
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+
+#include "tensorflow/lite/micro/kernels/ia8201/fully_connected.h"
 namespace tflite {
 namespace {
-typedef enum {
-  FC_OPT_NONE = 0,
-  FC_OPT_TYPE1 = 1,
-  FC_OPT_TYPE2 = 2,  // input channel align 4
-  FC_OPT_TYPE3 = 3,
-  FC_OPT_TYPE4 = 4,
 
-  // hybrid using MVMSINE MAP
-  FC_OPT_FLT_X_INT8_MVM = 8,
-} fc_opt_type;
-struct OpDataFullyConnectedEx {
-  // The scaling factor from input to output (aka the 'real multiplier') can
-  // be represented as a fixed point multiplier plus a left shift.
-
-  OpDataFullyConnected FcOp;
-
-  int buffer_idx;
-  int32_t *mapped_filter;  // aligned 4bytes, int8_t data to store pointer for
-                           // mapping W
-  AScalar outputMultipler;
-  AScalar outputOffset;
-  uint32_t input_offset_int8;
-  int32_t *inputOffsetWithW;
-  // int32_t filter_int8_exp;
-  AScalar filter_scale;  // for quantized int8 weight
-  int opt_constraint;    //
-  int opt_constraint_float;
-
-  // afloat converted buffer; for cannot convert inplace
-  AScalar *weight_aflt;
-  AScalar *bias_aflt;
-};
-
-TfLiteStatus CalculateOpData(TfLiteContext *context,
-                             TfLiteFusedActivation activation,
-                             TfLiteType data_type, const TfLiteTensor *input,
-                             const TfLiteTensor *filter,
-                             const TfLiteTensor *bias, TfLiteTensor *output,
-                             OpDataFullyConnectedEx *data_ex) {
-  TfLiteStatus status = kTfLiteOk;
-  OpDataFullyConnected *data = &data_ex->FcOp;
-  // Set buffer index to a reset value
-  data_ex->buffer_idx = -1;
-  if (data_type != kTfLiteFloat32) {
-    double real_multiplier = 0.0;
-    TF_LITE_ENSURE_STATUS(GetQuantizedConvolutionMultipler(
-        context, input, filter, bias, output, &real_multiplier));
-    int exponent;
-    data_ex->outputMultipler = AScalar(real_multiplier);  // convert to afloat
-    QuantizeMultiplier(real_multiplier, &data->output_multiplier, &exponent);
-
-    // Work around for Int16 use reference ops
-    data->output_shift = exponent;  //-exponent;
-    TF_LITE_ENSURE_STATUS(CalculateActivationRangeQuantized(
-        context, activation, output, &data->output_activation_min,
-        &data->output_activation_max));
-
-    data->input_zero_point = input->params.zero_point;
-    data->filter_zero_point = filter->params.zero_point;
-    data->output_zero_point = output->params.zero_point;
-
-    return CalculateActivationRangeQuantized(context, activation, output,
-                                             &data->output_activation_min,
-                                             &data->output_activation_max);
-    //#endif
-  }
-  return status;
-}
 //#endif
 void *Init(TfLiteContext *context, const char *buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -957,7 +892,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       // accExt
@@ -980,7 +915,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
 
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
@@ -1003,7 +938,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       for (int32_t j = 0; j < (m & 0x7) && j < 4; j++) {
@@ -1029,7 +964,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
@@ -1067,7 +1002,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
   // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration
   if (((unsigned int)x & 3) != 0 && loopLimCol != 0) {
     loopLimCol = 0;
-  }
+  } 
 
   if (((unsigned int)x & 1) != 0) {
     return -1;
@@ -1159,7 +1094,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       // accExt
@@ -1181,7 +1116,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
 
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
@@ -1203,7 +1138,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       for (int32_t j = 0; j < (m & 0x7) && j < 4; j++) {
@@ -1229,7 +1164,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
@@ -2293,8 +2228,10 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
   OpDataFullyConnectedEx *data_ex =
       static_cast<OpDataFullyConnectedEx *>(node->user_data);
 
+#if defined( DMX1A_FC_OPT) || defined(HMD1A_FC_OPT) 
   OpDataFullyConnected *data =
       static_cast<OpDataFullyConnected *>(&data_ex->FcOp);
+#endif
   const auto params =
       static_cast<const TfLiteFullyConnectedParams *>(node->builtin_data);
   // new memory allocation
@@ -2316,7 +2253,7 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
   // TF_LITE_ENSURE_MSG(context,  input->type == filter->type,
   //                   "kernel Int8 Hybrid models are not supported on TFLite
   //                   Micro.");
-  TF_LITE_ENSURE_STATUS(CalculateOpData(context, params->activation,
+  TF_LITE_ENSURE_STATUS(CalculateOpDataFullyConnected(context, params->activation,
                                         input->type, input, filter, bias,
                                         output, data_ex));
   RuntimeShape filter_shape = GetTensorShape(filter);
@@ -2379,7 +2316,7 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
     // KN_PRINT_Q7_SIZE(filter_input, output_depth * accum_depth);
     if (!tflite::is_coeffs_mapped(context)) {
       KN_PRINTD(map_coeff_size);
-      KN_PRINT_Q7_SIZE(filter_input, (output_depth * accum_depth));
+      KN_PRINT_Q7_SIZE_ATMOST(filter_input, (output_depth * accum_depth), 64);
 
       p_fc_mapped_filter =
           (int32_t *)context->AllocatePersistentBuffer(context, map_coeff_size);
@@ -2388,7 +2325,7 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
                                             (int8_t *)filter_input,
                                             output_depth, accum_depth);
       }
-      KN_PRINT_Q7_SIZE(p_fc_mapped_filter, map_coeff_size);
+      KN_PRINT_Q7_SIZE_ATMOST(p_fc_mapped_filter, map_coeff_size, 64);
     } else {
       p_fc_mapped_filter = (int32_t *)filter_input;  // remapping
     }

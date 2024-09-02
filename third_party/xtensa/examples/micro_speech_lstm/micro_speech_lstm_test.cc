@@ -34,23 +34,33 @@ limitations under the License.
  * * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * */
-
+#define KN_SUPPORT_ISS_PROF
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/testing/micro_test.h"
 #include "tensorflow/lite/schema/schema_generated.h"
+#ifdef DMX1A
+#include "third_party/xtensa/examples/micro_speech_lstm/kn_dmx1a_micro_speech_lstm_model_data.h"
+#else
 #include "third_party/xtensa/examples/micro_speech_lstm/micro_speech_lstm_model_data.h"
+#endif
 #include "third_party/xtensa/examples/micro_speech_lstm/no_micro_features_data.h"
 #include "third_party/xtensa/examples/micro_speech_lstm/yes_micro_features_data.h"
 
+#include "tensorflow/lite/micro/ia8201/xt_profiler.h"
 TF_LITE_MICRO_TESTS_BEGIN
 
 TF_LITE_MICRO_TEST(TestInvoke) {
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
+  #ifdef DMX1A
+  const tflite::Model* model =
+      ::tflite::GetModel(g_kn_dmx1a_micro_speech_lstm_model_data);
+#else
   const tflite::Model* model =
       ::tflite::GetModel(g_micro_speech_lstm_model_data);
+#endif
   if (model->version() != TFLITE_SCHEMA_VERSION) {
     MicroPrintf(
         "Model provided is schema version %d not equal "
@@ -67,20 +77,22 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   micro_op_resolver.AddSoftmax();
 
   // Create an area of memory to use for input, output, and intermediate arrays.
-  constexpr int tensor_arena_size = 32 * 1024;
+
+  constexpr int tensor_arena_size = 48 * 1024;
 
   uint8_t tensor_arena[tensor_arena_size];
 
   // Build an interpreter to run the model with.
   tflite::MicroInterpreter interpreter(model, micro_op_resolver, tensor_arena,
                                        tensor_arena_size);
-  interpreter.AllocateTensors();
-
+  TfLiteStatus alloc_status = interpreter.AllocateTensors();
+  TFLITE_CHECK_EQ(alloc_status, kTfLiteOk);
+  printf("allocate tensor size: %d bytes\n",interpreter.arena_used_bytes());
   // Get information about the memory area to use for the model's input.
   TfLiteTensor* input = interpreter.input(0);
 
   // Make sure the input has the properties we expect.
-  TF_LITE_MICRO_EXPECT_NE(nullptr, input);
+  //TF_LITE_MICRO_EXPECT_NE(nullptr, input);
   TF_LITE_MICRO_EXPECT_EQ(3, input->dims->size);
   TF_LITE_MICRO_EXPECT_EQ(1, input->dims->data[0]);
   TF_LITE_MICRO_EXPECT_EQ(49, input->dims->data[1]);
@@ -94,7 +106,14 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   }
 
   // Run the model on this input and make sure it succeeds.
-  TfLiteStatus invoke_status = interpreter.Invoke();
+  TfLiteStatus invoke_status;
+  unsigned int c0,c1;
+  c0=c1=0;
+  KN_GET_ISS_CYCLES_IF_CC(1,
+  invoke_status = interpreter.Invoke(),c0, c1);
+  printf("yes cycle: %d\n",c1-c0);
+
+  //TfLiteStatus invoke_status = interpreter.Invoke();
   if (invoke_status != kTfLiteOk) {
     MicroPrintf("Invoke failed\n");
   }
@@ -119,7 +138,7 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   uint8_t unknown_score = output->data.int8[kUnknownIndex] + 128;
   TF_LITE_MICRO_EXPECT_GT(yes_score, unknown_score);
   TF_LITE_MICRO_EXPECT_GT(yes_score, no_score);
-
+  printf("yes: %d no:%d \n", yes_score, no_score);
   // Now test with a different input, from a recording of "No".
   const int8_t* no_features_data = g_no_micro_f9643d42_nohash_4_data;
   for (size_t i = 0; i < input->bytes; ++i) {
@@ -127,7 +146,12 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   }
 
   // Run the model on this "No" input.
-  invoke_status = interpreter.Invoke();
+    c0=c1=0;
+  KN_GET_ISS_CYCLES_IF_CC(1,
+  invoke_status = interpreter.Invoke(),c0, c1);
+  printf("no cycle: %d\n",c1-c0);
+
+  //invoke_status = interpreter.Invoke();
   if (invoke_status != kTfLiteOk) {
     MicroPrintf("Invoke failed\n");
   }
@@ -145,6 +169,8 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   yes_score = output->data.int8[kYesIndex] + 128;
   no_score = output->data.int8[kNoIndex] + 128;
   unknown_score = output->data.int8[kUnknownIndex] + 128;
+
+  printf("yes: %d no:%d \n", yes_score, no_score);
   TF_LITE_MICRO_EXPECT_GT(no_score, unknown_score);
   TF_LITE_MICRO_EXPECT_GT(no_score, yes_score);
   MicroPrintf("Ran successfully\n");

@@ -17,13 +17,15 @@ limitations under the License.
 
 #include <cstdint>
 
-#include "tensorflow/lite/micro/ia8201/config.h"
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
+
 #if defined(XTENSA) || defined(HMD1A)
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #endif
 // TODO(b/286250473): remove namespace once de-duped libraries
 #ifndef REMOVE_TFLM_SIGNAL

@@ -5,9 +5,16 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/dtln_inout_data.cc
 
 DTLN_TEST_HDRS := \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/dtln_inout_data.h
+# kn converter 
+#-i dtln_noise_suppression.tflite -o ..\..\..\tensorflow\lite\micro\examples\dtln\kn_dmx1a_dtln_noise_suppression.tflite --arch dmx --verbose
+ifeq ($(TARGET_ARCH), dmx1a)
+DTLN_GENERATOR_INPUTS := \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/kn_dmx1a_dtln_noise_suppression.tflite
 
+else
 DTLN_GENERATOR_INPUTS := \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/dtln_noise_suppression.tflite
+endif
 
 DTLN_GENERATED_SRCS := \
 $(GENERATED_SRCS_DIR)$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/dtln_noise_suppression_model_data.cc

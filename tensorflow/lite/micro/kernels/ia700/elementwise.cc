@@ -16,23 +16,20 @@ limitations under the License.
 #include <cmath>
 
 //#define KN_DEBUG
-#include "tensorflow/lite/micro/ia700/config.h"
-
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
-#include "tensorflow/lite/micro/micro_utils.h"
-
 namespace tflite {
-//namespace ops {
-//namespace micro {
-//namespace elementwise {
+// namespace ops {
+// namespace micro {
+// namespace elementwise {
 
 constexpr int kAbsNameId = 0;
 constexpr int kRsrqtNameId = 1;
@@ -227,7 +224,6 @@ inline TfLiteStatus EvalLogical(TfLiteContext* context, TfLiteNode* node,
                         /*validate_input_func=*/nullptr, kTfLiteBool);
 }
 
-
 void* ElementWiseAbsRsqrtInit(TfLiteContext* context, const char* buffer,
                               size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -320,7 +316,7 @@ TfLiteStatus AbsEval(TfLiteContext* context, TfLiteNode* node) {
       break;
     default:
       TF_LITE_KERNEL_LOG(context, "Current data type %s is not supported.",
-                  TfLiteTypeGetName(type));
+                         TfLiteTypeGetName(type));
       return kTfLiteError;
       break;
   }
@@ -338,25 +334,24 @@ TfLiteStatus CosEval(TfLiteContext* context, TfLiteNode* node) {
 TfLiteStatus LogEval(TfLiteContext* context, TfLiteNode* node) {
   return EvalNumeric(context, node, std::log);
 }
-#if defined(HEMILITE_ELEMENTWISE_OPT) 
+#if defined(HEMILITE_ELEMENTWISE_OPT)
 inline TfLiteStatus EvalSqrtFloat(TfLiteContext* context, TfLiteNode* node,
-	 TfLiteType expected_type) {
-	const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
-	TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
-	TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-	const size_t num_elements = ElementCount(*input->dims);
-	const float* in_data = tflite::micro::GetTensorData<float>(input);
-	float* out_data = tflite::micro::GetTensorData<float>(output);
-	for (size_t i = 0; i < num_elements; ++i) {
-		
-		out_data[i] = AScalar(in_data[i]).f_sqrt().to_float();
-	}
-	return kTfLiteOk;
+                                  TfLiteType expected_type) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
+  const size_t num_elements = ElementCount(*input->dims);
+  const float* in_data = tflite::micro::GetTensorData<float>(input);
+  float* out_data = tflite::micro::GetTensorData<float>(output);
+  for (size_t i = 0; i < num_elements; ++i) {
+    out_data[i] = AScalar(in_data[i]).f_sqrt().to_float();
+  }
+  return kTfLiteOk;
 }
 #endif
 TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
-#if defined(HEMILITE_ELEMENTWISE_OPT) 
-	return	EvalSqrtFloat(context, node, kTfLiteFloat32);
+#if defined(HEMILITE_ELEMENTWISE_OPT)
+  return EvalSqrtFloat(context, node, kTfLiteFloat32);
 #else
   return EvalNumeric(context, node, std::sqrt);
 #endif
@@ -364,18 +359,17 @@ TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
 
 #if defined(HEMILITE_ELEMENTWISE_OPT)
 inline TfLiteStatus EvalRsqrtFloat(TfLiteContext* context, TfLiteNode* node,
-	TfLiteType expected_type) {
-	const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
-	TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
-	TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-	const size_t num_elements = ElementCount(*input->dims);
-	const float* in_data = tflite::micro::GetTensorData<float>(input);
-	float* out_data = tflite::micro::GetTensorData<float>(output);
-	for (size_t i = 0; i < num_elements; ++i) {
-
-		out_data[i] = AScalar(in_data[i]).f_invsqrt().to_float();
-	}
-	return kTfLiteOk;
+                                   TfLiteType expected_type) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
+  const size_t num_elements = ElementCount(*input->dims);
+  const float* in_data = tflite::micro::GetTensorData<float>(input);
+  float* out_data = tflite::micro::GetTensorData<float>(output);
+  for (size_t i = 0; i < num_elements; ++i) {
+    out_data[i] = AScalar(in_data[i]).f_invsqrt().to_float();
+  }
+  return kTfLiteOk;
 }
 #endif
 
@@ -385,7 +379,7 @@ TfLiteStatus RsqrtEval(TfLiteContext* context, TfLiteNode* node) {
   switch (type) {
     case kTfLiteFloat32:
 #if defined(HEMILITE_ELEMENTWISE_OPT)
-	return	EvalRsqrtFloat(context, node, kTfLiteFloat32);
+      return EvalRsqrtFloat(context, node, kTfLiteFloat32);
 #else
       return EvalImpl<float>(
           context, node, [](float f) { return 1.f / std::sqrt(f); },
@@ -400,30 +394,28 @@ TfLiteStatus RsqrtEval(TfLiteContext* context, TfLiteNode* node) {
 
     default:
       TF_LITE_KERNEL_LOG(context, "Current data type %s is not supported.",
-                  TfLiteTypeGetName(type));
+                         TfLiteTypeGetName(type));
       return kTfLiteError;
   }
-  
 }
 #if defined(HEMILITE_ELEMENTWISE_OPT)
 inline TfLiteStatus EvalSquareFloat(TfLiteContext* context, TfLiteNode* node,
-	TfLiteType expected_type) {
-	const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
-	TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
-	TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
-	const size_t num_elements = ElementCount(*input->dims);
-	const float* in_data = tflite::micro::GetTensorData<float>(input);
-	float* out_data = tflite::micro::GetTensorData<float>(output);
-	for (size_t i = 0; i < num_elements; ++i) {
-
-		out_data[i] = (AScalar(in_data[i])* AScalar(in_data[i])).to_float();
-	}
-	return kTfLiteOk;
+                                    TfLiteType expected_type) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
+  const size_t num_elements = ElementCount(*input->dims);
+  const float* in_data = tflite::micro::GetTensorData<float>(input);
+  float* out_data = tflite::micro::GetTensorData<float>(output);
+  for (size_t i = 0; i < num_elements; ++i) {
+    out_data[i] = (AScalar(in_data[i]) * AScalar(in_data[i])).to_float();
+  }
+  return kTfLiteOk;
 }
 #endif
 TfLiteStatus SquareEval(TfLiteContext* context, TfLiteNode* node) {
 #if defined(HEMILITE_ELEMENTWISE_OPT)
-	return	EvalSquareFloat(context, node, kTfLiteFloat32);
+  return EvalSquareFloat(context, node, kTfLiteFloat32);
 #else
   return EvalNumeric(context, node, [](float f) { return f * f; });
 #endif
@@ -433,7 +425,7 @@ TfLiteStatus LogicalNotEval(TfLiteContext* context, TfLiteNode* node) {
   return EvalLogical(context, node, [](bool v) { return !v; });
 }
 
-}  // namespace-
+}  // namespace
 //}  // namespace elementwise
 
 TFLMRegistration Register_ABS() {

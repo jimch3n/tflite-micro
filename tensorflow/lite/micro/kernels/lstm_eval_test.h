@@ -18,8 +18,12 @@ limitations under the License.
 
 #include <algorithm>
 #include <limits>
-
+#if defined(IA8201)
+#include "tensorflow/lite/micro/ia8201/config.h"
+#include "tensorflow/lite/micro/kernels/ia8201/lstm_eval.h"
+#else
 #include "tensorflow/lite/micro/kernels/lstm_eval.h"
+#endif
 #include "tensorflow/lite/micro/kernels/testdata/lstm_test_data.h"
 #include "tensorflow/lite/micro/test_helpers.h"
 #include "tensorflow/lite/micro/testing/micro_test.h"
@@ -291,6 +295,9 @@ OpDataLSTM CreateLstmOpData(
 
 template <int batch_size, int time_steps, int input_dimension,
           int state_dimension>
+
+
+
 OpDataLSTM CreateLstmOpDataFloat(
     LstmNodeContent<float, float, float, float, batch_size, time_steps,
                     input_dimension, state_dimension>& node_contents) {
@@ -450,12 +457,19 @@ void TestUpdateLstmCellFloat(
   CellStateInfo cell_state_info;
   cell_state_info.cell_clip = node_content.BuiltinData().cell_clip;
   // Call the function to be tested
+  #if defined(IA8201)
+  tflite::lstm_internal::UpdateLstmCell(
+      step_info, cell_state, forget_gate,
+      gate_output_data.expected_input_gate_output,
+      gate_output_data.expected_cell_gate_output, forget_cell_mul_params,
+      input_mul_params, cell_state_info, buffer);
+  #else
   tflite::lstm_internal::UpdateLstmCell<float>(
       step_info, cell_state, forget_gate,
       gate_output_data.expected_input_gate_output,
       gate_output_data.expected_cell_gate_output, forget_cell_mul_params,
       input_mul_params, cell_state_info, buffer);
-
+  #endif
   ValidateResultGoldens(gate_output_data.expected_updated_cell,
                         tflite::micro::GetTensorData<float>(cell_state),
                         batch_size * state_dimension, tolerance);
@@ -512,11 +526,17 @@ void TestUpdateLstmCellInteger(
   tflite::lstm_internal::LstmStepManager step_info(&size_info);
 
   // Call the function to be tested
+  #if defined(IA8201)
+  tflite::lstm_internal::UpdateLstmCell(
+      step_info, cell_state, quantized_forget_gate, quantized_input_gate,
+      quantized_cell_gate, forget_cell_mul_params, input_mul_params,
+      cell_state_info, buffer);
+  #else
   tflite::lstm_internal::UpdateLstmCell<CellType>(
       step_info, cell_state, quantized_forget_gate, quantized_input_gate,
       quantized_cell_gate, forget_cell_mul_params, input_mul_params,
       cell_state_info, buffer);
-
+  #endif
   float cell_state_float[batch_size * state_dimension] = {};
   Dequantize(tflite::micro::GetTensorData<CellType>(cell_state),
              batch_size * state_dimension,

@@ -13,10 +13,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
-#include "tensorflow/lite/micro/ia8201/config.h"
+
 
 // afloat opt for both core
 #if defined(XTENSA) || defined(IA8201)
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 #endif

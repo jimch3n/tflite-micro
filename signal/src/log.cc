@@ -16,8 +16,9 @@ limitations under the License.
 #include "signal/src/log.h"
 
 #include "signal/src/msb.h"
+#if defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
-
+#endif
 #ifndef REMOVE_TFLM_SIGNAL
 namespace tflite {
 namespace tflm_signal {

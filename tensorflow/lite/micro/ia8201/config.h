@@ -46,7 +46,7 @@ limitations under the License.
 #define DMX1A_SQUARE_OPT
 
 // unidirectional_lstm_sequence
-//#define DMX1A_LSTM_OPT
+#define DMX1A_LSTM_OPT
 
 // signal kernel optimization
 //#define SIG_FB_LOG_OPT   //afloat

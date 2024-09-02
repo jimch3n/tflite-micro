@@ -12,11 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+//#define KN_DEBUG 
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/kernels/ia8201/lstm_eval.h"
 
-#include <limits>
-
+#include <limits> 
+ 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/portable_tensor_utils.h"
@@ -110,14 +111,14 @@ TfLiteStatus LstmTensors::ValidateTensorStatus(TfLiteContext* context) const {
 }
 namespace lstm_internal {
 
-#if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
+#if !defined(DMX1A_LSTM_OPT)
 const int32_t kInt16Max = std::numeric_limits<int16_t>::max();
 const int32_t kInt16Min = std::numeric_limits<int16_t>::min();
 #endif
 
 void AddElementWise(const int16_t* input_1, const int16_t* input_2, int n_batch,
                     int n_input, int16_t* output) {
-#if !(defined(HIFI3) || defined(HIFI4) || defined(HIFI5))
+#if !defined(DMX1A_LSTM_OPT)
   for (int batch = 0; batch < n_batch; ++batch) {
     for (int i = 0; i < n_input; ++i) {
       const int index = batch * n_input + i;
@@ -127,32 +128,688 @@ void AddElementWise(const int16_t* input_1, const int16_t* input_2, int n_batch,
     }
   }
 #else
-  xa_nn_elm_add_16x16_16(output, input_1, input_2, n_batch * n_input);
+//  xa_nn_elm_add_16x16_16(output, input_1, input_2, n_batch * n_input);
+//KN_PRINTS("TODO 16+16");
+//for(int ii =0; ii < )
+for (int batch = 0; batch < n_batch; ++batch) {
+  const int16_t *in1, *in2;
+  int16_t* out;
+  const int index = batch * n_input ;
+  in1 = &input_1[index];
+  in2 = &input_2[index];
+  out = &output[index];
+  int nloop = n_input >> 2; 
+  int remain = n_input & 3;
+  vr128 VR_in1, VR_in2;
+  vr128 VR_sum;
+
+  ulsr128 UR_in1 = align_16x4_load(in1);
+  ulsr128 UR_in2 = align_16x4_load(in2);
+  if (nloop > 0)
+  {
+    ulsr128 UR_out = align_16x4_store(out);
+
+    load_16x4_vr_a(VR_in1, UR_in1, in1);
+    load_16x4_vr_a(VR_in2, UR_in2, in2);
+
+      for (int i = 0; i < nloop-1; ++i) {
+      convert_16I_to_32F_x4(VR_in1, 0);
+      convert_16I_to_32F_x4(VR_in2, 0);
+      VR_sum = vadds(VR_in1, VR_in2, 0);
+      convert_32F_to_16I_x4(VR_sum, 0, 0);
+      store_16x4_vr_a(VR_sum, UR_out, out);
+
+      load_16x4_vr_a(VR_in1, UR_in1, in1);
+      load_16x4_vr_a(VR_in2, UR_in2, in2);
+      }
+      convert_16I_to_32F_x4(VR_in1, 0);
+      convert_16I_to_32F_x4(VR_in2, 0);
+      VR_sum = vadds(VR_in1, VR_in2, 0);
+      convert_32F_to_16I_x4(VR_sum, 0, 0);
+      store_16x4_vr_a(VR_sum, UR_out, out);
+      flush_16x4(UR_out, out);
+  }
+
+  if (remain) {
+    load_16x4_vr_a(VR_in1, UR_in1, in1);
+    load_16x4_vr_a(VR_in2, UR_in2, in2);
+
+    convert_16I_to_32F_x4(VR_in1, 0);
+    convert_16I_to_32F_x4(VR_in2, 0);
+    VR_sum = vadds(VR_in1, VR_in2, 0);
+    convert_32F_to_16I_x4(VR_sum, 0, 0);
+    for (int ii = 0; ii < remain; ii++) {
+      store16x1_vr_postI(VR_sum, out, INC1, VRQ0);
+      VR_sum = vpermsi(VR_sum, VR_sum, 0, SHR_BY_1_ELEM);
+    }
+  }
+}
+
 #endif
+
+KN_PRINT_Q15_SIZE(output, n_batch*n_input);
 }
 
 void AddElementWise(const float* input_1, const float* input_2, int n_batch,
                     int n_input, float* output) {
+
+  KN_PRINT_FLOAT(input_1, n_input*n_batch);
+  KN_PRINT_FLOAT(input_2, n_input * n_batch);
   for (int batch = 0; batch < n_batch; ++batch) {
     for (int i = 0; i < n_input; ++i) {
       const int index = batch * n_input + i;
       output[index] = input_1[index] + input_2[index];
     }
   }
+  KN_PRINT_FLOAT(output, n_input * n_batch);
 }
 
 #if defined(DMX1A_LSTM_OPT)
 
-int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
-                          int16_t* output, int m, int n,
-                          const int32_t outMultipler,
-                          //  const int32_t *inputOffsetWithW,  // xor 128
-                          const int32_t shift, int32_t outOffset, int signs) {
-  int16_t* pY = output;
 
-  const int32_t* pA = A;
-  const int32_t* pX;
-  const int32_t* pB = (const int32_t*)bias;
+#define SIGMOD_EXP (3)
+_AI fr32 Sigmoid1(fr32 x) {
+  fr32 fac = seta_fr(kConstTable_Log2_Of_e, 0, 0);
+  fr32 one = seta_fr(kConstTable_One, 0, 0);
+  x = fpmul(fac, x, 1);
+  x = pow2_fr(x);
+  x = fpadd(one, x, 0);
+  x = inv_fr(x);
+
+  return x;
+}
+
+
+void Sigmoid(int16_t* data, int32_t data_size) {
+
+  //ConvertQ15ToAfloat();
+  int loopLim = data_size >> 2;  // Includes loop unrolling count of 2
+  int remain = data_size & 3;
+
+  int16_t* x = data;
+  int16_t* y = data;
+
+  vr128 VR_x0, VR_y0, VR_z0;
+  ulsr128 UR_x = align_16x4_load(x);
+  ulsr128 UR_y = align_16x4_store(y);
+  vr128 VR_fac = vseta_vr(kConstTable_Log2_Of_e, 0,
+                          0);  // no rounding is consistent with HMD
+  vr128 VR_one = vseta_vr(kConstTable_One, 0, 0);
+
+  if (loopLim > 0) {
+    load_16x4_vr_a(VR_x0, UR_x, x);
+    convert_16I_to_32F_x4(VR_x0, SIGMOD_EXP);
+
+    VR_y0 = vmuls(VR_fac, VR_x0, 0xF);
+    for (int i = 0; i < loopLim-1; i++) {
+      pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+      pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+      pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+      pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+      VR_z0 = vadds(VR_one, VR_z0, 0);
+      load_16x4_vr_a(VR_x0, UR_x, x);
+      inv(VR_z0, VRQ0, VR_z0, VRQ0);
+      inv(VR_z0, VRQ1, VR_z0, VRQ1);
+      inv(VR_z0, VRQ2, VR_z0, VRQ2);
+      inv(VR_z0, VRQ3, VR_z0, VRQ3);
+      convert_16I_to_32F_x4(VR_x0, SIGMOD_EXP); 
+      convert_32F_to_16I_x4(VR_z0, 0, 1);//Q 11
+      store_16x4_vr_a(VR_z0, UR_y, y);
+      VR_y0 = vmuls(VR_fac, VR_x0, 0xF);
+    }
+    pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+    pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+    pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+    pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+    VR_z0 = vadds(VR_one, VR_z0, 0);
+
+    inv(VR_z0, VRQ0, VR_z0, VRQ0);
+    inv(VR_z0, VRQ1, VR_z0, VRQ1);
+    inv(VR_z0, VRQ2, VR_z0, VRQ2);
+    inv(VR_z0, VRQ3, VR_z0, VRQ3);
+    convert_32F_to_16I_x4(VR_z0, 0, 1);
+    store_16x4_vr_a(VR_z0, UR_y, y);
+
+    flush_16x4(UR_y, y);
+  }
+
+  // Remaining
+  for (int i = 0; i < remain; i++) {
+    fr32 frx;
+    vr128 VR_x;
+    load16x1_vr_postI(VR_x, x, INC1, VRQ0);
+    convert_16I_to_32F_x4(VR_x, SIGMOD_EXP);
+    frx = move32_fr_vr_idx(VR_x, VRQ0);
+  
+    fr32 fry = Sigmoid1(frx);
+    set_VRQ0(VR_x, fry);
+    convert_32F_to_16I_x1(VR_x, 0, 1, VRQ0);
+    store16x1_vr_postI(VR_x, y, INC1, VRQ0);
+  }
+  
+  // xa_nn_vec_sigmoid_sym16s_sym16s(data, data, 0, 0, data_size);
+}
+static void SigmoidV_Full(float* y, const float* x, int n) {
+  int loopLim = n >> 2;  // Includes loop unrolling count of 2
+  int remain = n & 3;
+  ulsr128 UR_x = align_32x4_load(x);
+  ulsr128 UR_y = align_32x4_store(y);
+  vr128 VR_fac = vseta_vr(kConstTable_Log2_Of_e, 0,
+                          0);  // no rounding is consistent with HMD
+  vr128 VR_one = vseta_vr(kConstTable_One, 0, 0);
+  vr128 VR_x0;
+
+  vr128 VR_y0;
+
+  vr128 VR_z0;
+
+  if (loopLim > 0) {
+    load_32x4_vr_a(VR_x0, UR_x, x);
+
+    convert_IEEE_float_to_32F_x4(VR_x0);
+
+    KN_PRINT_VR(VR_x0);
+
+    VR_y0 = vmuls(VR_fac, VR_x0, 0xF);
+    // Groups of 8
+    for (int i = 0; i < loopLim - 1; i++) {
+      pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+      pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+      pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+      pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+
+      VR_z0 = vadds(VR_one, VR_z0, 0);
+
+      load_32x4_vr_a(VR_x0, UR_x, x);
+
+      convert_IEEE_float_to_32F_x4(VR_x0);
+      inv(VR_z0, VRQ0, VR_z0, VRQ0);
+      inv(VR_z0, VRQ1, VR_z0, VRQ1);
+      inv(VR_z0, VRQ2, VR_z0, VRQ2);
+
+      inv(VR_z0, VRQ3, VR_z0, VRQ3);
+
+      KN_PRINT_VR(VR_z0);
+
+      convert_32F_to_IEEE_float_x4(VR_z0);
+      store_32x4_vr_a(VR_z0, UR_y, y);
+      VR_y0 = vmuls(VR_fac, VR_x0, 0xF);
+    }
+    pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+    pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+    pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+    pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+
+    VR_z0 = vadds(VR_one, VR_z0, 0);
+
+    inv(VR_z0, VRQ0, VR_z0, VRQ0);
+    inv(VR_z0, VRQ1, VR_z0, VRQ1);
+    inv(VR_z0, VRQ2, VR_z0, VRQ2);
+    inv(VR_z0, VRQ3, VR_z0, VRQ3);
+
+    KN_PRINT_VR(VR_z0);
+    convert_32F_to_IEEE_float_x4(VR_z0);
+    store_32x4_vr_a(VR_z0, UR_y, y);
+
+    flush_32x4(UR_y, y);
+  }
+  // Remaining
+  for (int i = 0; i < remain; i++) {
+    fr32 frx;
+    load_fr_postI(frx, x, INC1);
+    unsigned arInput = *(unsigned*)&frx;
+    frx = convert_IEEE_float_to_32F(arInput);
+    fr32 fry = Sigmoid1(frx);
+
+    unsigned arOutput = convert_32F_to_IEEE_float(fry);
+    KN_PRINTF(arOutput);
+    store_fr_postI(arOutput, y, INC1);
+  }
+}
+
+void Sigmoid(float* data, int32_t data_size) {
+  int data_dims[2] = {1, data_size};
+  RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(data_dims));
+  SigmoidV_Full(data, data, data_shape.FlatSize());
+  // reference_ops::Logistic(data_shape, data, data_shape, data);
+  KN_PRINT_FLOAT(data, data_shape.FlatSize());
+}
+
+void Sigmoid(const RuntimeShape& data_shape, int16_t* data) {
+//  KN_PRINT_Q15_SIZE(data, data_shape.FlatSize());
+
+  Sigmoid(data, data_shape.FlatSize());
+  KN_PRINT_Q15_SIZE(data, data_shape.FlatSize());
+}
+
+
+void Sigmoid(const RuntimeShape& data_shape, float* data) {
+ // reference_ops::Logistic(data_shape, data, data_shape, data);
+
+    SigmoidV_Full(data, data, data_shape.FlatSize());
+}
+
+_AI fr32 Tanh1(fr32 x) {
+  fr32 fac = seta_fr(kConstTable_Log2_Of_e, 0, 0);
+  fr32 one = seta_fr(kConstTable_One, 0, 0);
+  fr32 two = seta_fr(kConstTable_Two, 0, 0);
+  fr32 denumer, numer, inv1;
+
+  fac = fpmul(two, fac, 0);
+  x = fpmul(fac, x, 0);
+  x = pow2_fr(x);
+  denumer = fpadd(one, x, 0);  // exp(2*x) + 1
+  numer = fpadd(one, x, 1);    // exp(2*x) -1
+  inv1 = inv_fr(denumer);
+  // Newton's method
+  fpmac(two, inv1, denumer, 1);  // 2 - (x/x)
+  inv1 = fpmul(two, inv1, 0);
+  x = fpmul(inv1, numer, 0);
+
+  return x;
+}
+void Tanh(int32_t cell_state_scale_power, int16_t* input_data,
+          int16_t* output_data, int32_t data_size) {
+  int32_t tanh_input_left_shift = (15 + cell_state_scale_power) - 3;
+  //int32_t input_multiplier = 0;
+  if (tanh_input_left_shift < 0) /* handling negative shift value */
+  {
+    tanh_input_left_shift = -tanh_input_left_shift;
+
+  }
+
+    int16_t *x = input_data;
+    int16_t* y = output_data;
+    int loopLim = data_size >> 2;  // Includes loop unrolling count of 2
+    int remain = data_size & 3;
+    ulsr128 UR_x = align_16x4_load(x);
+    ulsr128 UR_y = align_16x4_store(y);
+    vr128 VR_fac = vseta_vr(kConstTable_Log2_Of_e, 0, 0);
+    vr128 VR_one = vseta_vr(kConstTable_One, 0, 0);
+    vr128 VR_two = vseta_vr(kConstTable_Two, 0, 0);
+
+    vr128 VR_x0;
+    vr128 VR_y0;
+    vr128 VR_z0;
+    vr128 VR_n0;
+    VR_fac = vmuls(VR_fac, VR_two, 0);
+
+    // Groups of 4
+    if (loopLim > 0) {
+      vr128 VR_t1;
+      load_16x4_vr_a(VR_x0, UR_x, x);
+      convert_16I_to_32F_x4(VR_x0, SIGMOD_EXP + tanh_input_left_shift);
+
+      VR_y0 = vmuls(VR_fac, VR_x0, 0);
+      for (int i = 0; i < loopLim-1; i++) {
+        pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+        pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+        pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+        pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+
+        VR_n0 = vadds(VR_one, VR_z0, 0xf);  // 1- exp(2*x)
+        VR_z0 = vadds(VR_one, VR_z0, 0);    // 1+ exp(2*x)
+
+        load_16x4_vr_a(VR_x0, UR_x, x);
+
+        convert_16I_to_32F_x4(VR_x0, SIGMOD_EXP + tanh_input_left_shift);
+        inv(VR_y0, VRQ0, VR_z0, VRQ0);
+        inv(VR_y0, VRQ1, VR_z0, VRQ1);
+        inv(VR_y0, VRQ2, VR_z0, VRQ2);
+        inv(VR_y0, VRQ3, VR_z0, VRQ3);
+
+        // Newton's method
+        VR_t1 = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
+        VR_y0 = vmuls(VR_t1, VR_y0, 0);
+
+        VR_y0 = vmuls(VR_n0, VR_y0, 0);
+        convert_32F_to_16I_x4(VR_y0, 0, 1);
+        store_16x4_vr_a(VR_y0, UR_y, y);
+        VR_y0 = vmuls(VR_fac, VR_x0, 0);
+      }
+
+
+      pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+      pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+      pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+      pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+
+      VR_n0 = vadds(VR_one, VR_z0, 0xf);  // 1- exp(2*x)
+      VR_z0 = vadds(VR_one, VR_z0, 0);    // 1+ exp(2*x)
+
+      inv(VR_y0, VRQ0, VR_z0, VRQ0);
+
+      inv(VR_y0, VRQ1, VR_z0, VRQ1);
+
+      inv(VR_y0, VRQ2, VR_z0, VRQ2);
+
+      inv(VR_y0, VRQ3, VR_z0, VRQ3);
+
+      // Newton's method
+      VR_t1 = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
+      VR_y0 = vmuls(VR_t1, VR_y0, 0);
+
+      VR_y0 = vmuls(VR_n0, VR_y0, 0);
+      convert_32F_to_16I_x4(VR_y0, 0, 1);
+      store_16x4_vr_a(VR_y0, UR_y, y);
+      flush_16x4(UR_y, y);
+    }
+
+    // Remaining
+    for (int i = 0; i < remain; i++) {
+      //fr32 frx;
+      vr128 VR_x0, VR_y0;
+      load16x1_vr_postI(VR_x0, x, INC1, VRQ0);
+
+      convert_16I_to_32F_x4(VR_x0, SIGMOD_EXP + tanh_input_left_shift);
+      fr32 fry = Tanh1(get_VRQ0(VR_x0));
+
+      set_VRQ0(VR_y0, fry);
+      convert_32F_to_16I_x4(VR_y0, 0, 1);
+      store16x1_vr_postI(VR_y0, y, INC1, VRQ0);
+    }
+
+  // xa_nn_vec_tanh_sym16s_sym16s(output_data, input_data, input_multiplier,
+  //                             tanh_input_left_shift, data_size);
+}
+static void TanhV(float* y, const float* x, int n) {
+
+  int loopLim = n >> 2;  // Includes loop unrolling count of 2
+  int remain = n & 3;
+  ulsr128 UR_x = align_32x4_load(x);
+  ulsr128 UR_y = align_32x4_store(y);
+  vr128 VR_fac = vseta_vr(kConstTable_Log2_Of_e, 0, 0);
+  vr128 VR_one = vseta_vr(kConstTable_One, 0, 0);
+  vr128 VR_two = vseta_vr(kConstTable_Two, 0, 0);
+  vr128 VR_x0;
+  vr128 VR_y0;
+  vr128 VR_z0;
+  vr128 VR_n0;
+
+
+  // VR_fac = 2*log2e
+  VR_fac = vmuls(VR_fac, VR_two, 0);
+
+  // Groups of 4
+  if (loopLim > 0) {
+    vr128 VR_t1;
+    load_32x4_vr_a(VR_x0, UR_x, x);
+
+    convert_IEEE_float_to_32F_x4(VR_x0);
+    VR_y0 = vmuls(VR_fac, VR_x0, 0);
+    for (int i = 0; i < loopLim-1; i++) {
+
+
+      pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+      pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+      pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+      pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+
+      VR_n0 = vadds(VR_one, VR_z0, 0xf);  // 1- exp(2*x)
+      VR_z0 = vadds(VR_one, VR_z0, 0);    // 1+ exp(2*x)
+
+
+      load_32x4_vr_a(VR_x0, UR_x, x);
+
+      convert_IEEE_float_to_32F_x4(VR_x0);
+      inv(VR_y0, VRQ0, VR_z0, VRQ0);
+      inv(VR_y0, VRQ1, VR_z0, VRQ1);
+      inv(VR_y0, VRQ2, VR_z0, VRQ2);
+      inv(VR_y0, VRQ3, VR_z0, VRQ3);
+
+      // Newton's method
+      VR_t1 = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
+      VR_y0 = vmuls(VR_t1, VR_y0, 0);
+
+      // Newton's method
+
+      VR_y0 = vmuls(VR_n0, VR_y0, 0);
+
+      convert_32F_to_IEEE_float_x4(VR_y0);
+
+      store_32x4_vr_a(VR_y0, UR_y, y);
+      VR_y0 = vmuls(VR_fac, VR_x0, 0);
+    }
+
+    pow2(VR_z0, VRQ0, VR_y0, VRQ0);
+    pow2(VR_z0, VRQ1, VR_y0, VRQ1);
+    pow2(VR_z0, VRQ2, VR_y0, VRQ2);
+    pow2(VR_z0, VRQ3, VR_y0, VRQ3);
+
+    VR_n0 = vadds(VR_one, VR_z0, 0xf);  // 1- exp(2*x)
+    VR_z0 = vadds(VR_one, VR_z0, 0);    // 1+ exp(2*x)
+
+    convert_IEEE_float_to_32F_x4(VR_x0);
+    inv(VR_y0, VRQ0, VR_z0, VRQ0);
+    inv(VR_y0, VRQ1, VR_z0, VRQ1);
+    inv(VR_y0, VRQ2, VR_z0, VRQ2);
+    inv(VR_y0, VRQ3, VR_z0, VRQ3);
+
+    // Newton's method
+    VR_t1 = vmacs_adj(VR_two, VR_y0, VR_z0, 0xf, 0);
+    VR_y0 = vmuls(VR_t1, VR_y0, 0);
+
+    VR_y0 = vmuls(VR_n0, VR_y0, 0);
+    convert_32F_to_IEEE_float_x4(VR_y0);
+    store_32x4_vr_a(VR_y0, UR_y, y);
+    flush_32x4(UR_y, y);
+  }
+
+  // Remaining
+  for (int i = 0; i < remain; i++) {
+    fr32 frx;
+    load_fr_postI(frx, x, INC1);
+    unsigned arInput = *(unsigned*)&frx;
+    frx = convert_IEEE_float_to_32F(arInput);
+    //   convert_IEEE_float_to_32F_x4(VR_x1);
+    fr32 fry = Tanh1(frx);
+    unsigned out = convert_32F_to_IEEE_float(fry);
+
+    store_fr_postI(out, y, INC1);
+  }
+
+}
+
+void Tanh(int32_t cell_state_scale_power, float* input_data, float* output_data,
+          int32_t data_size) {
+  int data_dims[2] = {1, data_size};
+  RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(data_dims));
+  TanhV(output_data, input_data, data_size);
+ 
+  KN_PRINT_FLOAT(output_data, data_size);
+}
+
+
+void Tanh(int32_t cell_state_scale_power, const RuntimeShape& input_data_shape,
+          int16_t* input_data, const RuntimeShape& output_data_shape,
+          int16_t* output_data) {
+
+  KN_PRINT_Q15_SIZE(input_data, input_data_shape.FlatSize());
+
+  Tanh(cell_state_scale_power, input_data, output_data,
+       input_data_shape.FlatSize());
+                              //input_data_shape, input_data, output_data_shape,
+                              //output_data);
+  KN_PRINT_Q15_SIZE(output_data, output_data_shape.FlatSize());
+}
+
+void Tanh(int32_t cell_state_scale_power, const RuntimeShape& input_data_shape,
+          float* input_data, const RuntimeShape& output_data_shape,
+          float* output_data) {
+
+  TanhV(input_data, output_data, input_data_shape.FlatSize());
+}
+
+// Input and output have the same shape in LSTM
+void Mul(const ArithmeticParams& params, const int16_t* input1_data,
+         const int16_t* input2_data, int8_t* output_data, int32_t data_size) {
+  // xa_nn_elm_mul_sym16sxsym16s_asym8s(
+  //    output_data, params.output_offset, params.output_shift,
+  //    params.output_multiplier, params.quantized_activation_min,
+  //   params.quantized_activation_max, input1_data, input2_data, data_size);
+  const int16_t* pin1 = input1_data;
+  const int16_t* pin2 = input2_data;
+  int8_t* pOut = output_data;
+  int loop = data_size >> 2;
+  int remain = data_size & 3;
+  AScalar outMultipler, outputOffset;
+  KN_PRINTX(params.output_multiplier);
+  ConvertQ31ToAfloat(params.output_multiplier, outMultipler,
+                     31 - 14 + params.output_shift);
+  //int out_shift = 
+  ConvertQ31ToAfloat(params.output_offset, outputOffset,
+                             17+1);
+
+  KN_PRINTAFLT(outMultipler);
+  KN_PRINTAFLT(outputOffset);
+  vr128 VR_out, VR_q7_out;
+  vr128 VR_outMultipler;
+  vr128 VR_ouputOffset;
+  vr128 VR_in1, VR_in2;
+  replicate_ar(VR_outMultipler, 0xf, outMultipler.fr);
+
+  replicate_ar(VR_ouputOffset, 0xf, outputOffset.fr);
+
+  ulsr128 UR_in1 = align_16x4_load(pin1);
+  ulsr128 UR_in2 = align_16x4_load(pin2);
+  ulsr128 UR_out = align_8x4_store(pOut);
+  
+  if (loop > 0) {
+    load_16x4_vr_a(VR_in1, UR_in1, pin1);
+    load_16x4_vr_a(VR_in2, UR_in2, pin2);
+
+    convert_16I_to_32F_x4(VR_in1, 0);
+    convert_16I_to_32F_x4(VR_in2, 0);
+    for (int ii = 0; ii < loop-1; ii++) {
+      VR_out = vmuls(VR_in1, VR_in2, 0);
+      VR_out = vmacs_adj(VR_ouputOffset, VR_outMultipler, VR_out, 0, 0);
+
+      convert_32F_to_16I_x4(VR_out, -8+2, 1);
+
+      rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      store_8x4_vr_a(VR_out, UR_out, pOut);
+
+       load_16x4_vr_a(VR_in1, UR_in1, pin1);
+       load_16x4_vr_a(VR_in2, UR_in2, pin2);
+
+       convert_16I_to_32F_x4(VR_in1, 0);
+       convert_16I_to_32F_x4(VR_in2, 0);
+
+    }
+    VR_out = vmuls(VR_in1, VR_in2, 0);
+    //VR_out = vmuls(VR_outMultipler, VR_out, 0);
+    VR_out = vmacs_adj(VR_ouputOffset, VR_outMultipler, VR_out, 0, 0);
+    convert_32F_to_16I_x4(VR_out, -8+2, 1);
+    rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+    // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+    VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+    store_8x4_vr_a(VR_out, UR_out, pOut);
+    flush_8x4(UR_out, pOut);
+  }
+
+  if (remain) {
+    load_16x4_vr_a(VR_in1, UR_in1, pin1);
+    load_16x4_vr_a(VR_in2, UR_in2, pin2);
+
+    convert_16I_to_32F_x4(VR_in1, 0);
+    convert_16I_to_32F_x4(VR_in2, 0);
+    VR_out = vmuls(VR_in1, VR_in2, 0);
+    VR_out = vmacs_adj(VR_ouputOffset, VR_outMultipler, VR_out, 0, 0);
+    convert_32F_to_16I_x4(VR_out, -8 + 2, 1);
+    rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+    VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      
+    for (int ii = 0; ii < remain; ii++) {
+      store8x1_vr_postI(VR_out,  pOut, INC1, VRQ0);
+      VR_out = vpermsi(VR_out, VR_out, 0, SHR_BY_1_ELEM);
+    }
+      
+  }
+}
+
+// Input and output have the same shape in LSTM
+void Mul(const ArithmeticParams& params, const int16_t* input1_data,
+         const int16_t* input2_data, int16_t* output_data, int32_t data_size) {
+  // int dims_4D[4] = {1, 1, 1, data_size};
+  // xa_nn_elm_mul_broadcast_4D_sym16sxsym16s_sym16s(
+  //     output_data, dims_4D, params.output_shift, params.output_multiplier,
+  //     params.quantized_activation_min, params.quantized_activation_max,
+  //     input1_data, dims_4D, input2_data, dims_4D);
+  KN_PRINTS("todo mul 16x16 = 16\n");
+  return;
+}
+
+// Input and output have the same shape in LSTM
+void Mul(const ArithmeticParams& params, const float* input1_data,
+         const float* input2_data, float* output_data, int32_t data_size) {
+  int dims_2D[2] = {1, data_size};
+  RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(dims_2D));
+  return reference_ops::Mul(params, data_shape, input1_data, data_shape,
+                            input2_data, data_shape, output_data);
+}
+// API for external test
+// 
+
+// Input and output have the same shape in LSTM
+void Mul(const RuntimeShape& shape, const ArithmeticParams& params,
+         const int16_t* input1_data, const int16_t* input2_data,
+         int8_t* output_data) {
+  KN_PRINT_Q15_SIZE(input1_data, shape.FlatSize());
+  KN_PRINT_Q15_SIZE(input2_data, shape.FlatSize());
+  KN_PRINTX(params.output_multiplier);
+  KN_PRINTX(params.output_shift);
+  KN_PRINTD(params.output_offset);
+  reference_integer_ops::MulElementwise(shape.FlatSize(), params, input1_data,
+                                        input2_data, output_data);
+
+  KN_PRINT_Q7_SIZE(output_data, shape.FlatSize());
+}
+
+// Input and output have the same shape in LSTM
+void Mul(const RuntimeShape& shape, const ArithmeticParams& params,
+         const int16_t* input1_data, const int16_t* input2_data,
+         int16_t* output_data) {
+  KN_PRINT_Q15_SIZE(input1_data, shape.FlatSize());
+  KN_PRINT_Q15_SIZE(input2_data, shape.FlatSize());
+  /*
+      const int32_t input1_val = params.input1_offset + input1_data[i];
+    const int32_t input2_val = params.input2_offset + input2_data[i];
+    const int32_t unclamped_result =
+        params.output_offset +
+        MultiplyByQuantizedMultiplier(input1_val * input2_val,
+                                      params.output_multiplier,
+                                      params.output_shift);
+  */
+  KN_PRINTD(params.input1_offset);
+  KN_PRINTD(params.output_multiplier);
+  KN_PRINTD(params.output_shift);
+  KN_PRINTD(params.input2_offset);
+  reference_integer_ops::MulElementwise(shape.FlatSize(), params, input1_data,
+                                        input2_data, output_data);
+
+  KN_PRINT_Q15_SIZE(output_data, shape.FlatSize());
+}
+
+// Input and output have the same shape in LSTM
+void Mul(const RuntimeShape& shape, const ArithmeticParams& params,
+         const float* input1_data, const float* input2_data,
+         float* output_data) {
+  return reference_ops::Mul(params, shape, input1_data, shape, input2_data,
+                            shape, output_data);
+}
+
+// input MVM8bx8b with bias, output offset,mutlipler,shift
+int FullyConnectedKernelLSTM(int32_t *x, const int32_t *A, const AScalar *bias,
+                         int16_t *output, int m, int n,
+                         const AScalar &outOffsetFr32,
+                         const uint32_t input_offset_int8x4,  // xor 128
+                         const AScalar &outMultiplerFr32, int signs) {
+  int16_t *pY = output;
+
+  const int32_t *pA = A;
+  const int32_t *pX;
+  const int32_t *pB = (const int32_t *)bias;
   int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2), 31-
   // const int bias_exp = 17;
   // const int output_offset_exp = 17;
@@ -174,43 +831,33 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
   vr128 VR_A;
   vr128 VR_x;
   vr128 VR_y;
-  // vr128 VR_inputOffset;
+  vr128 VR_inputOffset;
   xtbool2 signSpec = int_to_xt_bool2(signs);
 
   vr128 VR_outMult;
-  // vr128 VR_outOffset;
+  vr128 VR_outOffset;
   vr128 VR_b0 = vseta_vr(kConstTable_Zero, 0, 0);
   ulsr128 UR_out = align_16x4_store(pY);
-  AScalar outMultiplerFr32;
-
-  ConvertQ31ToAfloat(outMultipler, outMultiplerFr32, shift);
-
   replicate_ar(VR_outMult, 0xf, outMultiplerFr32.fr);
-  // replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
-  // replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
+  replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
+  replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
   for (int i = 0; i < loopLimRow; i++) {
+    VR_y = vseta_vr(0, 0, 0);
+    mov_AccExtend_vr(VR_y);
     pX = x;
     ulsr128 UR_A = align_32x4_load(pA);
     ulsr128 UR_x = align_32x4_load(pX);
     ulsr128 UR_b;
     load_32x4_vr_a(VR_A, UR_A, pA);
 
-    // if (pB)
-    {
+    if (pB) {
       UR_b = align_32x4_load(pB);
-      load_32x4_vr_a(VR_y, UR_b, pB);  // suppose not grate than 16 bit
-
-      VR_y = shift32_arith(VR_y, 2, 0);
-      load_32x4_vr_a(VR_b0, UR_b, pB);
-
-      VR_b0 = shift32_arith(VR_b0, 2, 0);
+      load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
     }
-    // VR_y = vexp_adji(VR_b0, 0); //vseta_vr(0, 0, 0);
-    mov_AccExtend_vr(VR_b0);
 
     for (int j = 0; j < loopLimCol; j++) {
       load_32x4_vr_a(VR_x, UR_x, pX);
-      // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
+      VR_x = vbool(VR_x, VR_inputOffset, 0x6);
       WUR_MvmAux(0);
 
       mac8bx8b(VR_y, VR_A, VR_x, signSpec);
@@ -240,7 +887,7 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
 
     for (int32_t j = (loopLimCol << 3); j < nBlockAligned2; j++) {
       load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
-      // VR_x = vbool(VR_x, VR_inputOffset, 0x6);
+      VR_x = vbool(VR_x, VR_inputOffset, 0x6);
       WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
       mac8bx8b(VR_y, VR_A, VR_x, signSpec);
       load_32x4_vr_a(VR_A, UR_A, pA);
@@ -252,25 +899,32 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      // vr128 VR_q7_out;
+      //vr128 VR_q7_out;
 
       vr128 VR_out;
-
-      // VR_out = vadds(VR_y, VR_b0, 0x0);
-      VR_out = vmuls(VR_y, VR_outMult, 0);
-      // VR_out = vadds(VR_out, VR_outOffset, 0);
+      //KN_PRINT_VR(VR_y);
+      //KN_PRINT_VR(VR_b0);
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      //KN_PRINT_VR(VR_out);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
-      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      //KN_PRINT_VR(VR_out);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1, 1);
+      //KN_PRINTX_VR(VR_out);
+      //convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      store_16x4_vr_a(VR_out, UR_out, pY);
+      
+      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       // accExt
       // store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
-      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
-      store_16x4_vr_a(VR_out, UR_out, pY);
+      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      //store_8x4_vr_a(VR_out, UR_out, pY);
 
-      // if (pB) {
-      //  load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
-      // }
+      if (pB) {
+        load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+      }
 
       VR_y = mov_vr_AccExtend();
 
@@ -279,16 +933,17 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      // VR_out = vadds(VR_y, VR_b0, 0x0);
-      VR_out = vmuls(VR_y, VR_outMult, 0);
-      // VR_out = vadds(VR_out, VR_outOffset, 0);
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
+      //KN_PRINT_VR(VR_out);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1, 1);
 
-      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
-
-      store_16x4_vr_a(VR_out, UR_out, pY);
+     // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+     store_16x4_vr_a(VR_out, UR_out, pY);
+     // store_8x4_vr_a(VR_out, UR_out, pY);
       flush_16x4(UR_out, pY);
       // store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ1);
     } else {
@@ -298,17 +953,17 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      // vr128 VR_q7_out;
+      //vr128 VR_q7_out;
 
       vr128 VR_out;
 
-      // VR_out = vadds(VR_y, VR_b0, 0x0);
-      VR_out = vmuls(VR_y, VR_outMult, 0);
-      // VR_out = vadds(VR_out, VR_outOffset, 0);
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
-      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1, 1);
+      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       for (int32_t j = 0; j < (m & 0x7) && j < 4; j++) {
         store16x1_vr_postI(VR_out, pY, INC1, VRQ0);
         VR_out = vpermsi(VR_out, VR_out, 0, SHR_BY_1_ELEM);
@@ -319,22 +974,22 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
       }
       VR_y = mov_vr_AccExtend();
 
-      // if (pB) {
-      //  load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
-      //}
+      if (pB) {
+        load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+      }
 
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
 
-      // VR_out = vadds(VR_y, VR_b0, 0x0);
-      VR_out = vmuls(VR_y, VR_outMult, 0);
-      // VR_out = vadds(VR_out, VR_outOffset, 0);
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x4(VR_out, (unsigned int)1 - 8, 0);
-      // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1, 1);
+     // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+     // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
       for (int32_t j = 4; j < (m & 0x7) && j < 8; j++) {
         store16x1_vr_postI(VR_out, pY, INC1, VRQ0);
@@ -347,148 +1002,206 @@ int MVMQuantizedInt8x8_16(int32_t* x, const int32_t* A, const int32_t* bias,
   return 0;
 }
 
-void MVMBatchVectorCwiseProductAccumulate(const int16_t* vector, int v_size,
-                                          const int16_t* batch_vector,
-                                          int n_batch, int32_t multiplier,
-                                          int shift, int16_t* result) {
-  //  perm16 permX0 = set_perm16(0xC840);
-  // perm16 permX1 = set_perm16(0xC840);
-  // perm16 permX2 = set_perm16(0xC840);
-  // perm16 permX3 = set_perm16(0xC840);
 
-  vr128 VR_multipler;
-  AScalar multiplierFr32;
+int FullyConnectedKernelInputOffsetLSTM(int32_t* x, const int32_t* A,
+                                    const AScalar* bias, int16_t* output, int m,
+                                    int n, const AScalar& outOffsetFr32,
+                                    const int32_t* inputOffsetWithW,  // xor 128
+                                    const AScalar& outMultiplerFr32,
+                                    int signs) {
+  int16_t* pY = output;
 
-  ConvertQ31ToAfloat(multiplier, multiplierFr32, shift);
+  const int32_t* pA = A;
+  const int32_t* pX;
+  const int32_t* pB = (const int32_t*)bias;
+  int exp_fxp = (signs == 3) ? 15 : ((signs == 1) ? 16 : 17);  // 31-(14+2), 31-
+  // const int bias_exp = 17;
+  // const int output_offset_exp = 17;
+  int nBlockAligned2 = ((n + 1) >> 1);
+  int loopLimCol = (nBlockAligned2 >> 3);  // block 16
+  int loopLimRow = ((m + 7) >> 3);         // group 8 alignment
+  int processLastLoop = ((m & 7) != 0);
 
-  replicate_ar(VR_multipler, 0xf, multiplierFr32.fr);
+  // FIX for input size pointer is not align 4 bytes  and  loopLimCol != 0
+  // prevent using load_32x4_vr_a unalign,
+  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration
+  if (((unsigned int)x & 3) != 0 && loopLimCol != 0) {
+    loopLimCol = 0;
+  }
 
-  for (int b = 0; b < n_batch; b++) {
-    vr128 VR_vector, VR_bvector;
-    const int16_t* pVector = vector;
-    const int16_t* pBVector = batch_vector;
-    int16_t* pResult1 = result;
-    int16_t* pResult2 = result;
+  if (((unsigned int)x & 1) != 0) {
+    return -1;
+  }
 
-    ulsr128 UR_vector = align_16x4_load(pVector);
-    ulsr128 UR_bvector = align_16x4_load(pBVector);
-    ulsr128 UR_result1 = align_16x4_load(pResult1);
-    ulsr128 UR_result2 = align_16x4_store(pResult2);
+  vr128 VR_A;
+  vr128 VR_x;
+  vr128 VR_y;
+  //  vr128 VR_inputOffset;
+  xtbool2 signSpec = int_to_xt_bool2(signs);
+  //  xtbool2 signSpecInput = int_to_xt_bool2(3);
+  const int32_t* inputOffsetW = inputOffsetWithW;
 
-    vr128 VR_prod, VR_result;
-    int v_size4 = v_size >> 2;
-    // replicate_ar(VR_result, 0xf, result);
+  vr128 VR_outMult;
+  vr128 VR_outOffset;
+  vr128 VR_b0 = vseta_vr(kConstTable_Zero, 0, 0);
+  ulsr128 UR_out = align_8x4_load(pY);
+  replicate_ar(VR_outMult, 0xf, outMultiplerFr32.fr);
+  replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
+  // replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
+  for (int i = 0; i < loopLimRow; i++) {
+    if (inputOffsetWithW) {
+      load32x4_vr_postI(VR_y, inputOffsetW, INC1);
+      load32x4_vr_postI(VR_x, inputOffsetW, INC1);
+      mov_AccExtend_vr(VR_x);
+    } else {
+      VR_y = vseta_vr(0, 0, 0);
+      mov_AccExtend_vr(VR_y);
+    }
+    pX = x;
+    ulsr128 UR_A = align_32x4_load(pA);
+    ulsr128 UR_x = align_32x4_load(pX);
+    ulsr128 UR_b;
+    load_32x4_vr_a(VR_A, UR_A, pA);
 
-    if (v_size4 > 0) {
-      load_16x4_vr_a(VR_vector, UR_vector, pVector);
-      convert_16I_to_32F_x4(VR_vector, 0);
-      load_16x4_vr_a(VR_bvector, UR_bvector, pBVector);
-      convert_16I_to_32F_x4(VR_bvector, 0);
+    if (pB) {
+      UR_b = align_32x4_load(pB);
+      load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+    }
+    for (int j = 0; j < loopLimCol; j++) {
+      load_32x4_vr_a(VR_x, UR_x, pX);
+      WUR_MvmAux(0);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-      for (int v = 0; v < v_size4 - 1; v++) {
-        load_16x4_vr_a(VR_result, UR_result1, pResult1);
-        convert_16I_to_32F_x4(VR_result, 0);
+      load_32x4_vr_a(VR_A, UR_A, pA);
 
-        // VR_prod = vmacs_adj(VR_result, VR_vector, VR_bvector, 0, 0);
-        VR_prod = vmuls(VR_vector, VR_bvector, 0);
-        VR_prod = vmuls(VR_multipler, VR_prod, 0);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-        vr128 VR_out = vadds(VR_prod, VR_result, 0);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-        convert_32F_to_16I_x4(VR_out, 0, 0);
-        store_16x4_vr_a(VR_out, UR_result2, pResult2);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-        load_16x4_vr_a(VR_vector, UR_vector, pVector);
-        convert_16I_to_32F_x4(VR_vector, 0);
-        load_16x4_vr_a(VR_bvector, UR_bvector, pBVector);
-        convert_16I_to_32F_x4(VR_bvector, 0);
-        // int32_t prod = vector[v] * *batch_vector++;
-        // prod = MultiplyByQuantizedMultiplier(prod, multiplier, shift);
-        // int32_t output = prod + *result;
-        // output = std::max(std::min(static_cast<int32_t>(32767), output),
-        //                  static_cast<int32_t>(-32768));
-        //*result++ = output;
-      }
-      load_16x4_vr_a(VR_result, UR_result1, pResult1);
-      convert_16I_to_32F_x4(VR_result, 0);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-      // VR_prod = vmacs_adj(VR_result, VR_vector, VR_bvector, 0, 0);
-      VR_prod = vmuls(VR_vector, VR_bvector, 0);
-      VR_prod = vmuls(VR_multipler, VR_prod, 0);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-      vr128 VR_out = vadds(VR_prod, VR_result, 0);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
 
-      convert_32F_to_16I_x4(VR_out, 0, 0);
-      store_16x4_vr_a(VR_out, UR_result2, pResult2);
-      flush_16x4(UR_result2, pResult2);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+
+      load_32x4_vr_a(VR_A, UR_A, pA);
     }
 
-    // reminder
+    for (int32_t j = (loopLimCol << 3); j < nBlockAligned2; j++) {
+      load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
+      WUR_MvmAux(1);  // select low part, due to load16x1 load in high of 32bit
+      //   KN_PRINTX_VR128(VR_A); KN_PRINTX_VR128(VR_x);
+      mac8bx8b(VR_y, VR_A, VR_x, signSpec);
+      load_32x4_vr_a(VR_A, UR_A, pA);
+    }
+
+    if (i != (loopLimRow - 1) || !processLastLoop) {
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
+
+      //vr128 VR_q7_out;
+
+      vr128 VR_out;
+
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vexp_adji(VR_out, 8);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1, 1);
+     // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      // accExt
+     // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      store_16x4_vr_a(VR_out, UR_out, pY);
+
+      if (pB) {
+        load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+      }
+
+      VR_y = mov_vr_AccExtend();
+
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
+
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vexp_adji(VR_out, 8);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1, 1);
+
+      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      store_16x4_vr_a(VR_out, UR_out, pY);
+      flush_16x4(UR_out, pY);
+      // store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ1);
+    } else {
+      // Convert and store outputs
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
+
+      //vr128 VR_q7_out;
+
+      vr128 VR_out;
+
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vexp_adji(VR_out, 8);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 , 1);
+      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+      for (int32_t j = 0; j < (m & 0x7) && j < 4; j++) {
+        store16x1_vr_postI(VR_out, pY, INC1, VRQ0);
+        VR_out = vpermsi(VR_out, VR_out, 0, SHR_BY_1_ELEM);
+      }
+
+      if ((m & 7) <= 4) {
+        break;
+      }
+      VR_y = mov_vr_AccExtend();
+
+      if (pB) {
+        load_32x4_vr_a(VR_b0, UR_b, pB);  // suppose not grate than 16 bit
+      }
+
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ2);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ3);
+
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMult, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vexp_adji(VR_out, 8);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)1 , 1);
+      //rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+      //VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+
+      for (int32_t j = 4; j < (m & 0x7) && j < 8; j++) {
+        store16x1_vr_postI(VR_out, pY, INC1, VRQ0);
+        VR_out = vpermsi(VR_out, VR_out, 0, SHR_BY_1_ELEM);
+      }
+    }
+    // Adjust pointer to compensate for loop priming
+    pA -= 4;  // NOTE pointer type int8v4, => 16/4 = 4;
   }
-}
-
-void Sigmoid(int16_t* data, int32_t data_size) {
-  // xa_nn_vec_sigmoid_sym16s_sym16s(data, data, 0, 0, data_size);
-}
-
-void Sigmoid(float* data, int32_t data_size) {
-  int data_dims[2] = {1, data_size};
-  RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(data_dims));
-  // reference_ops::Logistic(data_shape, data, data_shape, data);
-}
-
-void Tanh(int32_t cell_state_scale_power, int16_t* input_data,
-          int16_t* output_data, int32_t data_size) {
-  int32_t tanh_input_left_shift = (15 + cell_state_scale_power) - 3;
-  int32_t input_multiplier = 0;
-  if (tanh_input_left_shift < 0) /* handling negative shift value */
-  {
-    tanh_input_left_shift = -tanh_input_left_shift;
-#if (defined(USE_HIFI_ACT_TIE) && \
-     (defined(AE_TANH16X4X2) || defined(AE_TANH16X4)))
-    input_multiplier = 1;
-#else
-    input_multiplier = 3;
-#endif
-  }
-  // xa_nn_vec_tanh_sym16s_sym16s(output_data, input_data, input_multiplier,
-  //                             tanh_input_left_shift, data_size);
-}
-
-void Tanh(int32_t cell_state_scale_power, float* input_data, float* output_data,
-          int32_t data_size) {
-  int data_dims[2] = {1, data_size};
-  RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(data_dims));
-  // reference_ops::Tanh(data_shape, input_data, data_shape, output_data);
-}
-
-// Input and output have the same shape in LSTM
-void Mul(const ArithmeticParams& params, const int16_t* input1_data,
-         const int16_t* input2_data, int8_t* output_data, int32_t data_size) {
-  // xa_nn_elm_mul_sym16sxsym16s_asym8s(
-  //    output_data, params.output_offset, params.output_shift,
-  //    params.output_multiplier, params.quantized_activation_min,
-  //   params.quantized_activation_max, input1_data, input2_data, data_size);
-}
-
-// Input and output have the same shape in LSTM
-void Mul(const ArithmeticParams& params, const int16_t* input1_data,
-         const int16_t* input2_data, int16_t* output_data, int32_t data_size) {
-  // int dims_4D[4] = {1, 1, 1, data_size};
-  // xa_nn_elm_mul_broadcast_4D_sym16sxsym16s_sym16s(
-  //     output_data, dims_4D, params.output_shift, params.output_multiplier,
-  //     params.quantized_activation_min, params.quantized_activation_max,
-  //     input1_data, dims_4D, input2_data, dims_4D);
-  return;
-}
-
-// Input and output have the same shape in LSTM
-void Mul(const ArithmeticParams& params, const float* input1_data,
-         const float* input2_data, float* output_data, int32_t data_size) {
-  int dims_2D[2] = {1, data_size};
-  RuntimeShape data_shape(2, reinterpret_cast<const int32_t*>(dims_2D));
-  return reference_ops::Mul(params, data_shape, input1_data, data_shape,
-                            input2_data, data_shape, output_data);
+  return 0;
 }
 
 void FullyConnected(const FullyConnectedParams& params,
@@ -497,18 +1210,59 @@ void FullyConnected(const FullyConnectedParams& params,
                     const int num_batches, const int output_depth,
                     const int accum_depth) {
 #pragma loop_count min = 1
+
+  KN_PRINTD(params.input_offset);
+  //			int input_aligned4 = data.is_input_align_4;
+  int sign = (128 == params.input_offset)
+             ? 1
+             : 3;  // assumption: 128 + sign 8bit = unsigned
+
+  KN_PRINT_Q7_SIZE(input_data, accum_depth);
+  // ignore filter_data get from mapped_filter pointer;
+  int32_t* map_filter_data = (params.mapped_filter);
+
+  KN_PRINT_Q7_SIZE_ATMOST(
+             map_filter_data,
+                          ALIGN_COEFF_SIZE(accum_depth, output_depth), 64);
+
+  KN_PRINTX(bias_data);
+  KN_PRINTD(params.opt_constraint );
+  const int8_t *inputLocal = input_data;
+  int16_t *outputLocal = output_data;
+
+  AScalar AoutputMultiplier = AScalar::Raw( params.outputMultipler);
+  AScalar AoutputOffset = AScalar::Raw(params.outputOffset);
+
   for (int b = 0; b < num_batches; b++) {
     // xa_nn_matXvec_out_stride_sym8sxasym8s_16(
     //     output_data + b * output_depth, filter_data,
     //      input_data + b * accum_depth, bias_data, output_depth, accum_depth,
     //      accum_depth, 1, params.input_offset, params.output_multiplier,
     //      params.output_shift);
+  if(params.opt_constraint == 2)
+  {
+      FullyConnectedKernelLSTM((int32_t*)inputLocal, (int32_t*)map_filter_data,
+                             (AScalar*)params.bias_aflt, (int16_t*)outputLocal,
+                             output_depth, accum_depth, AoutputOffset,
+                             params.input_offset_int8, AoutputMultiplier, sign);
+    // input offset 80808080 or 0 xor input
+  }else{
+    FullyConnectedKernelInputOffsetLSTM(
+        (int32_t*)inputLocal, (int32_t*)map_filter_data,
+        (AScalar*)params.bias_aflt,
+        (int16_t*)outputLocal, output_depth, accum_depth, AoutputOffset,
+ 
+        params.inputOffsetWithW, AoutputMultiplier, sign);
 
-    MVMQuantizedInt8x8_16((int32_t*)input_data, (int32_t*)filter_data,
-                          bias_data, output_data, output_depth, accum_depth,
-                          params.output_multiplier, params.output_shift,
-                          params.output_offset, 3);
   }
+
+    inputLocal += accum_depth;
+    outputLocal += output_depth;
+
+  KN_PRINT_Q15_SIZE(output_data, output_depth);
+                        
+  }
+
   return;
 }
 
@@ -522,8 +1276,9 @@ void FullyConnected(const FullyConnectedParams& params,
   //    accum_depth, accum_depth, num_batches, accum_depth, output_depth, 1,
   //    params.input_offset, params.output_multiplier, params.output_shift,
   //    params.output_offset);
-
+   KN_PRINTS("TODO: 16x8");
   // 16x8
+  // TODO FIXME
   return;
 }
 
@@ -538,19 +1293,30 @@ void FullyConnected(const FullyConnectedParams& params, const float* input_data,
   RuntimeShape filter_shape(2, reinterpret_cast<const int32_t*>(filter_dims));
   int output_dims[2] = {num_batches, output_depth};
   RuntimeShape output_shape(2, reinterpret_cast<const int32_t*>(output_dims));
-  return tflite::reference_ops::FullyConnected(
+
+
+  KN_PRINT_FLOAT(input_data, input_shape.FlatSize());
+  KN_PRINT_FLOAT(filter_data, filter_shape.FlatSize());
+  KN_PRINT_FLOAT(bias_data, bias_shape.FlatSize());
+    
+   tflite::reference_ops::FullyConnected(
       params, input_shape, input_data, filter_shape, filter_data, bias_shape,
       bias_data, output_shape, output_data);
+  KN_PRINT_FLOAT(output_data, output_shape.FlatSize());
 }
 #else
 // ref ops
 
 void Sigmoid(const RuntimeShape& data_shape, int16_t* data) {
+
+KN_PRINT_Q15_SIZE(data,  data_shape.FlatSize());
   reference_integer_ops::Logistic(
       0 /*data->input_multiplier*/, 0 /*data->input_left_shift */,
       data_shape.FlatSize() /*NumElements(input->dims)*/,
       data /* tflite::micro::GetTensorData<int16_t>(input) */,
       data /*tflite::micro::GetTensorData<int16_t>(output) */);
+KN_PRINT_Q15_SIZE(data,data_shape.FlatSize());
+
 }
 
 void Sigmoid(const RuntimeShape& data_shape, float* data) {
@@ -560,6 +1326,8 @@ void Sigmoid(const RuntimeShape& data_shape, float* data) {
 void Tanh(int32_t cell_state_scale_power, const RuntimeShape& input_data_shape,
           int16_t* input_data, const RuntimeShape& output_data_shape,
           int16_t* output_data) {
+KN_PRINTS("tanh");
+            KN_PRINT_Q15_SIZE(input_data,input_data_shape.FlatSize());
   int32_t tanh_input_left_shift = (15 + cell_state_scale_power) - 3;
   int32_t input_multiplier = 0;
   if (tanh_input_left_shift < 0) /* handling negative shift value */
@@ -570,6 +1338,8 @@ void Tanh(int32_t cell_state_scale_power, const RuntimeShape& input_data_shape,
   reference_integer_ops::Tanh(input_multiplier, tanh_input_left_shift,
                               input_data_shape, input_data, output_data_shape,
                               output_data);
+KN_PRINT_Q15_SIZE(output_data,output_data_shape.FlatSize());
+                              
 }
 
 void Tanh(int32_t cell_state_scale_power, const RuntimeShape& input_data_shape,
@@ -583,16 +1353,26 @@ void Tanh(int32_t cell_state_scale_power, const RuntimeShape& input_data_shape,
 void Mul(const RuntimeShape& shape, const ArithmeticParams& params,
          const int16_t* input1_data, const int16_t* input2_data,
          int8_t* output_data) {
-  return reference_integer_ops::MulElementwise(
+  KN_PRINT_Q15_SIZE(input1_data,shape.FlatSize());
+  KN_PRINT_Q15_SIZE(input2_data,shape.FlatSize());
+  KN_PRINTX(params.output_multiplier);
+  KN_PRINTX(params.output_shift);
+  KN_PRINTD(params.output_offset);
+   reference_integer_ops::MulElementwise(
       shape.FlatSize(), params, input1_data, input2_data, output_data);
+ 
+  KN_PRINT_Q7_SIZE(output_data,shape.FlatSize());    
 }
 
 // Input and output have the same shape in LSTM
 void Mul(const RuntimeShape& shape, const ArithmeticParams& params,
          const int16_t* input1_data, const int16_t* input2_data,
          int16_t* output_data) {
-  return reference_integer_ops::MulElementwise(
+
+  reference_integer_ops::MulElementwise(
       shape.FlatSize(), params, input1_data, input2_data, output_data);
+
+  KN_PRINT_Q15_SIZE(output_data,shape.FlatSize());
 }
 
 // Input and output have the same shape in LSTM
@@ -602,7 +1382,7 @@ void Mul(const RuntimeShape& shape, const ArithmeticParams& params,
   return reference_ops::Mul(params, shape, input1_data, shape, input2_data,
                             shape, output_data);
 }
-
+ #endif
 void FullyConnected(const FullyConnectedParams& params,
                     const RuntimeShape& input_shape, const int8_t* input_data,
                     const RuntimeShape& filter_shape, const int8_t* filter_data,
@@ -610,15 +1390,24 @@ void FullyConnected(const FullyConnectedParams& params,
                     const RuntimeShape& output_shape, int16_t* output_data) {
   //
   KN_PRINT_Q7_SIZE(input_data, input_shape.FlatSize());
+  if (bias_data)
+  {KN_PRINT_Q31_SIZE(bias_data, output_shape.FlatSize());}
+    KN_PRINT_Q7_SIZE_ATMOST(filter_data, filter_shape.FlatSize(),64);
+
+  // offset 
+  
+  KN_PRINTX(params.input_offset);
+  KN_PRINTX(params.weights_offset);
+  KN_PRINTX(params.output_offset);
+    KN_PRINTX(params.output_multiplier);
+  KN_PRINTX(params.output_shift);
+// dump inputOffset and bias
+//int in_dim = filter_shape.Dims(1); 
+//int out_dim = filter_shape.Dims(0); 
 
   tflite::reference_integer_ops::FullyConnected(
       params, input_shape, input_data, filter_shape, filter_data, bias_shape,
       bias_data, output_shape, output_data);
-
-  //    MVMQuantizedInt8x8_16((int32_t*)input_data,
-  //    (int32_t*)op_data_ex->mapped_i2i_w,
-  //        (int32_t *)input_to_gate_bias, (int16_t*)gate, n_output,
-  //        n_input, input_to_gate_scale_a, input_to_gate_scale_b, 0, 3);
 
   KN_PRINT_Q15_SIZE(output_data, output_shape.FlatSize());
 }
@@ -628,9 +1417,11 @@ void FullyConnected(const FullyConnectedParams& params,
                     const RuntimeShape& filter_shape, const int8_t* filter_data,
                     const RuntimeShape& bias_shape, const int64_t* bias_data,
                     const RuntimeShape& output_shape, int16_t* output_data) {
+
   return tflite::reference_integer_ops::FullyConnected(
       params, input_shape, input_data, filter_shape, filter_data, bias_shape,
       bias_data, output_shape, output_data);
+
 }
 
 void FullyConnected(const FullyConnectedParams& params,
@@ -642,7 +1433,7 @@ void FullyConnected(const FullyConnectedParams& params,
       params, input_shape, input_data, filter_shape, filter_data, bias_shape,
       bias_data, output_shape, output_data);
 }
-#endif
+//#endif
 
 void Clipping(const int v_size, const CellStateInfo& cell_state_info,
               int16_t* vector) {
@@ -676,6 +1467,123 @@ void UpdateLstmCell(const LstmStepManager& step_info,
   // Check offset validity to avoid memory overflow
   TFLITE_DCHECK_LE(step_info.CellStateOffset() + cell_state_shape.FlatSize(),
                    tflite::micro::GetTensorShape(cell_state).FlatSize());
+
+  // Forget Gate x Cell State
+
+  int ctof_exp = forget_cell_mul_params.output_shift + 16 -2;
+  int ctoi_exp = input_mul_params.output_shift + 16-2 ;
+  KN_PRINTD(ctoi_right_shift);
+  KN_PRINTD(ctof_right_shift);
+        int cell_size =  cell_state_shape.FlatSize();
+  int loop = cell_size >> 2;
+  int remain = cell_size & 3;
+
+  int16_t *p_cs =  tflite::micro::GetTensorData<int16_t>(cell_state) +
+      step_info.CellStateOffset();
+  int16_t* p_cs_w = p_cs;
+  int16_t* p_fg = forget_gate_output;
+  const int16_t* p_cg = cell_gate_output;
+  const int16_t* p_ig = input_gate_output;
+  //forget_cell_mul_params
+ vr128 VR_fg, VR_cs, VR_ig, VR_cg;
+  vr128 VR_out;
+
+ ulsr128 UR_cs = align_16x4_load(p_cs);
+ ulsr128 UR_cs2 = align_16x4_store(p_cs_w);
+
+ ulsr128 UR_fg = align_16x4_load(p_fg);
+ ulsr128 UR_cg = align_16x4_load(p_cg);
+ ulsr128 UR_ig = align_16x4_load(p_ig);
+
+  if (loop > 0) {
+    //vr128 VR_forget;
+
+    load_16x4_vr_a(VR_fg, UR_fg, p_fg);
+    load_16x4_vr_a(VR_cs, UR_cs, p_cs);
+    load_16x4_vr_a(VR_cg, UR_cg, p_cg);
+    load_16x4_vr_a(VR_ig, UR_ig, p_ig);
+
+    convert_16I_to_32F_x4(VR_fg, ctof_exp);
+    convert_16I_to_32F_x4(VR_cs, 0);
+
+    convert_16I_to_32F_x4(VR_cg, 0);
+    convert_16I_to_32F_x4(VR_ig, ctoi_exp);
+
+    // cs*fg  co >> + cg*ig >> ci
+    for (int ii = 0; ii < loop-1; ii++) {
+    
+      VR_out = vmuls(VR_fg, VR_cs, 0);
+      
+     // KN_PRINT_VR(VR_out);
+      // ctof_right shift
+      VR_out = vmacs_adj(VR_out, VR_cg, VR_ig, 0, 0);
+     // KN_PRINT_VR(VR_out);
+
+      convert_32F_to_16I_x4(VR_out, 0, 1);
+
+      //KN_PRINTX_VR(VR_out);
+      store_16x4_vr_a(VR_out, UR_cs2, p_cs_w);
+
+      load_16x4_vr_a(VR_fg, UR_fg, p_fg);
+      load_16x4_vr_a(VR_cs, UR_cs, p_cs);
+      load_16x4_vr_a(VR_cg, UR_cg, p_cg);
+      load_16x4_vr_a(VR_ig, UR_ig, p_ig);
+
+      convert_16I_to_32F_x4(VR_fg, ctof_exp);
+
+      convert_16I_to_32F_x4(VR_cs, 0);
+      convert_16I_to_32F_x4(VR_cg, 0);
+      convert_16I_to_32F_x4(VR_ig, ctoi_exp);
+
+    }
+
+    VR_out = vmuls(VR_fg, VR_cs, 0);
+
+    KN_PRINT_VR(VR_out);
+    // ctof_right shift
+    VR_out = vmacs_adj(VR_out, VR_cg, VR_ig, 0, 0);
+    convert_32F_to_16I_x4(VR_out, 0, 1);
+
+    
+    KN_PRINTX_VR(VR_out);
+    store_16x4_vr_a(VR_out, UR_cs2, p_cs_w);
+    flush_16x4(UR_cs2, p_cs_w);
+  }
+
+  if (remain) {
+    load_16x4_vr_a(VR_fg, UR_fg, p_fg);
+    load_16x4_vr_a(VR_cs, UR_cs, p_cs);
+    load_16x4_vr_a(VR_cg, UR_cg, p_cg);
+    load_16x4_vr_a(VR_ig, UR_ig, p_ig);
+
+    convert_16I_to_32F_x4(VR_fg, ctof_exp);
+    convert_16I_to_32F_x4(VR_cs, 0);
+
+    convert_16I_to_32F_x4(VR_cg, 0);
+    convert_16I_to_32F_x4(VR_ig, ctoi_exp);
+    VR_out = vmuls(VR_fg, VR_cs, 0);
+
+    // KN_PRINT_VR(VR_out);
+    // ctof_right shift
+    VR_out = vmacs_adj(VR_out, VR_cg, VR_ig, 0, 0);
+    // KN_PRINT_VR(VR_out);
+
+    convert_32F_to_16I_x4(VR_out, 0, 1);
+
+    // KN_PRINTX_VR(VR_out);
+    // cs*fg  co >> + cg*ig >> ci
+    for (int ii = 0; ii < remain; ii++) {
+      store16x1_vr_postI(VR_out,  p_cs_w, INC1, VRQ0);
+      VR_out = vpermsi(VR_out, VR_out, 0, SHR_BY_1_ELEM);
+    }
+
+
+  }
+#ifdef KN_DEBUG
+  //int16_t* out_cell_state = tflite::micro::GetTensorData<int16_t>(cell_state) +
+  //                          step_info.CellStateOffset();
+  //KN_PRINT_Q15_SIZE(out_cell_state, cell_size);
+#endif
 
   // Multiplier is equivalent to 0.5 here so adding 1 to shifts
   // xa_nn_lstm_cell_state_update_16(
@@ -729,117 +1637,7 @@ void UpdateLstmCell(const LstmStepManager& step_info,
   }
 }
 #endif
-// Calculates a single LSTM gate, int8x8_16 version.
-// Implements the same functionality as CalculateLstmGateFloat.
-void CalculateLstmGateInteger8x8_16(
-    const OpDataLSTMEx* op_data_ex,
-    // Input and weights
-    const int8_t* input, const int8_t* input_to_gate_weights,
-    const int32_t* input_to_gate_bias, const int32_t input_to_gate_scale_a,
-    const int32_t input_to_gate_scale_b,
-    // Output state and weights
-    const int8_t* output_state, const int8_t* recurrent_to_gate_weights,
-    const int32_t* recurrent_to_gate_bias,
-    const int32_t recurrent_to_gate_scale_a,
-    const int32_t recurrent_to_gate_scale_b,
-    // Cell state and weights
-    const int16_t* cell_state, const int16_t* cell_to_gate_weights,
-    const int32_t cell_to_gate_scale_a, const int32_t cell_to_gate_scale_b,
-    // Layer normalization parameters (layer norm LSTM)
-    const int16_t* layer_norm_coefficients, const int32_t* layer_norm_bias,
-    const int32_t layer_norm_input_scale_a,
-    const int32_t layer_norm_input_scale_b,
-    const int32_t layer_norm_variance_guard,
-    // Array sizes
-    const int n_batch, const int n_input, const int n_output, const int n_cell,
-    const TfLiteFusedActivation activation,
-    // Output
-    int16_t* gate,
-    // Parameters for performance optimizations
-    // CpuBackendContext* context,
-    // Scratch arrays
-    int32_t* scratch5) {
-  const bool use_peephole = (cell_to_gate_weights != nullptr);
-  const bool use_layer_norm = (layer_norm_coefficients != nullptr);
 
-  // Initialize scratch buffers with zeros. Note that unlike float and hybrid
-  // versions, bias is only used in layer normalization.
-  std::fill_n(gate, n_batch * n_cell, 0);
-#if defined(DMX1A_LSTM_OPT)
-
-  MVMQuantizedInt8x8_16((int32_t*)input, (int32_t*)op_data_ex->mapped_i2i_w,
-                        (int32_t*)input_to_gate_bias, (int16_t*)gate, n_output,
-                        n_input, input_to_gate_scale_a, input_to_gate_scale_b,
-                        0, 3);
-#else
-  // For each batch and cell: compute input_weight * input.
-  tensor_utils::PortableMatrixBatchVectorMultiplyAccumulate(
-      input, input_to_gate_bias, input_to_gate_weights, input_to_gate_scale_a,
-      input_to_gate_scale_b, n_batch, n_input, n_cell, 0, scratch5, gate, NULL);
-#endif
-
-  KN_PRINT_Q15_SIZE(gate, n_output);
-// Note: no aux_input.
-
-// For each batch and cell: compute recurrent_weight * output_state.
-#if defined(DMX1A_LSTM_OPT)
-
-  MVMQuantizedInt8x8_16(
-      (int32_t*)output_state,
-      (int32_t*)op_data_ex->mapped_r2i_w,  // recurrent_to_gate_weights,
-      (int32_t*)recurrent_to_gate_bias, (int16_t*)gate, n_output, n_cell,
-      recurrent_to_gate_scale_a, recurrent_to_gate_scale_b, 0, 3);
-#else
-  tensor_utils::PortableMatrixBatchVectorMultiplyAccumulate(
-      output_state, recurrent_to_gate_bias, recurrent_to_gate_weights,
-      recurrent_to_gate_scale_a, recurrent_to_gate_scale_b, n_batch, n_output,
-      n_cell, 0, scratch5, gate, NULL);
-#endif
-  KN_PRINT_Q15_SIZE(gate, n_output);
-  // For each batch and cell: compute cell_weight * cell_state (peephole LSTM)
-  if (use_peephole) {
-#if defined(DMX1A_LSTM_OPT)
-
-    MVMBatchVectorCwiseProductAccumulate(
-        cell_to_gate_weights, n_output, cell_state, n_batch,
-        cell_to_gate_scale_a, cell_to_gate_scale_b, gate);
-#else
-    tensor_utils::PortableVectorBatchVectorCwiseProductAccumulate(
-        cell_to_gate_weights, n_output, cell_state, n_batch,
-        cell_to_gate_scale_a, cell_to_gate_scale_b, gate);
-#endif
-  }
-  // Do layer normalization (if layer norm LSTM)
-  if (use_layer_norm) {
-    tensor_utils::PortableApplyLayerNorm(
-        gate, layer_norm_coefficients, layer_norm_bias,
-        layer_norm_input_scale_a, layer_norm_input_scale_b,
-        layer_norm_variance_guard, n_batch, n_cell, gate);
-  }
-  // Apply activation
-  switch (activation) {
-    case kTfLiteActSigmoid:
-#if defined(DMX1A_LSTM_OPT)
-      // scratch = MVMConvert();
-      SigmoidV_Full(gate_flt, gate, n_cell);
-#else
-      tensor_utils::PortableApplySigmoid(gate, n_batch, n_cell, gate);
-
-#endif  // !defined(DMX1A_LSTM_OPT)
-      break;
-    case kTfLiteActTanh:
-#if defined(DMX1A_LSTM_OPT)
-      // tanV(
-#else
-      tensor_utils::PortableApplyTanh(3, gate, n_batch, n_cell, gate);
-
-#endif  // !defined(DMX1A_LSTM_OPT)
-      break;
-    default:
-      // Only Sigmoid or Tanh is used.
-      TFLITE_ASSERT_FALSE;
-  }
-}
 
 void UpdateLstmCellInteger(int n_batch, int n_cell, int16_t* cell_state,
                            int32_t cell_state_scale, const int16_t* input_gate,

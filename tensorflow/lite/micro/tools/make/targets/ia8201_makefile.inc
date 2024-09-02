@@ -125,6 +125,11 @@ endif
     tensorflow/lite/micro/examples/person_detection_experimental/Makefile.inc
   MICRO_LITE_EXAMPLE_TESTS := $(filter-out $(EXCLUDED_EXAMPLE_TESTS), $(MICRO_LITE_EXAMPLE_TESTS))
 
+## add examples from xtensa
+
+MICRO_LITE_EXAMPLE_TESTS += $(shell find $(TENSORFLOW_ROOT)third_party/xtensa/examples/ -name Makefile.inc)
+
+#$(info micro lite example test: $(MICRO_LITE_EXAMPLE_TESTS))
 # logistic output in afloat domain is more accuracy than fixed-point
   EXCLUDED_TESTS := \
     tensorflow/lite/micro/micro_interpreter_test.cc \

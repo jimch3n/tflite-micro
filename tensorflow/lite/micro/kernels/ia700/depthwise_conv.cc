@@ -14,15 +14,15 @@ limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
 
-#define ENABLE_DILATION_OPT // enable dialtion optimization 
+#define ENABLE_DILATION_OPT  // enable dialtion optimization
 
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/depthwise_conv.h"
-#include "tensorflow/lite/micro/ia700/config.h"
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
+#include "tensorflow/lite/micro/ia700/config.h"
 #ifndef REMOVE_REFOP_SUPPORT
 #include "tensorflow/lite/kernels/internal/reference/depthwiseconv_float.h"
 #include "tensorflow/lite/kernels/internal/reference/depthwiseconv_uint8.h"
@@ -31,9 +31,8 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
-
-#include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+#include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
 namespace tflite {
 namespace {
@@ -60,18 +59,18 @@ static VAR_ALIGN_16 unsigned int bytearray_hmd[] = {
 #endif
 // local Opdata additional member item
 typedef enum {
-    DS_CONV_OPT_NONE = 0,
-    DS_CONV_OPT_TYPE1 = 1,
-    DS_CONV_OPT_TYPE2 = 2, // input channel align 4
-    DS_CONV_OPT_TYPE3 = 3,
-    DS_CONV_OPT_TYPE4 = 4,
+  DS_CONV_OPT_NONE = 0,
+  DS_CONV_OPT_TYPE1 = 1,
+  DS_CONV_OPT_TYPE2 = 2,  // input channel align 4
+  DS_CONV_OPT_TYPE3 = 3,
+  DS_CONV_OPT_TYPE4 = 4,
 
-    // hybrid
-    DS_CONV_OPT_FLT_X_INT8 = 8,      //kernel float x float(int8->float)
-    DS_CONV_OPT_FLT_X_FLT16 = 16, // kernel MVM8bx8b
+  // hybrid
+  DS_CONV_OPT_FLT_X_INT8 = 8,    // kernel float x float(int8->float)
+  DS_CONV_OPT_FLT_X_FLT16 = 16,  // kernel MVM8bx8b
 } ds_conv_opt_type;
 
-#define DS_CONV_OPT_MASK (DS_CONV_OPT_FLT_X_INT8-1)
+#define DS_CONV_OPT_MASK (DS_CONV_OPT_FLT_X_INT8 - 1)
 struct DSConvOpData {
   struct OpDataConv ConvOp;  // reference opdata
 
@@ -98,61 +97,61 @@ struct DSConvOpData {
 };
 template <typename T>
 int DepthWiseConvMapFloatCoeffs(
-    T* pMapped,
+    T *pMapped,
     int32_t mvmMatrix,  // matrix type, big or smaller for mvm_sparse
-    int filter_height, int filter_width, const T* filter_data,
-    int depth_multi, int input_depth) {
-    int nInput = (mvmMatrix == 1) ? filter_height * filter_width * input_depth
-        : filter_height * filter_width;
-    int nOutput = input_depth * depth_multi;
+    int filter_height, int filter_width, const T *filter_data, int depth_multi,
+    int input_depth) {
+  int nInput = (mvmMatrix == 1) ? filter_height * filter_width * input_depth
+                                : filter_height * filter_width;
+  int nOutput = input_depth * depth_multi;
 
 #ifdef KN_DEBUG
 
-    printf("nInput: %d nOutput: %d  ", nInput, nOutput);
+  printf("nInput: %d nOutput: %d  ", nInput, nOutput);
 
 #endif
-    const T* src = filter_data;
-    T* dst = pMapped;
-    int mappedSize =
-        nInput * nOutput;  // nFullRowGroups * nFullColBlocks * BLOCK_SIZE_FLT;
-    if (pMapped && filter_data) {
-        tflite::block_fill_bytes((char*)pMapped, 0, sizeof(T) * mappedSize);
+  const T *src = filter_data;
+  T *dst = pMapped;
+  int mappedSize =
+      nInput * nOutput;  // nFullRowGroups * nFullColBlocks * BLOCK_SIZE_FLT;
+  if (pMapped && filter_data) {
+    tflite::block_fill_bytes((char *)pMapped, 0, sizeof(T) * mappedSize);
 
-        for (int dm = 0; dm < depth_multi; dm++) {
-            for (int fy = 0; fy < filter_height; fy++) {
-                for (int fx = 0; fx < filter_width; fx++) {
-                    for (int in_ch = 0; in_ch < input_depth; in_ch++) {
-                        int out_channel = (in_ch * depth_multi) + dm;
-                        int inputIdx = (fy * filter_width + fx);
+    for (int dm = 0; dm < depth_multi; dm++) {
+      for (int fy = 0; fy < filter_height; fy++) {
+        for (int fx = 0; fx < filter_width; fx++) {
+          for (int in_ch = 0; in_ch < input_depth; in_ch++) {
+            int out_channel = (in_ch * depth_multi) + dm;
+            int inputIdx = (fy * filter_width + fx);
 
-                        int filter_srcIdx =
-                            inputIdx * depth_multi * input_depth + out_channel;
+            int filter_srcIdx =
+                inputIdx * depth_multi * input_depth + out_channel;
 
-                        int input_srcIdx =
-                            (mvmMatrix == 1)
-                            ? (fy * filter_width + fx) * input_depth + in_ch
-                            : inputIdx;
+            int input_srcIdx =
+                (mvmMatrix == 1)
+                    ? (fy * filter_width + fx) * input_depth + in_ch
+                    : inputIdx;
 
-                        // convert to mvm's matrix order
-                        int group = out_channel / ROWS_PER_GROUP_FLT;
-                        int j = out_channel % ROWS_PER_GROUP_FLT;
-                        int block = input_srcIdx;
-                        int dstIdx;
+            // convert to mvm's matrix order
+            int group = out_channel / ROWS_PER_GROUP_FLT;
+            int j = out_channel % ROWS_PER_GROUP_FLT;
+            int block = input_srcIdx;
+            int dstIdx;
 
-                        dstIdx =  // group * ROWS_PER_GROUP_FLT * nFullBlockColsAligned2 +
-                                  // block * ROWS_PER_GROUP_FLT + j;
-                            (mvmMatrix == 1) ? out_channel * nInput + block :
+            dstIdx =  // group * ROWS_PER_GROUP_FLT * nFullBlockColsAligned2 +
+                      // block * ROWS_PER_GROUP_FLT + j;
+                (mvmMatrix == 1) ? out_channel * nInput + block :
 
-                            group * ROWS_PER_GROUP_FLT * nInput +
-                            block * ROWS_PER_GROUP_FLT + j;
+                                 group * ROWS_PER_GROUP_FLT * nInput +
+                                     block * ROWS_PER_GROUP_FLT + j;
 
-                        dst[dstIdx] = src[filter_srcIdx];
-                    }
-                }
-            }
+            dst[dstIdx] = src[filter_srcIdx];
+          }
         }
+      }
     }
-    return mappedSize;
+  }
+  return mappedSize;
 }
 void *Init(TfLiteContext *context, const char *buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
@@ -170,15 +169,15 @@ TfLiteStatus PrepareCommon(TfLiteContext *context, TfLiteNode *node) {
   const auto &params =
       *(static_cast<const TfLiteDepthwiseConvParams *>(node->builtin_data));
 
-  MicroContext* micro_context = GetMicroContext(context);
+  MicroContext *micro_context = GetMicroContext(context);
 
-  TfLiteTensor* output =
+  TfLiteTensor *output =
       micro_context->AllocateTempOutputTensor(node, kDepthwiseConvOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
-  TfLiteTensor* input =
+  TfLiteTensor *input =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* filter =
+  TfLiteTensor *filter =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
 
@@ -355,15 +354,15 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
   auto *params =
       reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
 
-  MicroContext* micro_context = GetMicroContext(context);
+  MicroContext *micro_context = GetMicroContext(context);
 
-  TfLiteTensor* output =
+  TfLiteTensor *output =
       micro_context->AllocateTempOutputTensor(node, kDepthwiseConvOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
-  TfLiteTensor* input =
+  TfLiteTensor *input =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* filter =
+  TfLiteTensor *filter =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
 
@@ -416,18 +415,19 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
     const int8_t *filter_input =
         tflite::micro::GetTensorData<int8_t>(filterEval);
 
-   
 #ifdef ENABLE_DILATION_OPT
-    bool dilation_xy1 = true; //enable DIALTION
+    bool dilation_xy1 = true;  // enable DIALTION
 #else
-    bool dilation_xy1 = (1 == params->dilation_width_factor && 1 == params->dilation_height_factor);
+    bool dilation_xy1 = (1 == params->dilation_width_factor &&
+                         1 == params->dilation_height_factor);
 #endif
     data_ex->opt_constraint = dilation_xy1;
 
 #if defined(HEMILITE_DW_CONV_OPT)
     if (data_ex->opt_constraint) {
-     // data_ex->opt_constraint =
-     //     DEPTHWISE_CONV_OPT_MAC8Bx8B_INPUT_OFFSET;  // input is not 0, or 128
+      // data_ex->opt_constraint =
+      //     DEPTHWISE_CONV_OPT_MAC8Bx8B_INPUT_OFFSET;  // input is not 0, or
+      //     128
 
       uint8_t offsetInput = ds_conv2d.input_offset & 0xff;
       data_ex->input_offset_int8 = (offsetInput << 24) | (offsetInput << 16) |
@@ -437,19 +437,18 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
                                        (offsetInput << 16) |
                                        (offsetInput << 8) | offsetInput;
 
-    //  if (ds_conv2d.input_offset == 128 || ds_conv2d.input_offset == 0) 
-	  {
-       // type of only 1
+      //  if (ds_conv2d.input_offset == 128 || ds_conv2d.input_offset == 0)
+      {
+        // type of only 1
       }
 
       if (ds_conv2d.ch_mult == 1) {
-      {
-		  data_ex->opt_constraint = DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE; }
-	  }
-	  else {
-		  data_ex->opt_constraint =
-			  DEPTHWISE_CONV_OPT_MAC8Bx8B;
-	  }
+        {
+          data_ex->opt_constraint = DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE;
+        }
+      } else {
+        data_ex->opt_constraint = DEPTHWISE_CONV_OPT_MAC8Bx8B;
+      }
     }  // able to use mvm
        // data->mvmConstraint = 0;
 
@@ -498,28 +497,25 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
                                  (AScalar *)data->per_channel_output_multiplier,
                                  output_matVec, data->per_channel_output_shift,
                                  0);
-	  int32_t buf_size_scratch = 0;
-	  int32_t buf_size_im2col = 0;
-	  if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE)
-	  {
-		  int align8_inch = (((ds_conv2d.in_ch + 7) >> 3) << 3);
-		  int aling2_filrter_dim =
-			  (((ds_conv2d.ker_x * ds_conv2d.ker_y + 1) >> 1) << 1);
+      int32_t buf_size_scratch = 0;
+      int32_t buf_size_im2col = 0;
+      if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE) {
+        int align8_inch = (((ds_conv2d.in_ch + 7) >> 3) << 3);
+        int aling2_filrter_dim =
+            (((ds_conv2d.ker_x * ds_conv2d.ker_y + 1) >> 1) << 1);
 
-
-		  buf_size_im2col =
-			  (align8_inch * aling2_filrter_dim)  *
-			  params->depth_multiplier;  // get scratch buffer size for optimization
-	  }
-	  else if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B)
-	  {
-		  buf_size_im2col =
-			  ((((ds_conv2d.in_ch * ds_conv2d.ker_x * ds_conv2d.ker_y) + 15) >> 4)
-				  << 4) *
-			  params->depth_multiplier;  // get scratch buffer size for optimization
-
-	  }
-									 //int align8_outch = (((ds_conv2d.out_ch + 7) >> 3) << 3);
+        buf_size_im2col =
+            (align8_inch * aling2_filrter_dim) *
+            params
+                ->depth_multiplier;  // get scratch buffer size for optimization
+      } else if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B) {
+        buf_size_im2col =
+            ((((ds_conv2d.in_ch * ds_conv2d.ker_x * ds_conv2d.ker_y) + 15) >> 4)
+             << 4) *
+            params
+                ->depth_multiplier;  // get scratch buffer size for optimization
+      }
+      // int align8_outch = (((ds_conv2d.out_ch + 7) >> 3) << 3);
       int32_t buf_size_output =
           (((ds_conv2d.out_ch + 7) >> 3) << 3) *
           sizeof(int32_t);  // output store 8 multiple align
@@ -538,63 +534,59 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
       // prepare ConvInput Offset
       KN_PRINTD(ds_conv2d.input_offset);
 
-	  if (ds_conv2d.input_offset != 128 && ds_conv2d.input_offset != 0)
-	  {
-		  if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE)
-		  {
-			  int inFCM = ds_conv2d.out_ch * ds_conv2d.ch_mult;
-			  int inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
+      if (ds_conv2d.input_offset != 128 && ds_conv2d.input_offset != 0) {
+        if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE) {
+          int inFCM = ds_conv2d.out_ch * ds_conv2d.ch_mult;
+          int inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
 
-			  int filter_dim_align2 = (((inFCN + 1) >> 1) << 1);
+          int filter_dim_align2 = (((inFCN + 1) >> 1) << 1);
 
-			  KN_PRINTD(inFCN);
+          KN_PRINTD(inFCN);
 
 #if defined(HEMILITE_DW_CONV_OPT)
           const int group = 4;
           const int shift = 2;
 
 #endif
-			  int inFCM_ALIGN = (((inFCM + group - 1) >> shift) << shift);
-			  KN_PRINTD(inFCM_ALIGN);
-			  int32_t *inputOffsetWithW =
-				  (int32_t *)context->AllocatePersistentBuffer(
-					  context, inFCM_ALIGN * sizeof(int32_t));
+          int inFCM_ALIGN = (((inFCM + group - 1) >> shift) << shift);
+          KN_PRINTD(inFCM_ALIGN);
+          int32_t *inputOffsetWithW =
+              (int32_t *)context->AllocatePersistentBuffer(
+                  context, inFCM_ALIGN * sizeof(int32_t));
 
-			  data_ex->inputOffsetWithW = inputOffsetWithW;
+          data_ex->inputOffsetWithW = inputOffsetWithW;
 
-			  for (int g = 0; g < (inFCM_ALIGN >> shift); g++) {
-				  int32_t *scratchPerGroup = inputOffsetWithW + group * g;
-				  int8_t *pKernel =
-					  (int8_t *)data_ex->mapped_filter + group * filter_dim_align2 * g;
+          for (int g = 0; g < (inFCM_ALIGN >> shift); g++) {
+            int32_t *scratchPerGroup = inputOffsetWithW + group * g;
+            int8_t *pKernel = (int8_t *)data_ex->mapped_filter +
+                              group * filter_dim_align2 * g;
 
-				  DepthWiseConvKernel8xnInputOffset(data_ex->input_offset_int8,
-					  pKernel,  // data_ex->mapped_filter,
-					  scratchPerGroup, inFCM_ALIGN, inFCN,
-					  3);
-			  }
+            DepthWiseConvKernel8xnInputOffset(
+                data_ex->input_offset_int8,
+                pKernel,  // data_ex->mapped_filter,
+                scratchPerGroup, inFCM_ALIGN, inFCN, 3);
+          }
 
-			  KN_PRINT_Q31_SIZE(inputOffsetWithW, inFCM_ALIGN);
-		  }
-		  else if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B)
-		  {
-			  int inFCM = ds_conv2d.out_ch;
-			  int inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
-			  int inFCMA8 = (((inFCM + 7) >> 3) << 3);
-			  KN_PRINTD(inFCM);
-			  KN_PRINTD(inFCN);
-			  int32_t *inputOffsetWithW =
-				  (int32_t *)context->AllocatePersistentBuffer(
-					  context, inFCMA8 * sizeof(int32_t));
-			  data_ex->inputOffsetWithW = inputOffsetWithW;
+          KN_PRINT_Q31_SIZE(inputOffsetWithW, inFCM_ALIGN);
+        } else if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B) {
+          int inFCM = ds_conv2d.out_ch;
+          int inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
+          int inFCMA8 = (((inFCM + 7) >> 3) << 3);
+          KN_PRINTD(inFCM);
+          KN_PRINTD(inFCN);
+          int32_t *inputOffsetWithW =
+              (int32_t *)context->AllocatePersistentBuffer(
+                  context, inFCMA8 * sizeof(int32_t));
+          data_ex->inputOffsetWithW = inputOffsetWithW;
 
-			  MVMInputOffsetPrepare(data_ex->mapped_filter, inputOffsetWithW, inFCM,
-				  inFCN, data_ex->input_offset_int8);
+          MVMInputOffsetPrepare(data_ex->mapped_filter, inputOffsetWithW, inFCM,
+                                inFCN, data_ex->input_offset_int8);
 
-			  KN_PRINT_Q31_SIZE(data_ex->inputOffsetWithW, inFCMA8);
-		  }
-	  }else{
-		   data_ex->inputOffsetWithW = nullptr;
-		  }
+          KN_PRINT_Q31_SIZE(data_ex->inputOffsetWithW, inFCMA8);
+        }
+      } else {
+        data_ex->inputOffsetWithW = nullptr;
+      }
     }  // constraint
 
 #endif
@@ -615,15 +607,15 @@ TfLiteStatus PrepareFloat(TfLiteContext *context, TfLiteNode *node) {
   auto *params =
       reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
 
-  MicroContext* micro_context = GetMicroContext(context);
+  MicroContext *micro_context = GetMicroContext(context);
 
-  TfLiteTensor* output =
+  TfLiteTensor *output =
       micro_context->AllocateTempOutputTensor(node, kDepthwiseConvOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
-  TfLiteTensor* input =
+  TfLiteTensor *input =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* filter =
+  TfLiteTensor *filter =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvWeightsTensor);
   TF_LITE_ENSURE(context, filter != nullptr);
 
@@ -641,9 +633,10 @@ TfLiteStatus PrepareFloat(TfLiteContext *context, TfLiteNode *node) {
 
   data_ex->opt_constraint_float = 0;
 #ifdef ENABLE_DILATION_OPT
-  bool dilation_xy1 = true; //enable DIALTION
+  bool dilation_xy1 = true;  // enable DIALTION
 #else
-  bool dilation_xy1 = (1 == params->dilation_width_factor && 1 == params->dilation_height_factor);
+  bool dilation_xy1 = (1 == params->dilation_width_factor &&
+                       1 == params->dilation_height_factor);
 #endif
   if (dilation_xy1) {
     data_ex->opt_constraint_float = DS_CONV_OPT_TYPE1;
@@ -653,150 +646,143 @@ TfLiteStatus PrepareFloat(TfLiteContext *context, TfLiteNode *node) {
   }  // able to use mvm
 
   KN_PRINTD(data_ex->opt_constraint_float);
-  
+
   const TfLiteEvalTensor *filterEval =
       tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
- 
 
-  if (data_ex->opt_constraint_float > 0) 
-  {
-      switch (filter->type)
-      {
-      case kTfLiteFloat32:
-      {
-          float* p_mapped_filter = nullptr;
-          const float* filter_input = tflite::micro::GetTensorData<float>(filterEval);
-          const int32_t buf_size = tflite::DepthWiseConvMapFloatCoeffs<float>(
-              NULL, data_ex->opt_constraint_float, ds_conv2d.ker_y, ds_conv2d.ker_x,
-              NULL, params->depth_multiplier, ds_conv2d.in_ch);
-          KN_PRINTD(buf_size);
-          KN_PRINTD(tflite::is_coeffs_mapped(context));
-          if (!tflite::is_coeffs_mapped(context)) {
-              const float* pfilter_val = &filter_input[0];
+  if (data_ex->opt_constraint_float > 0) {
+    switch (filter->type) {
+      case kTfLiteFloat32: {
+        float *p_mapped_filter = nullptr;
+        const float *filter_input =
+            tflite::micro::GetTensorData<float>(filterEval);
+        const int32_t buf_size = tflite::DepthWiseConvMapFloatCoeffs<float>(
+            NULL, data_ex->opt_constraint_float, ds_conv2d.ker_y,
+            ds_conv2d.ker_x, NULL, params->depth_multiplier, ds_conv2d.in_ch);
+        KN_PRINTD(buf_size);
+        KN_PRINTD(tflite::is_coeffs_mapped(context));
+        if (!tflite::is_coeffs_mapped(context)) {
+          const float *pfilter_val = &filter_input[0];
 
-              p_mapped_filter = (float*)context->AllocatePersistentBuffer(
-                  context, buf_size * sizeof(float));
-              KN_PRINTD(data_ex->opt_constraint_float);
-              tflite::DepthWiseConvMapFloatCoeffs<float>(
-                  (float*)p_mapped_filter, data_ex->opt_constraint_float,
-                  ds_conv2d.ker_y, ds_conv2d.ker_x, (float*)pfilter_val,
-                  params->depth_multiplier, ds_conv2d.in_ch);
-              data_ex->mapped_filter = (int32_t*)p_mapped_filter;
+          p_mapped_filter = (float *)context->AllocatePersistentBuffer(
+              context, buf_size * sizeof(float));
+          KN_PRINTD(data_ex->opt_constraint_float);
+          tflite::DepthWiseConvMapFloatCoeffs<float>(
+              (float *)p_mapped_filter, data_ex->opt_constraint_float,
+              ds_conv2d.ker_y, ds_conv2d.ker_x, (float *)pfilter_val,
+              params->depth_multiplier, ds_conv2d.in_ch);
+          data_ex->mapped_filter = (int32_t *)p_mapped_filter;
+        } else {
+          data_ex->mapped_filter = (int32_t *)filter_input;
+        }
+        // data->mapped_filter = p_mapped_filter;
+        data_ex->mapped_filter_size = buf_size;
+        KN_PRINT_FLOAT(data_ex->mapped_filter, buf_size);
+      } break;
+      case kTfLiteInt8: {  // hybrid mode should converted by
+                           // kn_tflite_converter
+        // 1. conditioanl only
+
+        data_ex->filter_scale = AScalar(filter->params.scale);
+
+        KN_PRINTAFLT(data_ex->filter_scale);
+        // check multiple channels scale
+        const auto *affine_quantization =
+            reinterpret_cast<TfLiteAffineQuantization *>(
+                filter->quantization.params);
+
+        // KN_PRINTD(affine_quantization->scale->data);
+        // KN_PRINTD(affine_quantization->zero_point->data);
+        if (affine_quantization) {
+          const bool is_per_channel = affine_quantization->scale->size > 1;
+          const float *filter_scales = affine_quantization->scale->data;
+          const int num_channels =
+              filter->dims->data[kDepthwiseConvQuantizedDimension];
+          if (is_per_channel) {
+            for (int i = 0; i < num_channels; ++i) {
+              // If per-tensor quantization parameter is specified, broadcast it
+              // along the quantization dimension (channels_out).
+              const AScalar scale = AScalar(filter_scales[i]);
+              data_ex->ConvOp.per_channel_output_multiplier[i] = scale.raw();
+            }
+            KN_PRINT_AFLOAT(data_ex->ConvOp.per_channel_output_multiplier,
+                            num_channels);
+          } else {
+            data_ex->ConvOp.per_channel_output_multiplier = nullptr;
           }
-          else {
-              data_ex->mapped_filter = (int32_t*)filter_input;
-          }
-          // data->mapped_filter = p_mapped_filter;
-          data_ex->mapped_filter_size = buf_size;
-          KN_PRINT_FLOAT(data_ex->mapped_filter, buf_size);
-      }
-      break;
-      case kTfLiteInt8:
-      { // hybrid mode should converted by kn_tflite_converter
-          // 1. conditioanl only 
 
-          data_ex->filter_scale = AScalar(filter->params.scale);
+          // KN_PRINT_FLOAT_INT8_PER_CH(data_ex->mapped_filter,
+          //    buf_size,
+          //    data_ex->filter_scale);
+        } else {
+          data_ex->ConvOp.per_channel_output_multiplier = nullptr;
+        }
+        int8_t *p_mapped_filter = nullptr;
+        const int8_t *filter_input =
+            tflite::micro::GetTensorData<int8_t>(filterEval);
+        const int32_t buf_size = tflite::DepthWiseConvMapFloatCoeffs<int8_t>(
+            NULL, data_ex->opt_constraint_float, ds_conv2d.ker_y,
+            ds_conv2d.ker_x, NULL, params->depth_multiplier, ds_conv2d.in_ch);
+        KN_PRINTD(buf_size);
+        KN_PRINTD(tflite::is_coeffs_mapped(context));
+        if (!tflite::is_coeffs_mapped(context)) {
+          const int8_t *pfilter_val = &filter_input[0];
 
-          KN_PRINTAFLT(data_ex->filter_scale);
-          // check multiple channels scale
-          const auto* affine_quantization =
-              reinterpret_cast<TfLiteAffineQuantization*>(filter->quantization.params);
+          p_mapped_filter = (int8_t *)context->AllocatePersistentBuffer(
+              context, buf_size * sizeof(int8_t));
+          KN_PRINTD(data_ex->opt_constraint_float);
+          tflite::DepthWiseConvMapFloatCoeffs<int8_t>(
+              p_mapped_filter, data_ex->opt_constraint_float, ds_conv2d.ker_y,
+              ds_conv2d.ker_x, pfilter_val, params->depth_multiplier,
+              ds_conv2d.in_ch);
+          data_ex->mapped_filter = (int32_t *)p_mapped_filter;
+        } else {
+          data_ex->mapped_filter = (int32_t *)filter_input;
+        }
+        data_ex->opt_constraint_float |= DS_CONV_OPT_FLT_X_INT8;
+        data_ex->mapped_filter_size = buf_size;
 
-          //KN_PRINTD(affine_quantization->scale->data);
-          //KN_PRINTD(affine_quantization->zero_point->data);
-          if (affine_quantization)
-          {
-              const bool is_per_channel = affine_quantization->scale->size > 1;
-              const float* filter_scales = affine_quantization->scale->data;
-              const int num_channels = filter->dims->data[kDepthwiseConvQuantizedDimension];
-              if (is_per_channel) {
+        data_ex->filter_scale = AScalar(filter->params.scale);
+        // NO PER CH scale
+        // KN_PRINT_FLOAT_INT8(data_ex->mapped_filter, buf_size,
+        // data_ex->filter_scale);
+        KN_PRINT_Q7_SIZE(data_ex->mapped_filter, buf_size);
+      } break;
+      case kTfLiteFloat16: {
+        TfLiteFloat16 *p_mapped_filter = nullptr;
+        const TfLiteFloat16 *filter_input =
+            tflite::micro::GetTensorData<TfLiteFloat16>(filterEval);
+        const int32_t buf_size =
+            tflite::DepthWiseConvMapFloatCoeffs<TfLiteFloat16>(
+                NULL, data_ex->opt_constraint_float, ds_conv2d.ker_y,
+                ds_conv2d.ker_x, NULL, params->depth_multiplier,
+                ds_conv2d.in_ch);
+        KN_PRINTD(buf_size);
+        KN_PRINTD(tflite::is_coeffs_mapped(context));
+        if (!tflite::is_coeffs_mapped(context)) {
+          const TfLiteFloat16 *pfilter_val = &filter_input[0];
 
-                  for (int i = 0; i < num_channels; ++i) {
-                      // If per-tensor quantization parameter is specified, broadcast it along the
-                      // quantization dimension (channels_out).
-                      const AScalar scale = AScalar(filter_scales[i]);
-                      data_ex->ConvOp.per_channel_output_multiplier[i] = scale.raw();
-                  }
-                  KN_PRINT_AFLOAT(data_ex->ConvOp.per_channel_output_multiplier, num_channels);
-              }
-              else {
-                  data_ex->ConvOp.per_channel_output_multiplier = nullptr;
-              }
-
-              //KN_PRINT_FLOAT_INT8_PER_CH(data_ex->mapped_filter,
-              //    buf_size, 
-              //    data_ex->filter_scale);
-          }
-          else {
-              data_ex->ConvOp.per_channel_output_multiplier = nullptr;
-
-          }
-          int8_t* p_mapped_filter = nullptr;
-          const int8_t* filter_input = tflite::micro::GetTensorData<int8_t>(filterEval);
-          const int32_t buf_size = tflite::DepthWiseConvMapFloatCoeffs<int8_t>(
-              NULL, data_ex->opt_constraint_float, ds_conv2d.ker_y, ds_conv2d.ker_x,
-              NULL, params->depth_multiplier, ds_conv2d.in_ch);
-          KN_PRINTD(buf_size);
-          KN_PRINTD(tflite::is_coeffs_mapped(context));
-          if (!tflite::is_coeffs_mapped(context)) {
-              const int8_t* pfilter_val = &filter_input[0];
-
-              p_mapped_filter = (int8_t*)context->AllocatePersistentBuffer(
-                  context, buf_size * sizeof(int8_t));
-              KN_PRINTD(data_ex->opt_constraint_float);
-              tflite::DepthWiseConvMapFloatCoeffs<int8_t>(
-                  p_mapped_filter, data_ex->opt_constraint_float,
-                  ds_conv2d.ker_y, ds_conv2d.ker_x, pfilter_val,
-                  params->depth_multiplier, ds_conv2d.in_ch);
-              data_ex->mapped_filter = (int32_t*)p_mapped_filter;
-          }
-          else {
-              data_ex->mapped_filter = (int32_t*)filter_input;
-          }
-          data_ex->opt_constraint_float |= DS_CONV_OPT_FLT_X_INT8;
-          data_ex->mapped_filter_size = buf_size;
-
-          data_ex->filter_scale = AScalar(filter->params.scale);
-          // NO PER CH scale
-          //KN_PRINT_FLOAT_INT8(data_ex->mapped_filter, buf_size, data_ex->filter_scale);
-          KN_PRINT_Q7_SIZE(data_ex->mapped_filter, buf_size);
-      }
-      break;
-      case kTfLiteFloat16:
-      {
-          TfLiteFloat16* p_mapped_filter = nullptr;
-          const TfLiteFloat16* filter_input = tflite::micro::GetTensorData<TfLiteFloat16>(filterEval);
-          const int32_t buf_size = tflite::DepthWiseConvMapFloatCoeffs<TfLiteFloat16>(
-              NULL, data_ex->opt_constraint_float, ds_conv2d.ker_y, ds_conv2d.ker_x,
-              NULL, params->depth_multiplier, ds_conv2d.in_ch);
-          KN_PRINTD(buf_size);
-          KN_PRINTD(tflite::is_coeffs_mapped(context));
-          if (!tflite::is_coeffs_mapped(context)) {
-              const TfLiteFloat16* pfilter_val = &filter_input[0];
-
-              p_mapped_filter = (TfLiteFloat16*)context->AllocatePersistentBuffer(
-                  context, buf_size * sizeof(TfLiteFloat16));
-              KN_PRINTD(data_ex->opt_constraint_float);
-              tflite::DepthWiseConvMapFloatCoeffs<TfLiteFloat16>(
-                  p_mapped_filter, data_ex->opt_constraint_float,
-                  ds_conv2d.ker_y, ds_conv2d.ker_x, pfilter_val,
-                  params->depth_multiplier, ds_conv2d.in_ch);
-              data_ex->mapped_filter = (int32_t*)p_mapped_filter;
-          }
-          else {
-              data_ex->mapped_filter = (int32_t*)filter_input;
-          }
-          data_ex->opt_constraint_float |= DS_CONV_OPT_FLT_X_FLT16;
-          data_ex->mapped_filter_size = buf_size;
-          KN_PRINT_AFLOAT16(data_ex->mapped_filter, buf_size);
-      }
-      break;
+          p_mapped_filter = (TfLiteFloat16 *)context->AllocatePersistentBuffer(
+              context, buf_size * sizeof(TfLiteFloat16));
+          KN_PRINTD(data_ex->opt_constraint_float);
+          tflite::DepthWiseConvMapFloatCoeffs<TfLiteFloat16>(
+              p_mapped_filter, data_ex->opt_constraint_float, ds_conv2d.ker_y,
+              ds_conv2d.ker_x, pfilter_val, params->depth_multiplier,
+              ds_conv2d.in_ch);
+          data_ex->mapped_filter = (int32_t *)p_mapped_filter;
+        } else {
+          data_ex->mapped_filter = (int32_t *)filter_input;
+        }
+        data_ex->opt_constraint_float |= DS_CONV_OPT_FLT_X_FLT16;
+        data_ex->mapped_filter_size = buf_size;
+        KN_PRINT_AFLOAT16(data_ex->mapped_filter, buf_size);
+      } break;
       default:
-          return kTfLiteError;
-          break;
-      }// end of switch case filter->type
-      KN_PRINTD(data_ex->opt_constraint_float);
-  } // end of data_ex->opt_constraint_float > 0
+        return kTfLiteError;
+        break;
+    }  // end of switch case filter->type
+    KN_PRINTD(data_ex->opt_constraint_float);
+  }  // end of data_ex->opt_constraint_float > 0
   int32_t buf_size_scratch = 0;
   int32_t buf_size_im2col =
       ((((ds_conv2d.in_ch * ds_conv2d.ker_x * ds_conv2d.ker_y) + 3) >> 2)
@@ -824,13 +810,14 @@ TfLiteStatus PrepareFloat(TfLiteContext *context, TfLiteNode *node) {
 }
 
 TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
-  MicroContext* micro_context = GetMicroContext(context);
- //const TfLiteTensor *input = GetInput(context, node, kDepthwiseConvInputTensor);
-  TfLiteTensor* input =
+  MicroContext *micro_context = GetMicroContext(context);
+  // const TfLiteTensor *input = GetInput(context, node,
+  // kDepthwiseConvInputTensor);
+  TfLiteTensor *input =
       micro_context->AllocateTempInputTensor(node, kDepthwiseConvInputTensor);
   TF_LITE_ENSURE(context, input != nullptr);
   if (input->type == kTfLiteInt8) {  // constraint
-   micro_context->DeallocateTempTfLiteTensor(input);
+    micro_context->DeallocateTempTfLiteTensor(input);
     return PrepareInt8(context, node);
   }
 
@@ -843,78 +830,78 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
   return kTfLiteError;
 }
 #ifdef HEMILITE_CONV_OPT
-static int DepthWiseConvFloat16Kernel(float* x, const TfLiteFloat16* A, const float* bias,
-    float* output, int m, int n,
-    const AScalar& act_min,
-    const AScalar& act_max) {
-    const TfLiteFloat16* pA = A;
-    const float* pX;
-    const float* pBias = bias;
-    int loopLimCol = (n >> 1);  // block 16
+static int DepthWiseConvFloat16Kernel(float *x, const TfLiteFloat16 *A,
+                                      const float *bias, float *output, int m,
+                                      int n, const AScalar &act_min,
+                                      const AScalar &act_max) {
+  const TfLiteFloat16 *pA = A;
+  const float *pX;
+  const float *pBias = bias;
+  int loopLimCol = (n >> 1);  // block 16
 
-    int remainCol = n & 1;
+  int remainCol = n & 1;
 
-    float* pDst = output;
+  float *pDst = output;
 
-    vr64 VR_A;
-    vr64 VR_x;
-    vr64 VR_y;
-    vr64 VR_max, VR_min;
+  vr64 VR_A;
+  vr64 VR_x;
+  vr64 VR_y;
+  vr64 VR_max, VR_min;
 
-    replicate_ar(VR_max, 0x3, act_max.fr);
-    replicate_ar(VR_min, 0x3, act_min.fr);
+  replicate_ar(VR_max, 0x3, act_max.fr);
+  replicate_ar(VR_min, 0x3, act_min.fr);
 
-    // filter index:
-    //
-    for (int i = 0; i < m; i++) {
-        VR_y = vseta_vr(0,  0);
-        vr64 VR_out, VR_bias;
-        pX = x;
-        //ulsr32 UR_A = align_16x2_load(pA);
-        ulsr32 UR_x = align_32x2_load(pX);
-        load16x2_vr_postI(VR_A,  pA, INC1);
-        load_32x2_vr_a(VR_x, UR_x, pX);
+  // filter index:
+  //
+  for (int i = 0; i < m; i++) {
+    VR_y = vseta_vr(0, 0);
+    vr64 VR_out, VR_bias;
+    pX = x;
+    // ulsr32 UR_A = align_16x2_load(pA);
+    ulsr32 UR_x = align_32x2_load(pX);
+    load16x2_vr_postI(VR_A, pA, INC1);
+    load_32x2_vr_a(VR_x, UR_x, pX);
 
-        for (int j = 0; j < loopLimCol - 1; j++) {
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+    for (int j = 0; j < loopLimCol - 1; j++) {
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
 
-            VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);  // linear
-                                                       //  KN_PRINT_VR(VR_y);
-            load16x2_vr_postI(VR_A, pA, INC1);
-            load_32x2_vr_a(VR_x, UR_x, pX);
-        }
-
-        convert_IEEE_float_to_32F_x2(VR_x);
-        convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-
-        VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
-        if( remainCol) {
-            load16x1_vr_postI(VR_A, pA, INC1, VRQ0);
-            load32x1_vr_postI(VR_x, pX, INC1, VRQ0);
-
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-           // fmacs(VR_y, VRQ0, VR_x, VRQ0, VR_A, VRQ0, 0);
-            fr32 fr_y = fmacs(get_VRL(VR_y), get_VRL(VR_x), get_VRL(VR_A), 0);
-            set_VRL(VR_y, fr_y);
-        }
-
-        load32x1_vr_postI(VR_bias, pBias, INC1, VRQ0);
-        convert_IEEE_float_to_32F_x2(VR_bias);
-        fr32 fr_yout = fadds(get_VRL(VR_y), get_VRH(VR_y), 0);
-        set_VRL(VR_out, fr_yout);
-
-       // fadds(VR_out, VRQ0, VR_out, VRQ0, VR_bias, VRQ0, 0);
-        VR_out = vadds(VR_out, VR_bias, 0);
-        VR_out = vmax(VR_min, VR_out);
-        VR_out = vmin(VR_max, VR_out);
-
-        convert_32F_to_IEEE_float_x2(VR_out);
-        store32x1_vr_postI(VR_out, pDst, INC1, VRQ0);
+      VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);  // linear
+                                             //  KN_PRINT_VR(VR_y);
+      load16x2_vr_postI(VR_A, pA, INC1);
+      load_32x2_vr_a(VR_x, UR_x, pX);
     }
 
-    return 0;
+    convert_IEEE_float_to_32F_x2(VR_x);
+    convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+
+    VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
+    if (remainCol) {
+      load16x1_vr_postI(VR_A, pA, INC1, VRQ0);
+      load32x1_vr_postI(VR_x, pX, INC1, VRQ0);
+
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+      // fmacs(VR_y, VRQ0, VR_x, VRQ0, VR_A, VRQ0, 0);
+      fr32 fr_y = fmacs(get_VRL(VR_y), get_VRL(VR_x), get_VRL(VR_A), 0);
+      set_VRL(VR_y, fr_y);
+    }
+
+    load32x1_vr_postI(VR_bias, pBias, INC1, VRQ0);
+    convert_IEEE_float_to_32F_x2(VR_bias);
+    fr32 fr_yout = fadds(get_VRL(VR_y), get_VRH(VR_y), 0);
+    set_VRL(VR_out, fr_yout);
+
+    // fadds(VR_out, VRQ0, VR_out, VRQ0, VR_bias, VRQ0, 0);
+    VR_out = vadds(VR_out, VR_bias, 0);
+    VR_out = vmax(VR_min, VR_out);
+    VR_out = vmin(VR_max, VR_out);
+
+    convert_32F_to_IEEE_float_x2(VR_out);
+    store32x1_vr_postI(VR_out, pDst, INC1, VRQ0);
+  }
+
+  return 0;
 }
 
 static int DepthWiseConvFloatKernel(float *x, const float *A, const float *bias,
@@ -1001,231 +988,225 @@ static int DepthWiseConvFloatKernel(float *x, const float *A, const float *bias,
   return 0;
 }
 
-static int DepthWiseConvFloatInt8Kernel(float* x, const int8_t* A, const AScalar& scale, const float* bias,
-    float* output, int m, int n,
-    const AScalar& act_min,
-    const AScalar& act_max,  AScalar* scale_ptr = nullptr) {
-    const int8_t* pA = A;
-    const float* pX;
-    const float* pBias = bias;
-    int loopLimCol = (n >> 1);  // block 16
+static int DepthWiseConvFloatInt8Kernel(float *x, const int8_t *A,
+                                        const AScalar &scale, const float *bias,
+                                        float *output, int m, int n,
+                                        const AScalar &act_min,
+                                        const AScalar &act_max,
+                                        AScalar *scale_ptr = nullptr) {
+  const int8_t *pA = A;
+  const float *pX;
+  const float *pBias = bias;
+  int loopLimCol = (n >> 1);  // block 16
 
-    int remainCol = n & 1;
+  int remainCol = n & 1;
 
-    float* pDst = output;
+  float *pDst = output;
 
-    vr64 VR_A;
-    vr64 VR_x;
-    vr64 VR_y;
-    vr64 VR_max, VR_min;
-    vr64 VR_scale;
-    AScalar* pScalePerCh = scale_ptr;
+  vr64 VR_A;
+  vr64 VR_x;
+  vr64 VR_y;
+  vr64 VR_max, VR_min;
+  vr64 VR_scale;
+  AScalar *pScalePerCh = scale_ptr;
 
-    const int wBlkExp = 7;
-    replicate_ar(VR_max, 0x3, act_max.fr);
-    replicate_ar(VR_min, 0x3, act_min.fr);
-    replicate_ar(VR_scale, 0x3, scale.fr);
+  const int wBlkExp = 7;
+  replicate_ar(VR_max, 0x3, act_max.fr);
+  replicate_ar(VR_min, 0x3, act_min.fr);
+  replicate_ar(VR_scale, 0x3, scale.fr);
 
-    // filter index:
-    //
-    for (int i = 0; i < m; i++) {
-        VR_y = vseta_vr(0, 0);
-        vr64 VR_out, VR_bias;
-        pX = x;
-        //ulsr128 UR_A = align_8x4_load(pA);
-        ulsr32 UR_x = align_32x2_load(pX);
-        load8x2_vr_postI(VR_A, pA, INC1);
-        load_32x2_vr_a(VR_x, UR_x, pX);
+  // filter index:
+  //
+  for (int i = 0; i < m; i++) {
+    VR_y = vseta_vr(0, 0);
+    vr64 VR_out, VR_bias;
+    pX = x;
+    // ulsr128 UR_A = align_8x4_load(pA);
+    ulsr32 UR_x = align_32x2_load(pX);
+    load8x2_vr_postI(VR_A, pA, INC1);
+    load_32x2_vr_a(VR_x, UR_x, pX);
 
-        for (int j = 0; j < loopLimCol - 1; j++) {
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_16I_to_32F_x2(VR_A, wBlkExp);
+    for (int j = 0; j < loopLimCol - 1; j++) {
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_16I_to_32F_x2(VR_A, wBlkExp);
 
-            VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);  // linear
-                                                       //  KN_PRINT_VR(VR_y);
-            load8x2_vr_postI(VR_A,  pA, INC1);
-            load_32x2_vr_a(VR_x, UR_x, pX);
-        }
+      VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);  // linear
+                                             //  KN_PRINT_VR(VR_y);
+      load8x2_vr_postI(VR_A, pA, INC1);
+      load_32x2_vr_a(VR_x, UR_x, pX);
+    }
 
+    convert_IEEE_float_to_32F_x2(VR_x);
+    convert_16I_to_32F_x2(VR_A, wBlkExp);
+
+    VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
+    if (remainCol) {
+      load8x1_vr_postI(VR_A, pA, INC1, VRQ0);
+      load32x1_vr_postI(VR_x, pX, INC1, VRQ0);
+
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_16I_to_32F_x2(VR_A, wBlkExp);
+      // fmacs(VR_y, VRQ0, VR_x, VRQ0, VR_A, VRQ0, 0);
+      fr32 fr_y = fmacs(get_VRL(VR_y), get_VRL(VR_x), get_VRL(VR_A), 0);
+      set_VRL(VR_y, fr_y);
+    }
+
+    load32x1_vr_postI(VR_bias, pBias, INC1, VRQ0);
+    convert_IEEE_float_to_32F_x2(VR_bias);
+
+    fr32 fr_yout = fadds(get_VRL(VR_y), get_VRH(VR_y), 0);
+    set_VRL(VR_y, fr_yout);
+    if (scale_ptr) {
+      load32x1_vr_postI(VR_scale, pScalePerCh, INC1, VRQ0);
+    }
+    VR_out = vmuls(VR_y, VR_scale, 0);
+    VR_out = vadds(VR_out, VR_bias, 0);
+
+    VR_out = vmax(VR_min, VR_out);
+    VR_out = vmin(VR_max, VR_out);
+
+    convert_32F_to_IEEE_float_x2(VR_out);
+    store32x1_vr_postI(VR_out, pDst, INC1, VRQ0);
+  }
+
+  return 0;
+}
+static int DepthWiseConvFloatInt8KernelVIP(float *x, const int8_t *A,
+                                           const AScalar &scale,
+                                           const float *bias, float *output,
+                                           int m, int n, const AScalar &act_min,
+                                           const AScalar &act_max,
+                                           AScalar *scale_ptr = nullptr) {
+  const float *pBias = bias;
+  int loopLimRow = (m >> 1);
+
+  float *pDst = output;
+  const int wBlkExp = 7;
+  vr64 VR_A;
+  vr64 VR_x;
+  vr64 VR_y;
+  vr64 VR_max, VR_min;
+  vr64 VR_scale;
+  int nextIn = m >> 1;
+  TF_LITE_ASSERT((m & 1) == 0);
+
+  ulsr32 UR_b = align_32x2_load(pBias);
+  ulsr32 UR_out = align_32x2_store(pDst);
+  AScalar *pScalePerCh = scale_ptr;
+  replicate_ar(VR_max, 0x3, act_max.fr);
+  replicate_ar(VR_min, 0x3, act_min.fr);
+  replicate_ar(VR_scale, 0x3, scale.fr);
+  {
+    for (int i = 0; i < loopLimRow; i++) {
+      const float *pX = x + i * 2;
+      const int8_t *pA = (int8_t *)A + i * 2 * n;
+
+      // ulsr32 UR_A = align_8x4_load(pA);
+      VR_y = vseta_vr(0, 0);
+      vr64 VR_out, VR_bias;
+
+      load8x2_vr_postI(VR_A, pA, INC1);
+
+      load32x2_vr_postR(VR_x, pX, nextIn);
+
+      for (int j = 0; j < n - 1; j++) {
         convert_IEEE_float_to_32F_x2(VR_x);
         convert_16I_to_32F_x2(VR_A, wBlkExp);
-
         VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
-        if( remainCol) 
-        {
-            load8x1_vr_postI(VR_A, pA, INC1, VRQ0);
-            load32x1_vr_postI(VR_x, pX, INC1, VRQ0);
+        // KN_PRINT_VR64(VR_y);
+        load8x2_vr_postI(VR_A, pA, INC1);
+        load32x2_vr_postR(VR_x, pX, nextIn);
+      }
 
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_16I_to_32F_x2(VR_A, wBlkExp);
-            //fmacs(VR_y, VRQ0, VR_x, VRQ0, VR_A, VRQ0, 0);
-            fr32 fr_y = fmacs(get_VRL(VR_y), get_VRL(VR_x), get_VRL(VR_A), 0);
-            set_VRL(VR_y, fr_y);
-        }
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_16I_to_32F_x2(VR_A, wBlkExp);
 
-        load32x1_vr_postI(VR_bias, pBias, INC1, VRQ0);
-        convert_IEEE_float_to_32F_x2(VR_bias);
+      VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
 
-        fr32 fr_yout = fadds(get_VRL(VR_y), get_VRH(VR_y), 0);
-        set_VRL(VR_y, fr_yout);
-        if (scale_ptr)
-        {
-            load32x1_vr_postI(VR_scale, pScalePerCh, INC1, VRQ0);
-        }
-        VR_out = vmuls(VR_y, VR_scale, 0);
-        VR_out = vadds(VR_out, VR_bias, 0);
-  
+      // KN_PRINT_VR64(VR_y);
+      load_32x2_vr_a(VR_bias, UR_b, pBias);
 
-        VR_out = vmax(VR_min, VR_out);
-        VR_out = vmin(VR_max, VR_out);
+      // KN_PRINT_VR64(VR_bias);
+      convert_IEEE_float_to_32F_x2(VR_bias);
 
-        convert_32F_to_IEEE_float_x2(VR_out);
-        store32x1_vr_postI(VR_out, pDst, INC1, VRQ0);
+      if (scale_ptr) {
+        load32x2_vr_postI(VR_scale, pScalePerCh, INC1);
+      }
+      // KN_PRINT_VR64(VR_scale);
+      VR_y = vmuls(VR_scale, VR_y, 0);  // scale up
+      VR_out = vadds(VR_y, VR_bias, 0);
+      // KN_PRINT_VR64(VR_out);
+      VR_out = vmax(VR_min, VR_out);
+      VR_out = vmin(VR_max, VR_out);
+      // KN_PRINT_VR64(VR_out);
+      convert_32F_to_IEEE_float_x2(VR_out);
+      store_32x2_vr_a(VR_out, UR_out, pDst);
     }
-
-    return 0;
-}
-static int DepthWiseConvFloatInt8KernelVIP(float* x, const int8_t* A, const AScalar& scale,
-    const float* bias, float* output, int m,
-    int n, const AScalar& act_min,
-    const AScalar& act_max, AScalar* scale_ptr = nullptr) {
-
-    const float* pBias = bias;
-    int loopLimRow = (m >> 1);
-
-
-    float* pDst = output;
-    const int wBlkExp = 7;
-    vr64 VR_A;
-    vr64 VR_x;
-    vr64 VR_y;
-    vr64 VR_max, VR_min;
-    vr64 VR_scale;
-    int nextIn = m >> 1;
-    TF_LITE_ASSERT((m & 1) == 0);
-
-    ulsr32 UR_b = align_32x2_load(pBias);
-    ulsr32 UR_out = align_32x2_store(pDst);
-    AScalar* pScalePerCh = scale_ptr;
-    replicate_ar(VR_max, 0x3, act_max.fr);
-    replicate_ar(VR_min, 0x3, act_min.fr);
-    replicate_ar(VR_scale, 0x3, scale.fr);
-    {
-        for (int i = 0; i < loopLimRow; i++) 
-        {
-            const float* pX = x + i * 2;
-            const int8_t* pA = (int8_t*)A + i * 2 * n;
-
-            //ulsr32 UR_A = align_8x4_load(pA);
-            VR_y = vseta_vr(0, 0);
-            vr64 VR_out, VR_bias;
-
-            load8x2_vr_postI(VR_A, pA, INC1);
-
-            load32x2_vr_postR(VR_x, pX, nextIn);
-
-            for (int j = 0; j < n - 1; j++) {
-                convert_IEEE_float_to_32F_x2(VR_x);
-                convert_16I_to_32F_x2(VR_A, wBlkExp);
-                VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
-               // KN_PRINT_VR64(VR_y);
-                load8x2_vr_postI(VR_A, pA, INC1);
-                load32x2_vr_postR(VR_x, pX, nextIn);
-            }
-
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_16I_to_32F_x2(VR_A, wBlkExp);
-
-            VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
-
-            //KN_PRINT_VR64(VR_y);
-            load_32x2_vr_a(VR_bias, UR_b, pBias);
-
-            //KN_PRINT_VR64(VR_bias);
-            convert_IEEE_float_to_32F_x2(VR_bias);
-
-            if (scale_ptr)
-            {
-                load32x2_vr_postI(VR_scale, pScalePerCh, INC1);
-            }
-            //KN_PRINT_VR64(VR_scale);
-            VR_y = vmuls(VR_scale, VR_y, 0); //scale up
-            VR_out = vadds(VR_y, VR_bias, 0);
-            //KN_PRINT_VR64(VR_out);
-            VR_out = vmax(VR_min, VR_out);
-            VR_out = vmin(VR_max, VR_out);
-            //KN_PRINT_VR64(VR_out);
-            convert_32F_to_IEEE_float_x2(VR_out);
-            store_32x2_vr_a(VR_out, UR_out, pDst);
-        }
-    }
-    flush_32x2(UR_out, pDst);
-    return 0;
+  }
+  flush_32x2(UR_out, pDst);
+  return 0;
 }
 
-static int DepthWiseConvFloat16KernelVIP(float* x, const TfLiteFloat16* A,
-    const float* bias, float* output, int m,
-    int n, const AScalar& act_min,
-    const AScalar& act_max) {
+static int DepthWiseConvFloat16KernelVIP(float *x, const TfLiteFloat16 *A,
+                                         const float *bias, float *output,
+                                         int m, int n, const AScalar &act_min,
+                                         const AScalar &act_max) {
+  const float *pBias = bias;
+  int loopLimRow = (m >> 1);
 
-    const float* pBias = bias;
-    int loopLimRow = (m >> 1);
+  float *pDst = output;
+  vr64 VR_A;
+  vr64 VR_x;
+  vr64 VR_y;
+  vr64 VR_max, VR_min;
+  int nextIn = m >> 1;
+  TF_LITE_ASSERT((m & 1) == 0);
 
+  ulsr32 UR_b = align_32x2_load(pBias);
+  ulsr32 UR_out = align_32x2_store(pDst);
 
-    float* pDst = output;
-    vr64 VR_A;
-    vr64 VR_x;
-    vr64 VR_y;
-    vr64 VR_max, VR_min;
-    int nextIn = m >> 1;
-    TF_LITE_ASSERT((m & 1) == 0);
+  replicate_ar(VR_max, 0x3, act_max.fr);
+  replicate_ar(VR_min, 0x3, act_min.fr);
+  {
+    for (int i = 0; i < loopLimRow; i++) {
+      const float *pX = x + i * 2;
+      const TfLiteFloat16 *pA = (TfLiteFloat16 *)A + i * 2 * n;
 
-    ulsr32 UR_b = align_32x2_load(pBias);
-    ulsr32 UR_out = align_32x2_store(pDst);
+      // ulsr128 UR_A = align_16x4_load(pA);
+      VR_y = vseta_vr(0, 0);
+      vr64 VR_out, VR_bias;
 
-    replicate_ar(VR_max, 0x3, act_max.fr);
-    replicate_ar(VR_min, 0x3, act_min.fr);
-    {
-        for (int i = 0; i < loopLimRow; i++) {
-            const float* pX = x + i * 2;
-            const TfLiteFloat16* pA = (TfLiteFloat16*)A + i * 2 * n;
+      load16x2_vr_postI(VR_A, pA, INC1);
 
-            //ulsr128 UR_A = align_16x4_load(pA);
-            VR_y = vseta_vr(0, 0);
-            vr64 VR_out, VR_bias;
+      load32x2_vr_postR(VR_x, pX, nextIn);
 
-            load16x2_vr_postI(VR_A, pA, INC1);
+      for (int j = 0; j < n - 1; j++) {
+        convert_IEEE_float_to_32F_x2(VR_x);
+        convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+        VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
+        load16x2_vr_postI(VR_A, pA, INC1);
+        load32x2_vr_postR(VR_x, pX, nextIn);
+      }
 
-            load32x2_vr_postR(VR_x, pX, nextIn);
+      convert_IEEE_float_to_32F_x2(VR_x);
+      convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
 
-            for (int j = 0; j < n - 1; j++) {
-                convert_IEEE_float_to_32F_x2(VR_x);
-                convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
-                VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
-                load16x2_vr_postI(VR_A, pA, INC1);
-                load32x2_vr_postR(VR_x, pX, nextIn);
-            }
+      VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
 
-            convert_IEEE_float_to_32F_x2(VR_x);
-            convert_16F_to_32F_x2(VR_A, TF_FLT16_SIGN, TF_FLT16_EXP, TF_FLT16_BIAS);
+      load_32x2_vr_a(VR_bias, UR_b, pBias);
+      convert_IEEE_float_to_32F_x2(VR_bias);
 
-            VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
+      VR_out = vadds(VR_y, VR_bias, 0);
 
+      VR_out = vmax(VR_min, VR_out);
+      VR_out = vmin(VR_max, VR_out);
 
-            load_32x2_vr_a(VR_bias, UR_b, pBias);
-            convert_IEEE_float_to_32F_x2(VR_bias);
-
-            VR_out = vadds(VR_y, VR_bias, 0);
-
-            VR_out = vmax(VR_min, VR_out);
-            VR_out = vmin(VR_max, VR_out);
-
-            convert_32F_to_IEEE_float_x2(VR_out);
-            store_32x2_vr_a(VR_out, UR_out, pDst);
-        }
+      convert_32F_to_IEEE_float_x2(VR_out);
+      store_32x2_vr_a(VR_out, UR_out, pDst);
     }
-    flush_32x2(UR_out, pDst);
-    return 0;
+  }
+  flush_32x2(UR_out, pDst);
+  return 0;
 }
 static int DepthWiseConvFloatKernelVIP(float *x, const float *A,
                                        const float *bias, float *output, int m,
@@ -1272,7 +1253,7 @@ static int DepthWiseConvFloatKernelVIP(float *x, const float *A,
       for (int j = 0; j < n - 1; j++) {
         convert_IEEE_float_to_32F_x2(VR_x);
         convert_IEEE_float_to_32F_x2(VR_A);
-        VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);  
+        VR_y = vmacs(VR_y, VR_x, VR_A, 0, 0);
         load_32x2_vr_a(VR_A, UR_A, pA);  //, nextIn);
         load32x2_vr_postR(VR_x, pX, nextIn);
       }
@@ -1424,57 +1405,54 @@ int DepthWiseConvApplyOffsetPerCh(
 
   replicate_ar(VR_outOffset, 0x3, outOffsetFr32.fr);
   ulsr32 UR_outMultPerCh = align_32x2_load(pOutMultiplerFr32);
- 
 
   uint32_t groupOfChannel = (uint32_t)output_depth >> 1;
-  if (groupOfChannel > 0)
-  {
-	  load_32x2_vr_a(VR_outMultPerCh, UR_outMultPerCh, pOutMultiplerFr32);
-	  load_32x2_vr_a(VR_b0, UR_b, pB);
-	  load_32x2_vr_a(VR_y, UR_Dst, pDst);
-	  convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
-	  convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
-	  for (uint32_t group = 0; group < groupOfChannel-1; group++) {
+  if (groupOfChannel > 0) {
+    load_32x2_vr_a(VR_outMultPerCh, UR_outMultPerCh, pOutMultiplerFr32);
+    load_32x2_vr_a(VR_b0, UR_b, pB);
+    load_32x2_vr_a(VR_y, UR_Dst, pDst);
+    convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+    convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+    for (uint32_t group = 0; group < groupOfChannel - 1; group++) {
+      VR_out = vadds(VR_y, VR_b0, 0x0);
+      VR_out = vmuls(VR_out, VR_outMultPerCh, 0);
+      VR_out = vadds(VR_out, VR_outOffset, 0);
+      // VR_out = vexp_adji(VR_out, 8);
 
-		  VR_out = vadds(VR_y, VR_b0, 0x0);
-		  VR_out = vmuls(VR_out, VR_outMultPerCh, 0);
-		  VR_out = vadds(VR_out, VR_outOffset, 0);
-		  // VR_out = vexp_adji(VR_out, 8);
+      load_32x2_vr_a(VR_b0, UR_b, pB);
+      load_32x2_vr_a(VR_y, UR_Dst, pDst);
 
-		  load_32x2_vr_a(VR_b0, UR_b, pB);
-		  load_32x2_vr_a(VR_y, UR_Dst, pDst);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
+      load_32x2_vr_a(VR_outMultPerCh, UR_outMultPerCh, pOutMultiplerFr32);
+      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
+      rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
+      // accExt
 
-		  convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
-		  convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
-		  load_32x2_vr_a(VR_outMultPerCh, UR_outMultPerCh, pOutMultiplerFr32);
-		  convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
-		  rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
-		  // accExt
+      VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
+      store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+      store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
+    }
 
-		  VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
-		  store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
-		  store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
-	  }
+    VR_out = vadds(VR_y, VR_b0, 0x0);
+    VR_out = vmuls(VR_out, VR_outMultPerCh, 0);
+    VR_out = vadds(VR_out, VR_outOffset, 0);
+    // VR_out = vexp_adji(VR_out, 8);
 
-	  VR_out = vadds(VR_y, VR_b0, 0x0);
-	  VR_out = vmuls(VR_out, VR_outMultPerCh, 0);
-	  VR_out = vadds(VR_out, VR_outOffset, 0);
-	  // VR_out = vexp_adji(VR_out, 8);
+    convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
+    rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
+    // accExt
 
-	  convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
-	  rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
-	  // accExt
-
-	  VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
-	  store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
-	  store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
+    VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
+    store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+    store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
   }
 
   if (output_depth & 1) {
     // load_32x4_vr_a(VR_y, UR_Dst, pDst);
-	  load32x1_vr_postI(VR_y, pDst, INC1, VRQ0);
-	  load32x1_vr_postI(VR_b0, pB, INC1, VRQ0);
-	  load32x1_vr_postI(VR_outMultPerCh, pOutMultiplerFr32, INC1, VRQ0);
+    load32x1_vr_postI(VR_y, pDst, INC1, VRQ0);
+    load32x1_vr_postI(VR_b0, pB, INC1, VRQ0);
+    load32x1_vr_postI(VR_outMultPerCh, pOutMultiplerFr32, INC1, VRQ0);
     convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
 
     VR_out = vadds(VR_y, VR_b0, 0x0);
@@ -1486,7 +1464,6 @@ int DepthWiseConvApplyOffsetPerCh(
 
     VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
     store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
-
   }
   return 0;
 }
@@ -1504,7 +1481,7 @@ int DepthWiseConvSparseInt8PerCh(
   int filter_dim_align2 = (((filter_dim + 1) >> 1)
                            << 1);  // to align next block input A is 16 bytes,
                                    // unaligned load can ignore alignment
-  for (int g = 0; g<m>> 2; g++) {
+  for (int g = 0; g<m> > 2; g++) {
     // output 8 of n input
     int32_t *scratchPerGroup = pScratch + 4 * g;
     int8_t *pBuffer = (int8_t *)x + (g)*4;  // +f*nPerFilter*channel;
@@ -1543,16 +1520,14 @@ int DepthWiseConvQuantizedInt8PerChInputOffset(
   // atbool signSpecInput = atbool(3);
   int32_t *inputOffsetW = inputOffsetWithW;
   // FIX for input size pointer is not align 4 bytes  and  loopLimCol != 0
-// prevent using load_32x4_vr_a unalign,
-// nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration 
-  if (((unsigned int)x & 3) != 0 && loopLimCol != 0)
-  {
-      loopLimCol = 0;
+  // prevent using load_32x4_vr_a unalign,
+  // nBlockAlign2 loopLimCol = 0, using load16x2 loop to run iteration
+  if (((unsigned int)x & 3) != 0 && loopLimCol != 0) {
+    loopLimCol = 0;
   }
 
-  if (((unsigned int)x & 1) != 0)
-  {
-      return -1;
+  if (((unsigned int)x & 1) != 0) {
+    return -1;
   }
 
   for (int i = 0; i < loopLimRow; i++) {
@@ -1604,186 +1579,186 @@ int DepthWiseConvQuantizedInt8PerChInputOffset(
   return 0;
 }
 
-
 #endif
 
 #if defined(HEMILITE_DW_CONV_OPT)
 
-void DepthwiseConvFloatInt8VIP(TfLiteDepthwiseConvParams* params,
-    const DSConvOpData* data, const float* input_data,
-    const int8_t* filter_data, const float* bias_data,
-    float* output_data,int w_mapped_type = 0)
+void DepthwiseConvFloatInt8VIP(TfLiteDepthwiseConvParams *params,
+                               const DSConvOpData *data,
+                               const float *input_data,
+                               const int8_t *filter_data,
+                               const float *bias_data, float *output_data,
+                               int w_mapped_type = 0)
 
 {
-    const ds_conv2d_layer_t& ds_conv2d = data->ds_conv2d;
+  const ds_conv2d_layer_t &ds_conv2d = data->ds_conv2d;
 
-    int inFCM = 0;
-    int inFCN = 0;
+  int inFCM = 0;
+  int inFCN = 0;
 
-    float* pBuffer = (float*)ds_conv2d.pIm2Col;
-    //  float *pOutput = (float *)ds_conv2d.pOutput;
-    float* outBuf = output_data;
-    int32_t outBufIdx = 0;
-    int32_t dim_kernel_x = ds_conv2d.ker_x;
-    int32_t dim_im_in_x = ds_conv2d.in_x;
-    int32_t ch_im_in = ds_conv2d.in_ch;
-    AScalar act_min, act_max;
-    // const int dbg_idx = -10;//309/inFCM;
-    uint16_t dilation_y = ds_conv2d.dilation_y;
-    uint16_t dilation_x = ds_conv2d.dilation_x;
-    // float output_activation_min, output_activation_max;
-    CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
-    
-    AScalar filter_scale = data->filter_scale;
+  float *pBuffer = (float *)ds_conv2d.pIm2Col;
+  //  float *pOutput = (float *)ds_conv2d.pOutput;
+  float *outBuf = output_data;
+  int32_t outBufIdx = 0;
+  int32_t dim_kernel_x = ds_conv2d.ker_x;
+  int32_t dim_im_in_x = ds_conv2d.in_x;
+  int32_t ch_im_in = ds_conv2d.in_ch;
+  AScalar act_min, act_max;
+  // const int dbg_idx = -10;//309/inFCM;
+  uint16_t dilation_y = ds_conv2d.dilation_y;
+  uint16_t dilation_x = ds_conv2d.dilation_x;
+  // float output_activation_min, output_activation_max;
+  CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
 
-    KN_PRINTAFLT(act_max);
-    KN_PRINTAFLT(act_min);
-    KN_PRINTD(w_mapped_type);
+  AScalar filter_scale = data->filter_scale;
+
+  KN_PRINTAFLT(act_max);
+  KN_PRINTAFLT(act_min);
+  KN_PRINTD(w_mapped_type);
+  {
+    int BlkSize = ds_conv2d.ker_x * ds_conv2d.ker_y *
+                  ds_conv2d.in_ch;           // im2col buffer sizel
+    if (w_mapped_type == DS_CONV_OPT_TYPE2)  // VIP
     {
-        int BlkSize = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch; //im2col buffer sizel
-        if (w_mapped_type == DS_CONV_OPT_TYPE2) // VIP
-        {
-            inFCM = ds_conv2d.in_ch;  //
-            inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
+      inFCM = ds_conv2d.in_ch;  //
+      inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
 
-        }
-        else //if(w_mapped_type == DS_CONV_OPT_TYPE1) 
-        {
-            inFCM = ds_conv2d.in_ch * ds_conv2d.ch_mult;
-            inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
-           
-        }
-        KN_PRINTD(inFCM);
-        KN_PRINTD(inFCN);
-        AScalar* scale_per_channel = (AScalar*)data->ConvOp.per_channel_output_multiplier;
-        if (scale_per_channel) {
-          KN_PRINT_AFLOAT(scale_per_channel, inFCM);
-        }
-        for (int i_out_y = 0; i_out_y < ds_conv2d.out_y; ++i_out_y) {
-            for (int i_out_x = 0; i_out_x < ds_conv2d.out_x; ++i_out_x) {
-                int offset_im_src, offset_im_dst;
-                int len_cpy_x, len_cpy_y;
-
-                im2col_idx im2col_tab_2;
-                int padding =
-                    tflite::ConvIm2ColIndex(ds_conv2d, i_out_x, i_out_y, &im2col_tab_2);
-                len_cpy_y = im2col_tab_2.cpy_len_y;
-                len_cpy_x = im2col_tab_2.cpy_len_x;
-                offset_im_dst = im2col_tab_2.im_dst_offset;
-                offset_im_src = im2col_tab_2.im_src_offset;
-
-                if (!padding) {
-                    tflite::block_fill_words((int32_t*)pBuffer, 0, BlkSize);
-                }
-
-                tflite::im2col_padding_align4<float>(
-                    pBuffer + offset_im_dst, (const float*)input_data + offset_im_src,
-                    dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in, dilation_y, dilation_x);
-                if (w_mapped_type == DS_CONV_OPT_TYPE2) // VIP
-                {
-                  KN_PRINT_FLOAT(pBuffer, inFCN);
-                    DepthWiseConvFloatInt8KernelVIP(
-                        (float*)pBuffer, (const int8_t*)filter_data, filter_scale,
-                        (const float*)bias_data, (float*)&outBuf[outBufIdx * inFCM],
-                        inFCM, inFCN, act_min, act_max, scale_per_channel);
-                  KN_PRINT_FLOAT(&outBuf[outBufIdx * inFCM], inFCM);
-                }
-                else {
-                    DepthWiseConvFloatInt8Kernel(
-                        (float*)pBuffer, (const int8_t*)filter_data, filter_scale,
-                        (const float*)bias_data, (float*)&outBuf[outBufIdx * inFCM],
-                        inFCM, inFCN, act_min, act_max, scale_per_channel);
-                }
-                outBufIdx += 1;
-            }
-        }
+    } else  // if(w_mapped_type == DS_CONV_OPT_TYPE1)
+    {
+      inFCM = ds_conv2d.in_ch * ds_conv2d.ch_mult;
+      inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
     }
+    KN_PRINTD(inFCM);
+    KN_PRINTD(inFCN);
+    AScalar *scale_per_channel =
+        (AScalar *)data->ConvOp.per_channel_output_multiplier;
+    if (scale_per_channel) {
+      KN_PRINT_AFLOAT(scale_per_channel, inFCM);
+    }
+    for (int i_out_y = 0; i_out_y < ds_conv2d.out_y; ++i_out_y) {
+      for (int i_out_x = 0; i_out_x < ds_conv2d.out_x; ++i_out_x) {
+        int offset_im_src, offset_im_dst;
+        int len_cpy_x, len_cpy_y;
+
+        im2col_idx im2col_tab_2;
+        int padding =
+            tflite::ConvIm2ColIndex(ds_conv2d, i_out_x, i_out_y, &im2col_tab_2);
+        len_cpy_y = im2col_tab_2.cpy_len_y;
+        len_cpy_x = im2col_tab_2.cpy_len_x;
+        offset_im_dst = im2col_tab_2.im_dst_offset;
+        offset_im_src = im2col_tab_2.im_src_offset;
+
+        if (!padding) {
+          tflite::block_fill_words((int32_t *)pBuffer, 0, BlkSize);
+        }
+
+        tflite::im2col_padding_align4<float>(
+            pBuffer + offset_im_dst, (const float *)input_data + offset_im_src,
+            dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+            dilation_y, dilation_x);
+        if (w_mapped_type == DS_CONV_OPT_TYPE2)  // VIP
+        {
+          KN_PRINT_FLOAT(pBuffer, inFCN);
+          DepthWiseConvFloatInt8KernelVIP(
+              (float *)pBuffer, (const int8_t *)filter_data, filter_scale,
+              (const float *)bias_data, (float *)&outBuf[outBufIdx * inFCM],
+              inFCM, inFCN, act_min, act_max, scale_per_channel);
+          KN_PRINT_FLOAT(&outBuf[outBufIdx * inFCM], inFCM);
+        } else {
+          DepthWiseConvFloatInt8Kernel(
+              (float *)pBuffer, (const int8_t *)filter_data, filter_scale,
+              (const float *)bias_data, (float *)&outBuf[outBufIdx * inFCM],
+              inFCM, inFCN, act_min, act_max, scale_per_channel);
+        }
+        outBufIdx += 1;
+      }
+    }
+  }
 }
 
-void DepthwiseConvFloat16VIP(TfLiteDepthwiseConvParams* params,
-    const DSConvOpData* data, const float* input_data,
-    const TfLiteFloat16* filter_data, const float* bias_data,
-    float* output_data,int w_mapped_type = 0)
+void DepthwiseConvFloat16VIP(TfLiteDepthwiseConvParams *params,
+                             const DSConvOpData *data, const float *input_data,
+                             const TfLiteFloat16 *filter_data,
+                             const float *bias_data, float *output_data,
+                             int w_mapped_type = 0)
 
 {
-    const ds_conv2d_layer_t& ds_conv2d = data->ds_conv2d;
+  const ds_conv2d_layer_t &ds_conv2d = data->ds_conv2d;
 
-    int inFCM = 0;
-    int inFCN = 0;
+  int inFCM = 0;
+  int inFCN = 0;
 
-    float* pBuffer = (float*)ds_conv2d.pIm2Col;
-    //  float *pOutput = (float *)ds_conv2d.pOutput;
-    float* outBuf = output_data;
-    int32_t outBufIdx = 0;
-    int32_t dim_kernel_x = ds_conv2d.ker_x;
-    int32_t dim_im_in_x = ds_conv2d.in_x;
-    int32_t ch_im_in = ds_conv2d.in_ch;
-    AScalar act_min, act_max;
-    // const int dbg_idx = -10;//309/inFCM;
-    uint16_t dilation_y = ds_conv2d.dilation_y;
-    uint16_t dilation_x = ds_conv2d.dilation_x;
-    // float output_activation_min, output_activation_max;
-    CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
+  float *pBuffer = (float *)ds_conv2d.pIm2Col;
+  //  float *pOutput = (float *)ds_conv2d.pOutput;
+  float *outBuf = output_data;
+  int32_t outBufIdx = 0;
+  int32_t dim_kernel_x = ds_conv2d.ker_x;
+  int32_t dim_im_in_x = ds_conv2d.in_x;
+  int32_t ch_im_in = ds_conv2d.in_ch;
+  AScalar act_min, act_max;
+  // const int dbg_idx = -10;//309/inFCM;
+  uint16_t dilation_y = ds_conv2d.dilation_y;
+  uint16_t dilation_x = ds_conv2d.dilation_x;
+  // float output_activation_min, output_activation_max;
+  CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
 
-    AScalar filter_scale = data->filter_scale;
+  AScalar filter_scale = data->filter_scale;
 
+  {
+    int BlkSize = ds_conv2d.ker_x * ds_conv2d.ker_y *
+                  ds_conv2d.in_ch;           // im2col buffer sizel
+    if (w_mapped_type == DS_CONV_OPT_TYPE2)  // VIP
     {
-        int BlkSize = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch; //im2col buffer sizel
-        if (w_mapped_type == DS_CONV_OPT_TYPE2) // VIP
-        {
-            inFCM = ds_conv2d.in_ch;  //
-            inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
+      inFCM = ds_conv2d.in_ch;  //
+      inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
 
-        }
-        else //if(w_mapped_type == DS_CONV_OPT_TYPE1) 
-        {
-            inFCM = ds_conv2d.in_ch * ds_conv2d.ch_mult;
-            inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
-
-        }
-        for (int i_out_y = 0; i_out_y < ds_conv2d.out_y; ++i_out_y) {
-            for (int i_out_x = 0; i_out_x < ds_conv2d.out_x; ++i_out_x) {
-                int offset_im_src, offset_im_dst;
-                int len_cpy_x, len_cpy_y;
-
-                im2col_idx im2col_tab_2;
-                int padding =
-                    tflite::ConvIm2ColIndex(ds_conv2d, i_out_x, i_out_y, &im2col_tab_2);
-                len_cpy_y = im2col_tab_2.cpy_len_y;
-                len_cpy_x = im2col_tab_2.cpy_len_x;
-                offset_im_dst = im2col_tab_2.im_dst_offset;
-                offset_im_src = im2col_tab_2.im_src_offset;
-
-                if (!padding) {
-                    tflite::block_fill_words((int32_t*)pBuffer, 0, BlkSize);
-                }
-
-                tflite::im2col_padding_align4<float>(
-                    pBuffer + offset_im_dst, (const float*)input_data + offset_im_src,
-                    dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in, dilation_y, dilation_x);
-
-                if (w_mapped_type == DS_CONV_OPT_TYPE2)
-                {
-                    DepthWiseConvFloat16KernelVIP(
-                        (float*)pBuffer, (const TfLiteFloat16*)filter_data,
-                        (const float*)bias_data, (float*)&outBuf[outBufIdx * inFCM],
-                        inFCM, inFCN, act_min, act_max);
-                }
-                else {
-                    DepthWiseConvFloat16Kernel(
-                        (float*)pBuffer, (const TfLiteFloat16*)filter_data,
-                        (const float*)bias_data, (float*)&outBuf[outBufIdx * inFCM],
-                        inFCM, inFCN, act_min, act_max);
-                }
-                outBufIdx += 1;
-            }
-        }
+    } else  // if(w_mapped_type == DS_CONV_OPT_TYPE1)
+    {
+      inFCM = ds_conv2d.in_ch * ds_conv2d.ch_mult;
+      inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
     }
+    for (int i_out_y = 0; i_out_y < ds_conv2d.out_y; ++i_out_y) {
+      for (int i_out_x = 0; i_out_x < ds_conv2d.out_x; ++i_out_x) {
+        int offset_im_src, offset_im_dst;
+        int len_cpy_x, len_cpy_y;
+
+        im2col_idx im2col_tab_2;
+        int padding =
+            tflite::ConvIm2ColIndex(ds_conv2d, i_out_x, i_out_y, &im2col_tab_2);
+        len_cpy_y = im2col_tab_2.cpy_len_y;
+        len_cpy_x = im2col_tab_2.cpy_len_x;
+        offset_im_dst = im2col_tab_2.im_dst_offset;
+        offset_im_src = im2col_tab_2.im_src_offset;
+
+        if (!padding) {
+          tflite::block_fill_words((int32_t *)pBuffer, 0, BlkSize);
+        }
+
+        tflite::im2col_padding_align4<float>(
+            pBuffer + offset_im_dst, (const float *)input_data + offset_im_src,
+            dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+            dilation_y, dilation_x);
+
+        if (w_mapped_type == DS_CONV_OPT_TYPE2) {
+          DepthWiseConvFloat16KernelVIP(
+              (float *)pBuffer, (const TfLiteFloat16 *)filter_data,
+              (const float *)bias_data, (float *)&outBuf[outBufIdx * inFCM],
+              inFCM, inFCN, act_min, act_max);
+        } else {
+          DepthWiseConvFloat16Kernel(
+              (float *)pBuffer, (const TfLiteFloat16 *)filter_data,
+              (const float *)bias_data, (float *)&outBuf[outBufIdx * inFCM],
+              inFCM, inFCN, act_min, act_max);
+        }
+        outBufIdx += 1;
+      }
+    }
+  }
 }
 void DepthwiseConvFloatVIP(TfLiteDepthwiseConvParams *params,
                            const DSConvOpData *data, const float *input_data,
                            const float *filter_data, const float *bias_data,
-                           float *output_data,int w_mapped_type = 0)
+                           float *output_data, int w_mapped_type = 0)
 
 {
   const ds_conv2d_layer_t &ds_conv2d = data->ds_conv2d;
@@ -1811,20 +1786,18 @@ void DepthwiseConvFloatVIP(TfLiteDepthwiseConvParams *params,
   CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
 
   {
+    int BlkSize = ds_conv2d.ker_x * ds_conv2d.ker_y *
+                  ds_conv2d.in_ch;           // im2col buffer sizel
+    if (w_mapped_type == DS_CONV_OPT_TYPE2)  // VIP
+    {
+      inFCM = ds_conv2d.in_ch;  //
+      inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
 
-      int BlkSize = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch; //im2col buffer sizel
-      if (w_mapped_type == DS_CONV_OPT_TYPE2) // VIP
-      {
-          inFCM = ds_conv2d.in_ch;  //
-          inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;
-
-      }
-      else //if(w_mapped_type == DS_CONV_OPT_TYPE1) 
-      {
-          inFCM = ds_conv2d.in_ch * ds_conv2d.ch_mult;
-          inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
-
-      }
+    } else  // if(w_mapped_type == DS_CONV_OPT_TYPE1)
+    {
+      inFCM = ds_conv2d.in_ch * ds_conv2d.ch_mult;
+      inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y * ds_conv2d.in_ch;
+    }
 
     for (int i_out_y = 0; i_out_y < ds_conv2d.out_y; ++i_out_y) {
       for (int i_out_x = 0; i_out_x < ds_conv2d.out_x; ++i_out_x) {
@@ -1845,19 +1818,18 @@ void DepthwiseConvFloatVIP(TfLiteDepthwiseConvParams *params,
 
         tflite::im2col_padding_align4<float>(
             pBuffer + offset_im_dst, (const float *)input_data + offset_im_src,
-            dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in, dilation_y, dilation_x);
-        if (w_mapped_type == DS_CONV_OPT_TYPE2)
-        {
-            DepthWiseConvFloatKernelVIP(
-                (float*)pBuffer, (const float*)filter_data,
-                (const float*)bias_data, (float*)&outBuf[outBufIdx * inFCM],
-                inFCM, inFCN, act_min, act_max);
-        }
-        else {
-            DepthWiseConvFloatKernel(
-                (float*)pBuffer, (const float*)filter_data,
-                (const float*)bias_data, (float*)&outBuf[outBufIdx * inFCM],
-                inFCM, inFCN, act_min, act_max);
+            dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+            dilation_y, dilation_x);
+        if (w_mapped_type == DS_CONV_OPT_TYPE2) {
+          DepthWiseConvFloatKernelVIP(
+              (float *)pBuffer, (const float *)filter_data,
+              (const float *)bias_data, (float *)&outBuf[outBufIdx * inFCM],
+              inFCM, inFCN, act_min, act_max);
+        } else {
+          DepthWiseConvFloatKernel((float *)pBuffer, (const float *)filter_data,
+                                   (const float *)bias_data,
+                                   (float *)&outBuf[outBufIdx * inFCM], inFCM,
+                                   inFCN, act_min, act_max);
         }
         outBufIdx += 1;
       }
@@ -1951,7 +1923,6 @@ static void DepthwiseConvPerChannelPadding(DSConvOpData *data_ex,
   // DSConvOpData *data_ex = static_cast<DSConvOpData *>(node->user_data);
   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
 
-
   constexpr int group = 4;
   constexpr int shift = 2;
 
@@ -2008,7 +1979,8 @@ static void DepthwiseConvPerChannelPadding(DSConvOpData *data_ex,
         offset_im_dst = im2col_tab_2.im_dst_offset;
         offset_im_src = im2col_tab_2.im_src_offset;
         if (!padding) {
-          tflite::block_fill_words((int32_t *)pBuffer, input_offset_neg, inFCN16Size * 4);
+          tflite::block_fill_words((int32_t *)pBuffer, input_offset_neg,
+                                   inFCN16Size * 4);
         }
 
         tflite::im2col_padding_offset(
@@ -2016,17 +1988,16 @@ static void DepthwiseConvPerChannelPadding(DSConvOpData *data_ex,
             dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
             input_offset, dilation_y, dilation_x);
 
-		int status = DepthWiseConvQuantizedInt8PerChInputOffset(
+        int status = DepthWiseConvQuantizedInt8PerChInputOffset(
             (int32_t *)pBuffer, (const int32_t *)filter_data,
             (const AScalar *)bias_data, &outBuf[outBufIdx * inFCM], inFCM,
-            inFCN, outputOffset, inputOffsetWithW, outputMultiplerPerCh, pOutput, sign);
+            inFCN, outputOffset, inputOffsetWithW, outputMultiplerPerCh,
+            pOutput, sign);
         TFLITE_DCHECK(status == 0);
         outBufIdx += 1;
       }
     }
-  } 
-  else if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE) {
-
+  } else if (data_ex->opt_constraint == DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE) {
     int ch_align = (((ds_conv2d.out_ch + group - 1) >> shift) << shift);
 
     int in_ch_align = (ds_conv2d.in_ch & (group - 1)) == 0;
@@ -2115,7 +2086,8 @@ TfLiteStatus DepthwiseConvPerChOpt(TfLiteContext *context, TfLiteNode *node,
         (int32_t *)context->GetScratchBuffer(context, data_ex->buffer_idx);
 
     if (((uint32_t)p_aligned_scratch & 0xf) != 0)
-        p_aligned_scratch = (int32_t*)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
+      p_aligned_scratch =
+          (int32_t *)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
   }
   data_ex->ds_conv2d.pIm2Col = p_aligned_scratch;
   data_ex->ds_conv2d.pOutput =
@@ -2257,81 +2229,74 @@ static void EvalFloat(TfLiteContext *context, TfLiteNode *node,
           (int32_t *)context->GetScratchBuffer(context, data_ex->buffer_idx);
 
       // p force align up 16 bytes
-      if(((uint32_t)p_aligned_scratch & 0xf)!= 0)
-          p_aligned_scratch = (int32_t *)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
+      if (((uint32_t)p_aligned_scratch & 0xf) != 0)
+        p_aligned_scratch =
+            (int32_t *)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
     }
     data_ex->ds_conv2d.pIm2Col = p_aligned_scratch;
     data_ex->ds_conv2d.pOutput = nullptr;
 
-    //KN_PRINTX(data_ex->ds_conv2d.pIm2Col);
+    // KN_PRINTX(data_ex->ds_conv2d.pIm2Col);
   }
 
- KN_PRINTX(data_ex->opt_constraint_float);
+  KN_PRINTX(data_ex->opt_constraint_float);
   KN_PRINTD(filter->type);
-  if (data_ex->opt_constraint_float > 0)
-  {
-      switch (filter->type)
-      {
+  if (data_ex->opt_constraint_float > 0) {
+    switch (filter->type) {
       case kTfLiteFloat32:
-          /*if (data_ex->opt_constraint_float == DS_CONV_OPT_TYPE1) {
-              DepthwiseConvFloat(params, data_ex,
-                  tflite::micro::GetTensorData<float>(input),
-                  // tflite::micro::GetTensorData<float>(filter),
-                  (const float*)data_ex->mapped_filter,
-                  tflite::micro::GetTensorData<float>(bias),
-                  tflite::micro::GetTensorData<float>(output));
-          }
-          else if (data_ex->opt_constraint_float == DS_CONV_OPT_TYPE2) 
-          */{
-              DepthwiseConvFloatVIP(params, data_ex,
-                  tflite::micro::GetTensorData<float>(input),
-                  // tflite::micro::GetTensorData<float>(filter),
-                  (const float*)data_ex->mapped_filter,
-                  tflite::micro::GetTensorData<float>(bias),
-                  tflite::micro::GetTensorData<float>(output),
-                  data_ex->opt_constraint_float & DS_CONV_OPT_MASK);
-
-          }
-          break;
+        /*if (data_ex->opt_constraint_float == DS_CONV_OPT_TYPE1) {
+            DepthwiseConvFloat(params, data_ex,
+                tflite::micro::GetTensorData<float>(input),
+                // tflite::micro::GetTensorData<float>(filter),
+                (const float*)data_ex->mapped_filter,
+                tflite::micro::GetTensorData<float>(bias),
+                tflite::micro::GetTensorData<float>(output));
+        }
+        else if (data_ex->opt_constraint_float == DS_CONV_OPT_TYPE2)
+        */
+        {
+          DepthwiseConvFloatVIP(
+              params, data_ex, tflite::micro::GetTensorData<float>(input),
+              // tflite::micro::GetTensorData<float>(filter),
+              (const float *)data_ex->mapped_filter,
+              tflite::micro::GetTensorData<float>(bias),
+              tflite::micro::GetTensorData<float>(output),
+              data_ex->opt_constraint_float & DS_CONV_OPT_MASK);
+        }
+        break;
 
       case kTfLiteInt8:
 
-          if (0!=(data_ex->opt_constraint_float & DS_CONV_OPT_FLT_X_INT8)) {
+        if (0 != (data_ex->opt_constraint_float & DS_CONV_OPT_FLT_X_INT8)) {
+          KN_PRINT_Q7_SIZE(data_ex->mapped_filter, ElementCount(*output->dims));
 
-                KN_PRINT_Q7_SIZE(data_ex->mapped_filter,
-                           ElementCount(*output->dims));
-
-              DepthwiseConvFloatInt8VIP(params, data_ex,
-                  tflite::micro::GetTensorData<float>(input),
-                  // tflite::micro::GetTensorData<float>(filter),
-                  (const int8_t*)data_ex->mapped_filter,
-                  tflite::micro::GetTensorData<float>(bias),
-                  tflite::micro::GetTensorData<float>(output),
-                  data_ex->opt_constraint_float & DS_CONV_OPT_MASK);
-
-          }
-          break;
+          DepthwiseConvFloatInt8VIP(
+              params, data_ex, tflite::micro::GetTensorData<float>(input),
+              // tflite::micro::GetTensorData<float>(filter),
+              (const int8_t *)data_ex->mapped_filter,
+              tflite::micro::GetTensorData<float>(bias),
+              tflite::micro::GetTensorData<float>(output),
+              data_ex->opt_constraint_float & DS_CONV_OPT_MASK);
+        }
+        break;
       case kTfLiteFloat16:
-          if (0!=(data_ex->opt_constraint_float & DS_CONV_OPT_FLT_X_FLT16)) {
-              // TBD
+        if (0 != (data_ex->opt_constraint_float & DS_CONV_OPT_FLT_X_FLT16)) {
+          // TBD
 
-              DepthwiseConvFloat16VIP(params, data_ex,
-                  tflite::micro::GetTensorData<float>(input),
-                  (const TfLiteFloat16*)data_ex->mapped_filter,
-                  tflite::micro::GetTensorData<float>(bias),
-                  tflite::micro::GetTensorData<float>(output),
-                  data_ex->opt_constraint_float & DS_CONV_OPT_MASK);
-
-          }
-          break;
+          DepthwiseConvFloat16VIP(
+              params, data_ex, tflite::micro::GetTensorData<float>(input),
+              (const TfLiteFloat16 *)data_ex->mapped_filter,
+              tflite::micro::GetTensorData<float>(bias),
+              tflite::micro::GetTensorData<float>(output),
+              data_ex->opt_constraint_float & DS_CONV_OPT_MASK);
+        }
+        break;
       default:
-          TFLITE_DCHECK(filter->type == kTfLiteFloat32 ||
-              filter->type == kTfLiteInt8 ||
-              filter->type == kTfLiteFloat16
-          );
-      }
-  }
-  else
+        TFLITE_DCHECK(filter->type == kTfLiteFloat32 ||
+                      filter->type == kTfLiteInt8 ||
+                      filter->type == kTfLiteFloat16);
+    }
+  } else
 #endif
   {
 #ifndef REMOVE_REFOP_SUPPORT
@@ -2367,151 +2332,140 @@ static void EvalFloat(TfLiteContext *context, TfLiteNode *node,
                  ElementCount(*output->dims));
 }
 
+TfLiteStatus EvalDepthWiseConvFloatInt8(TfLiteContext *context,
+                                        TfLiteNode *node) {
+  TFLITE_DCHECK(node->user_data != nullptr);
+  TFLITE_DCHECK(node->builtin_data != nullptr);
 
-TfLiteStatus EvalDepthWiseConvFloatInt8(TfLiteContext* context, TfLiteNode* node)
-{
-    TFLITE_DCHECK(node->user_data != nullptr);
-    TFLITE_DCHECK(node->builtin_data != nullptr);
+  auto *params =
+      reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
 
-    auto* params =
-        reinterpret_cast<TfLiteDepthwiseConvParams*>(node->builtin_data);
-    DSConvOpData& data_ex = *(static_cast<DSConvOpData*>(node->user_data));
-
-    TfLiteEvalTensor* output =
-        tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
-    const TfLiteEvalTensor* input =
-        tflite::micro::GetEvalInput(context, node, kDepthwiseConvInputTensor);
-    const TfLiteEvalTensor* filter =
-        tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
-    const TfLiteEvalTensor* bias =
-        (NumInputs(node) == 3)
-        ? tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor)
-        : nullptr;
-    TfLiteStatus status = kTfLiteOk;
-    float output_activation_min, output_activation_max;
-    CalculateActivationRange(params->activation, &output_activation_min,
-        &output_activation_max);
-    KN_PRINTD(data_ex.opt_constraint_float);
+  TfLiteEvalTensor *output =
+      tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
+  const TfLiteEvalTensor *input =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvInputTensor);
+  const TfLiteEvalTensor *filter =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
+  const TfLiteEvalTensor *bias =
+      (NumInputs(node) == 3)
+          ? tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor)
+          : nullptr;
+  TfLiteStatus status = kTfLiteOk;
+  float output_activation_min, output_activation_max;
+  CalculateActivationRange(params->activation, &output_activation_min,
+                           &output_activation_max);
+  KN_PRINTD(data_ex.opt_constraint_float);
 
 #if defined(HEMILITE_DW_CONV_OPT)
 
-    if (data_ex.opt_constraint_float > 0) {
-        // get scratch buffer
-        //KN_PRINTD(data_ex->opt_constraint_float);
-        int32_t* p_aligned_scratch = nullptr;
+  if (data_ex.opt_constraint_float > 0) {
+    // get scratch buffer
+    // KN_PRINTD(data_ex->opt_constraint_float);
+    int32_t *p_aligned_scratch = nullptr;
 
-        if (data_ex.buffer_idx > -1) {
-            p_aligned_scratch =
-                (int32_t*)context->GetScratchBuffer(context, data_ex.buffer_idx);
-        }
-        data_ex.ds_conv2d.pIm2Col = p_aligned_scratch;
-        data_ex.ds_conv2d.pOutput = nullptr;
-
-        //KN_PRINTX(data_ex->ds_conv2d.pIm2Col);
+    if (data_ex.buffer_idx > -1) {
+      p_aligned_scratch =
+          (int32_t *)context->GetScratchBuffer(context, data_ex.buffer_idx);
     }
-    if (data_ex.opt_constraint_float > 0)
-    {
-        switch (filter->type)
-        {
-        
-        case kTfLiteInt8:
-            if (0 != (data_ex.opt_constraint_float & DS_CONV_OPT_FLT_X_INT8)) {
-                DepthwiseConvFloatInt8VIP(params, &data_ex,
-                    tflite::micro::GetTensorData<float>(input),
-                    // tflite::micro::GetTensorData<float>(filter),
-                    (const int8_t*)data_ex.mapped_filter,
-                    tflite::micro::GetTensorData<float>(bias),
-                    tflite::micro::GetTensorData<float>(output),
-                    data_ex.opt_constraint_float & DS_CONV_OPT_MASK);
+    data_ex.ds_conv2d.pIm2Col = p_aligned_scratch;
+    data_ex.ds_conv2d.pOutput = nullptr;
 
-            }
-            break;
-        
-        default:
-            TFLITE_DCHECK(filter->type == kTfLiteInt8);
+    // KN_PRINTX(data_ex->ds_conv2d.pIm2Col);
+  }
+  if (data_ex.opt_constraint_float > 0) {
+    switch (filter->type) {
+      case kTfLiteInt8:
+        if (0 != (data_ex.opt_constraint_float & DS_CONV_OPT_FLT_X_INT8)) {
+          DepthwiseConvFloatInt8VIP(
+              params, &data_ex, tflite::micro::GetTensorData<float>(input),
+              // tflite::micro::GetTensorData<float>(filter),
+              (const int8_t *)data_ex.mapped_filter,
+              tflite::micro::GetTensorData<float>(bias),
+              tflite::micro::GetTensorData<float>(output),
+              data_ex.opt_constraint_float & DS_CONV_OPT_MASK);
         }
+        break;
+
+      default:
+        TFLITE_DCHECK(filter->type == kTfLiteInt8);
     }
+  }
 #endif
-    KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
-        ElementCount(*output->dims));
-    return status;
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                 ElementCount(*output->dims));
+  return status;
 }
 
+TfLiteStatus EvalDepthWiseConvFloat16(TfLiteContext *context,
+                                      TfLiteNode *node) {
+  TFLITE_DCHECK(node->user_data != nullptr);
+  TFLITE_DCHECK(node->builtin_data != nullptr);
 
+  auto *params =
+      reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
 
-TfLiteStatus EvalDepthWiseConvFloat16(TfLiteContext * context, TfLiteNode * node)
-{
-        TFLITE_DCHECK(node->user_data != nullptr);
-        TFLITE_DCHECK(node->builtin_data != nullptr);
-
-        auto* params =
-            reinterpret_cast<TfLiteDepthwiseConvParams*>(node->builtin_data);
-        DSConvOpData& data_ex = *(static_cast<DSConvOpData*>(node->user_data));
-
-        TfLiteEvalTensor* output =
-            tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
-        const TfLiteEvalTensor* input =
-            tflite::micro::GetEvalInput(context, node, kDepthwiseConvInputTensor);
-        const TfLiteEvalTensor* filter =
-            tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
-        const TfLiteEvalTensor* bias =
-            (NumInputs(node) == 3)
-            ? tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor)
-            : nullptr;
-        TfLiteStatus status = kTfLiteOk;
-    float output_activation_min, output_activation_max;
-    CalculateActivationRange(params->activation, &output_activation_min,
-        &output_activation_max);
-    KN_PRINTD(data_ex.opt_constraint_float);
+  TfLiteEvalTensor *output =
+      tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
+  const TfLiteEvalTensor *input =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvInputTensor);
+  const TfLiteEvalTensor *filter =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
+  const TfLiteEvalTensor *bias =
+      (NumInputs(node) == 3)
+          ? tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor)
+          : nullptr;
+  TfLiteStatus status = kTfLiteOk;
+  float output_activation_min, output_activation_max;
+  CalculateActivationRange(params->activation, &output_activation_min,
+                           &output_activation_max);
+  KN_PRINTD(data_ex.opt_constraint_float);
 #if defined(HEMILITE_DW_CONV_OPT)
 
-    if (data_ex.opt_constraint_float > 0) {
-        // get scratch buffer
-        //KN_PRINTD(data_ex->opt_constraint_float);
-        int32_t* p_aligned_scratch = nullptr;
+  if (data_ex.opt_constraint_float > 0) {
+    // get scratch buffer
+    // KN_PRINTD(data_ex->opt_constraint_float);
+    int32_t *p_aligned_scratch = nullptr;
 
-        if (data_ex.buffer_idx > -1) {
-            p_aligned_scratch =
-                (int32_t*)context->GetScratchBuffer(context, data_ex.buffer_idx);
+    if (data_ex.buffer_idx > -1) {
+      p_aligned_scratch =
+          (int32_t *)context->GetScratchBuffer(context, data_ex.buffer_idx);
 
-            if (((uint32_t)p_aligned_scratch & 0xf) != 0)
-                p_aligned_scratch = (int32_t*)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
-        }
-        data_ex.ds_conv2d.pIm2Col = p_aligned_scratch;
-        data_ex.ds_conv2d.pOutput = nullptr;
-
-        //KN_PRINTX(data_ex->ds_conv2d.pIm2Col);
+      if (((uint32_t)p_aligned_scratch & 0xf) != 0)
+        p_aligned_scratch =
+            (int32_t *)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
     }
-    if (data_ex.opt_constraint_float > 0)
-    {
-        switch (filter->type)
-        {
+    data_ex.ds_conv2d.pIm2Col = p_aligned_scratch;
+    data_ex.ds_conv2d.pOutput = nullptr;
 
-        case kTfLiteFloat16:
-            if (0 != (data_ex.opt_constraint_float & DS_CONV_OPT_FLT_X_FLT16))
-            {
-                // TBD
+    // KN_PRINTX(data_ex->ds_conv2d.pIm2Col);
+  }
+  if (data_ex.opt_constraint_float > 0) {
+    switch (filter->type) {
+      case kTfLiteFloat16:
+        if (0 != (data_ex.opt_constraint_float & DS_CONV_OPT_FLT_X_FLT16)) {
+          // TBD
 
-                DepthwiseConvFloat16VIP(params, &data_ex,
-                    tflite::micro::GetTensorData<float>(input),
-                    (const TfLiteFloat16*)data_ex.mapped_filter,
-                    tflite::micro::GetTensorData<float>(bias),
-                    tflite::micro::GetTensorData<float>(output),
-                    data_ex.opt_constraint_float & DS_CONV_OPT_MASK);
-
-            }
-            break;
-        default:
-            TFLITE_DCHECK( filter->type == kTfLiteFloat16);
+          DepthwiseConvFloat16VIP(
+              params, &data_ex, tflite::micro::GetTensorData<float>(input),
+              (const TfLiteFloat16 *)data_ex.mapped_filter,
+              tflite::micro::GetTensorData<float>(bias),
+              tflite::micro::GetTensorData<float>(output),
+              data_ex.opt_constraint_float & DS_CONV_OPT_MASK);
         }
+        break;
+      default:
+        TFLITE_DCHECK(filter->type == kTfLiteFloat16);
     }
-    
+  }
+
 #endif
 
-    KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
-        ElementCount(*output->dims));
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                 ElementCount(*output->dims));
 
-    return status;
+  return status;
 }
 TfLiteStatus EvalDepthWiseConv(TfLiteContext *context, TfLiteNode *node) {
   TFLITE_DCHECK(node->user_data != nullptr);
@@ -2594,26 +2548,26 @@ TfLiteStatus EvalDepthWiseConvInt8Opt(TfLiteContext *context,
 
 TFLMRegistration Register_DEPTHWISE_CONV_2D() {
   return tflite::micro::RegisterOp(Init,
-          /*prepare=*/Prepare,
-          /*invoke=*/EvalDepthWiseConv);
+                                   /*prepare=*/Prepare,
+                                   /*invoke=*/EvalDepthWiseConv);
 }
 
 TFLMRegistration Register_DEPTHWISE_CONV_2D_INT8() {
   return tflite::micro::RegisterOp(Init,
-          /*prepare=*/PrepareInt8,
-          /*invoke=*/EvalDepthWiseConvInt8Opt);
+                                   /*prepare=*/PrepareInt8,
+                                   /*invoke=*/EvalDepthWiseConvInt8Opt);
 }
 TFLMRegistration Register_DEPTHWISE_CONV_2D_FLOAT16() {
   return tflite::micro::RegisterOp(Init,
-      
-        /*prepare=*/Prepare,
-        /*invoke=*/EvalDepthWiseConvFloat16);
+
+                                   /*prepare=*/Prepare,
+                                   /*invoke=*/EvalDepthWiseConvFloat16);
 }
 
 TFLMRegistration Register_DEPTHWISE_CONV_2D_FLOATINT8() {
   return tflite::micro::RegisterOp(Init,
-    
-        /*prepare=*/Prepare,
-        /*invoke=*/EvalDepthWiseConvFloatInt8);
+
+                                   /*prepare=*/Prepare,
+                                   /*invoke=*/EvalDepthWiseConvFloatInt8);
 }
 }  // namespace tflite

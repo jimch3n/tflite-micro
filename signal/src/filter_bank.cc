@@ -16,8 +16,9 @@ limitations under the License.
 //#define KN_DEBUG
 #include "signal/src/filter_bank.h"
 
-#include "tensorflow/lite/micro/ia8201/config.h"
+
 #if defined(XTENSA) || defined(HMD1A)
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>

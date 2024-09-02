@@ -12,16 +12,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include "tensorflow/lite/micro/ia8201/config.h"
+
 #if defined(XTENSA) || defined(HMD1A)
+#include "tensorflow/lite/micro/ia8201/config.h"
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #endif
 #include "signal/src/complex.h"
 #include "signal/src/energy.h"
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
 
 #ifndef REMOVE_TFLM_SIGNAL
 namespace tflite {
