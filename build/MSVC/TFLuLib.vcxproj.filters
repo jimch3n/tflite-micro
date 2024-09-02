@@ -1,0 +1,628 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\ia8201-kernel">
+      <UniqueIdentifier>{7a9686a0-9649-4497-99a4-5f0bdd5af5bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\kernel">
+      <UniqueIdentifier>{c16eb465-a1e1-42df-a3a4-a31e284f262b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ia8201">
+      <UniqueIdentifier>{deb7451e-d505-43f8-8397-8acddcbcbcb6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\arena_allocator">
+      <UniqueIdentifier>{4a948f55-93e8-47be-b0a1-8da1b41a6b50}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lite">
+      <UniqueIdentifier>{5a1c5bb0-9389-4e63-96fd-d5e24585edb5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\memory_planner">
+      <UniqueIdentifier>{d1983146-02f7-4d8c-ba09-99bffd5ad83f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\tflite_bridge">
+      <UniqueIdentifier>{14b08a9d-8170-4e4e-a11d-f32272b32223}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lite\core">
+      <UniqueIdentifier>{20c84c7f-03f5-4e62-85c9-2c6fe0c4f8fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\lite\kernel">
+      <UniqueIdentifier>{b0bafb15-1f4f-43f6-86a9-3812a61b261c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\signal">
+      <UniqueIdentifier>{32ae26c5-8eb4-48cb-8d29-349eea2caa15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\signal\kernel">
+      <UniqueIdentifier>{01e3d9eb-7710-4603-80e1-612c1ad2643d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\signal\kiss_fft">
+      <UniqueIdentifier>{af6ad82c-5c49-4a12-8397-49315d0a561a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\fake_micro_context.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\flatbuffer_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_helpers.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_allocation_info.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_allocator.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_context.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_log.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_op_resolver.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_profiler.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_resource_variable.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\mock_micro_graph.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\recording_micro_allocator.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\test_helpers.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\test_helper_custom_ops.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\add.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\assign_variable.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\arg_min_max.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\add_n.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\call_once.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\batch_to_space_nd.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\broadcast_args.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\broadcast_to.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\cumsum.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\comparisons.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ceil.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\cast.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\detection_postprocess.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\depth_to_space.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose_conv.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\unpack.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\var_handle.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\while.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\zeros_like.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\concatenation.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\depthwise_conv.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\depthwise_conv_common.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\dequantize.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\conv.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\elementwise.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\expand_dims.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\exp.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\elu.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\div.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\fully_connected.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\reshape.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\strided_slice.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\svdf.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\tanh.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\logistic.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\l2norm.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\pooling.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\mvm_helper.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\mul.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\softmax.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\softmax_common.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\sub.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\squared_difference.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\reduce.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\lstm_eval.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\unidirectional_sequence_lstm.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\quantize.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_batch_nd.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_depth.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split_v.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\squeeze.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mul_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\neg.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\pack.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\pad.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\pooling_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\prelu.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\prelu_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\quantize_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\round.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\select.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\shape.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\slice.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\resize_bilinear.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\resize_nearest_neighbor.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\micro_tensor_utils.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\fill.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\maximum_minimum.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor_div.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor_mod.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\gather.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\gather_nd.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\hard_swish.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\hard_swish_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\if.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\kernel_runner.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\kernel_util.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\l2_pool_2d.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\leaky_relu.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\leaky_relu_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\log_softmax.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logical.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logical_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logistic_common.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\read_variable.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mirror_pad.cc">
+      <Filter>Source Files\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\delay.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\dummy_ops.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\energy.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_log.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_spectral_subtraction.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_square_root.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\framer.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\overlap_add.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\rfft.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\stacker.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\window.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\circular_buffer.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\energy.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\fft_auto_scale.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank_log.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank_spectral_subtraction.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank_square_root.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\kiss_fft_wrappers\kiss_fft_float.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\kiss_fft_wrappers\kiss_fft_int16.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\kiss_fft_wrappers\kiss_fft_int32.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\log.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\max_abs.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\msb_32.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\msb_64.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\overlap_add.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\rfft_float.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\rfft_int16.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\rfft_int32.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\square_root_32.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\square_root_64.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\window.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\error_reporter.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\flatbuffer_conversions.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\tensor_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\portable_tensor_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\quantization_util.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\reference\comparisons.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\reference\portable_tensor_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\tensor_ctypes.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\tensor_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\conv_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\embedding_lookup.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ethosu.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\add_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\fully_connected_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\reduce_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\reshape_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\sub_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\svdf_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\schema\schema_utils.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\strided_slice_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\fft_auto_scale_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\fft_auto_scale_kernel.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_square_root_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\irfft.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\pcan.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\irfft_float.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\irfft_int16.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\irfft_int32.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\pcan_argc_fixed.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\batch_matmul.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_context.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_graph.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_planner\greedy_memory_planner.cc">
+      <Filter>Source Files\memory_planner</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_planner\linear_memory_planner.cc">
+      <Filter>Source Files\memory_planner</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_planner\non_persistent_buffer_planner_shim.cc">
+      <Filter>Source Files\memory_planner</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\tflite_bridge\flatbuffer_conversions_bridge.cc">
+      <Filter>Source Files\tflite_bridge</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\tflite_bridge\micro_error_reporter.cc">
+      <Filter>Source Files\tflite_bridge</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia8201\debug_log.cc">
+      <Filter>Source Files\ia8201</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia8201\micro_time.cc">
+      <Filter>Source Files\ia8201</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia8201\platform.cc">
+      <Filter>Source Files\ia8201</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia8201\system_setup.cc">
+      <Filter>Source Files\ia8201</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\non_persistent_arena_buffer_allocator.cc">
+      <Filter>Source Files\arena_allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\persistent_arena_buffer_allocator.cc">
+      <Filter>Source Files\arena_allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\recording_single_arena_buffer_allocator.cc">
+      <Filter>Source Files\arena_allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\single_arena_buffer_allocator.cc">
+      <Filter>Source Files\arena_allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\c\common.cc">
+      <Filter>Source Files\lite\core</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\kernel_util.cc">
+      <Filter>Source Files\lite\kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\lstm_eval_common.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

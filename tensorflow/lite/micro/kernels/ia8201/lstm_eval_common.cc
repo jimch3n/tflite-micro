@@ -206,8 +206,7 @@ TfLiteStatus CreateGateParams(
 
       MVMInputOffsetPrepare(p_input_mapped_filter, inputOffsetWithW,
                             m_input, n_input,
-                            fc_data_temp_ex.input_offset_int8,
-                            NULL, 0);
+                            fc_data_temp_ex.input_offset_int8);
       KN_PRINT_Q31_SIZE(fc_data_temp_ex.inputOffsetWithW, inFCMA8);
     }
     if (input_bias) {
@@ -317,7 +316,7 @@ TfLiteStatus CreateGateParams(
 
       MVMInputOffsetPrepare(p_hidden_mapped_filter, inputOffsetWithW,
                             m_hidden, n_hidden,
-                            fc_data_temp_ex.input_offset_int8, pB, 2);
+                            fc_data_temp_ex.input_offset_int8);
       KN_PRINT_Q31_SIZE(fc_data_temp_ex.inputOffsetWithW, inFCMA8);
     }
     if (hidden_state_bias) {

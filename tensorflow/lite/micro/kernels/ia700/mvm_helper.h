@@ -259,7 +259,7 @@ int DepthWiseConvMap8bitCoeffs(int8_t* pMapped, int32_t mvmMatrix,
                                const int8_t* filter_data, int depth_multi,
                                int input_depth);
 void MVMInputOffsetPrepare(const int32_t* A, int32_t* output, int m, int n,
-                           uint32_t input_offset, int32_t *pB=NULL, int bshift=0);
+                           uint32_t input_offset);
 
 void convert_ieee_float_to_afloat16(const float* input, uint16_t* out_float16,
                                     int size);

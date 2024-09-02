@@ -22,7 +22,10 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/cppmath.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/types.h"
-
+//#define FC_FLT_DEBUG
+#ifdef FC_FLT_DEBUG
+#include <stdio.h>
+#endif
 namespace tflite {
 namespace reference_ops {
 
@@ -45,19 +48,47 @@ inline void FullyConnected(
   const int output_depth = MatchingDim(weights_shape, weights_dims_count - 2,
                                        output_shape, output_dims_count - 1);
   const int accum_depth = weights_shape.Dims(weights_dims_count - 1);
+  #ifdef FC_FLT_DEBUG
+  int dbg_lb = 0;
+  int dbg_ub = dbg_lb + 4;
+  float total_o;
+  #endif
   for (int b = 0; b < batches; ++b) {
     for (int out_c = 0; out_c < output_depth; ++out_c) {
       float total = 0.f;
       for (int d = 0; d < accum_depth; ++d) {
+#ifdef FC_FLT_DEBUG
+        total_o = total;  
+#endif
         total += input_data[b * accum_depth + d] *
                  weights_data[out_c * accum_depth + d];
+#ifdef FC_FLT_DEBUG
+        if (out_c + output_depth * b >= dbg_lb  &&
+            out_c + output_depth * b < dbg_ub )
+          printf(" %.10f = %.10f + input[%3d] %.10f * w[%3d] %.10f\n", (double)total,
+                 (double)total_o, b * accum_depth + d,
+                 (double)input_data[b * accum_depth + d],
+                 out_c * accum_depth + d,
+                 (double)weights_data[out_c * accum_depth + d]);
+#endif
       }
+
       float bias_value = 0.0f;
       if (bias_data) {
         bias_value = bias_data[out_c];
       }
+
+
       output_data[out_c + output_depth * b] = ActivationFunctionWithMinMax(
           total + bias_value, output_activation_min, output_activation_max);
+#ifdef FC_FLT_DEBUG
+      if (out_c + output_depth * b >= dbg_lb &&
+          out_c + output_depth * b < dbg_ub)
+        printf("out[%10d] %.10f =  %.10f + %.10f \n", out_c + output_depth * b,
+               (double)output_data[out_c + output_depth * b], (double)total,
+               (double)bias_value);
+#endif
+
     }
   }
 }

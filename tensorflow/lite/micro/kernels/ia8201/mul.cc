@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
+
 #include "tensorflow/lite/micro/ia8201/config.h"
 
 #ifndef REMOVE_REFOP_SUPPORT

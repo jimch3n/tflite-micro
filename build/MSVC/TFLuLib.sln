@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32929.386
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TFLuLib", "TFLuLib.vcxproj", "{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{FCE12DA2-959E-4BA9-84EC-3B6A7386B5E3}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello_world_test", "hello_world_test.vcxproj", "{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Dmx1a|x86 = Dmx1a|x86
+		Dmx1a-Remove_ref_ops|x86 = Dmx1a-Remove_ref_ops|x86
+		Hmd1a|x86 = Hmd1a|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a|x86.ActiveCfg = Dmx1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a|x86.Build.0 = Dmx1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = Dmx1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Hmd1a|x86.ActiveCfg = Hmd1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Hmd1a|x86.Build.0 = Hmd1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a|x86.ActiveCfg = Dmx1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a|x86.Build.0 = Dmx1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = Dmx1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Hmd1a|x86.ActiveCfg = Hmd1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Hmd1a|x86.Build.0 = Hmd1a|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E589570C-AD92-4D94-9C14-5044B678DE58}
+	EndGlobalSection
+EndGlobal

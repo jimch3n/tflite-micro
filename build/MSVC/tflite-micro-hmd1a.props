@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <TFLM_ROOT>..\..\</TFLM_ROOT>
+    <SDK_ROOT>..\..\third_party\ia8201_sdk\Rome</SDK_ROOT>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(TFLM_ROOT)/tensorflow/lite/micro/tools/make/downloads/flatbuffers/include;$(TFLM_ROOT)/tensorflow/lite/micro/tools/make/downloads/gemmlowp;$(TFLM_ROOT)/tensorflow/lite/micro/tools/make/downloads/kissfft;$(TFLM_ROOT)/tensorflow/lite/micro/tools/make/downloads/ruy;$(TFLM_ROOT)\;$(SDK_ROOT)\Src\Cores\Core_$(Configuration)\Include;$(SDK_ROOT)\Src\Cores\Core_$(Configuration)\DSP\Include;$(SDK_ROOT)\Src\Cores\AVL;$(SDK_ROOT)\Src\Cores\Core_$(Configuration)\SimulationEnvironment\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;IA8201;HMD1A;AVL_HEMI;TF_LITE_MCU_DEBUG_LOG;TF_LITE_STATIC_MEMORY;TF_LITE_DISABLE_X86_NEON;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(SDK_ROOT)\Src\Cores\Core_$(Configuration)\SimulationEnvironment\Libs\SimulationEnvironment.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <BuildMacro Include="TFLM_ROOT">
+      <Value>$(TFLM_ROOT)</Value>
+    </BuildMacro>
+    <BuildMacro Include="SDK_ROOT">
+      <Value>$(SDK_ROOT)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

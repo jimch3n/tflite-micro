@@ -16,7 +16,10 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_INTEGER_OPS_FULLY_CONNECTED_H_
 
 #include <algorithm>
-
+//#define DEBUG
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 #include "tensorflow/lite/kernels/internal/common.h"
 
 namespace tflite {
@@ -98,24 +101,86 @@ void FullyConnected(const FullyConnectedParams& params,
   const int output_depth = output_shape.Dims(output_dim_count - 1);
   TFLITE_DCHECK_LE(output_depth, filter_shape.Dims(filter_dim_count - 2));
   const int accum_depth = filter_shape.Dims(filter_dim_count - 1);
+#ifdef DEBUG
+  int debug_lb = 0;
+  int debug_up = debug_lb+4;
+  int dbg_scale = 1;
+  if (128==input_offset)
+  {
+      dbg_scale = 2;
+  }else{
+      dbg_scale = 4;
+  }
+#endif
   for (int b = 0; b < batches; ++b) {
     for (int out_c = 0; out_c < output_depth; ++out_c) {
       BiasType acc = 0;
+      #ifdef DEBUG
+   int dbg_flag =  out_c >= debug_lb && out_c < debug_up;
+   #endif
       for (int d = 0; d < accum_depth; ++d) {
         int32_t input_val = input_data[b * accum_depth + d];
         int32_t filter_val = filter_data[out_c * accum_depth + d];
+#ifdef DEBUG
+        BiasType acc_o = acc;
+        #endif
         acc += (filter_val + filter_offset) * (input_val + input_offset);
+#ifdef DEBUG
+    if(dbg_flag)
+    {        
+      printf("acc %08x (scale:%d) = %08x + (filter[%3d] %02x + offset %d) * (input[%3d] %02x + offset %d)\n ", 
+    acc*dbg_scale,dbg_scale, acc_o,  //acc, scale, 08x
+            out_c * accum_depth + d, filter_val&0xff, filter_offset, //filter
+            b * accum_depth + d, input_val&0xff, input_offset);
+    }
+        #endif
       }
+#ifdef DEBUG
+      BiasType acc_o = acc;
+#endif
       if (bias_data) {
+
         acc += bias_data[out_c];
+#ifdef DEBUG
+        if (dbg_flag)
+          printf("Bias acc[%3d ] %d = %d + bias_data: %d\n", out_c, acc, acc_o,
+                 bias_data[out_c]);
+#endif
       }
+
       int32_t acc_scaled =
           MultiplyByQuantizedMultiplier(acc, output_multiplier, output_shift);
+
+#ifdef DEBUG
+    if(dbg_flag)
+      printf("Scale acc[%3d ] = %d multipiler:%d shift:%d\n", out_c,
+             acc_scaled, output_multiplier,
+              output_shift);
+#endif
       acc_scaled += output_offset;
+
+#ifdef DEBUG
+    if(dbg_flag)
+      printf("Out offset acc[%3d ] %d = + output_offset: %d\n", out_c,
+             acc_scaled, output_offset);
+#endif
       acc_scaled = std::max(acc_scaled, output_activation_min);
       acc_scaled = std::min(acc_scaled, output_activation_max);
+
+#ifdef DEBUG
+    if(dbg_flag)
+      printf("Min/Max  acc[%3d ] %d = min/max: %dd  %d\n", out_c,
+             acc_scaled,
+             output_activation_min, output_activation_max);
+#endif
       output_data[out_c + output_depth * b] =
           static_cast<OutputType>(acc_scaled);
+
+#ifdef DEBUG
+    if(dbg_flag)
+      printf("Final acc[%3d ] = %d  \n", out_c + output_depth * b,
+             output_data[out_c + output_depth * b]);
+#endif
     }
   }
 }
