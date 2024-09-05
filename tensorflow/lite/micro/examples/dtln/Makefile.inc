@@ -11,9 +11,14 @@ ifeq ($(TARGET_ARCH), dmx1a)
 DTLN_GENERATOR_INPUTS := \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/kn_dmx1a_dtln_noise_suppression.tflite
 
+else 
+ifeq ($(TARGET_ARCH), hmd1a)
+DTLN_GENERATOR_INPUTS := $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/kn_hmd1a_dtln_noise_suppression.tflite
+
 else
 DTLN_GENERATOR_INPUTS := \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/dtln/dtln_noise_suppression.tflite
+endif
 endif
 
 DTLN_GENERATED_SRCS := \

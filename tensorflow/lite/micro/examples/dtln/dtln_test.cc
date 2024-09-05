@@ -23,8 +23,12 @@ limitations under the License.
 #include "tensorflow/lite/schema/schema_generated.h"
 
 #include "tensorflow/lite/micro/ia8201/xt_profiler.h"
-#ifdef DMX1A
+#if defined(DMX1A)
 #include "tensorflow/lite/micro/examples/dtln/kn_dmx1a_dtln_noise_suppression_model_data.h"
+
+#elif defined(HMD1A) && !defined(HMD1A_HIFI3)
+#include "tensorflow/lite/micro/examples/dtln/kn_hmd1a_dtln_noise_suppression_model_data.h"
+
 #else
 #include "tensorflow/lite/micro/examples/dtln/dtln_noise_suppression_model_data.h"
 #endif
@@ -37,8 +41,11 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
 
-  #ifdef DMX1A
+  #if defined( DMX1A)
   const tflite::Model* model = ::tflite::GetModel(g_kn_dmx1a_dtln_noise_suppression_model_data);
+  #elif defined(HMD1A) && !defined(HMD1A_HIFI3)
+  const tflite::Model* model = ::tflite::GetModel(g_kn_hmd1a_dtln_noise_suppression_model_data);
+  
   #else
   const tflite::Model* model =
       ::tflite::GetModel(g_dtln_noise_suppression_model_data);
@@ -60,11 +67,11 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   micro_op_resolver.AddLogistic();
 
 // Create an area of memory to use for input, output, and intermediate arrays.
-//#if defined(IA8201) || defined(IA700) || defined(XTENSA)
-//  constexpr int tensor_arena_size = 16 * 1024;  // remap coefficients
-//#else
+#if defined(HMD1A_HIFI3)
+  constexpr int tensor_arena_size = 216 * 1024;  // remap coefficients
+#else
   constexpr int tensor_arena_size = 16 * 1024;
-//#endif
+#endif
   alignas(16) uint8_t tensor_arena[tensor_arena_size];
 
   // Build an interpreter to run the model with.

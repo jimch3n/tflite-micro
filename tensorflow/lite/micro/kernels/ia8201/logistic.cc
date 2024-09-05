@@ -147,7 +147,7 @@ void* LogisticInit(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 
-TfLiteStatus LogisticPrepare(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus IA8201_LogisticPrepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   OpData* data = static_cast<OpData*>(node->user_data);
 
@@ -735,7 +735,7 @@ void EvalLogisticFloat(const TfLiteEvalTensor* input,
 #endif
   KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), flat_size);
 }
-TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus IA8201_LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
   TfLiteEvalTensor* output =
@@ -820,8 +820,8 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
 
 TFLMRegistration Register_LOGISTIC() {
   return tflite::micro::RegisterOp(LogisticInit,
-                                   /*prepare=*/LogisticPrepare,
-                                   /*invoke=*/LogisticEval);
+                                   /*prepare=*/IA8201_LogisticPrepare,
+                                   /*invoke=*/IA8201_LogisticEval);
 }
 //}  // namespace micro
 //}  // namespace ops

@@ -18,8 +18,13 @@ ifeq ($(TARGET_ARCH), dmx1a)
    MICRO_SPEECH_LSTM_GENERATOR_INPUTS := \
    third_party/xtensa/examples/micro_speech_lstm/kn_dmx1a_micro_speech_lstm.tflite
 else
+ifeq ($(TARGET_ARCH), hmd1a)
+  MICRO_SPEECH_LSTM_GENERATOR_INPUTS := \
+   third_party/xtensa/examples/micro_speech_lstm/kn_hmd1a_micro_speech_lstm.tflite
+else
   MICRO_SPEECH_LSTM_GENERATOR_INPUTS := \
    third_party/xtensa/examples/micro_speech_lstm/micro_speech_lstm.tflite
+endif
 endif
    MICRO_SPEECH_LSTM_HDRS := \
    third_party/xtensa/examples/micro_speech_lstm/no_micro_features_data.h \

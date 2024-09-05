@@ -40,8 +40,11 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/testing/micro_test.h"
 #include "tensorflow/lite/schema/schema_generated.h"
-#ifdef DMX1A
+#if defined(DMX1A)
 #include "third_party/xtensa/examples/micro_speech_lstm/kn_dmx1a_micro_speech_lstm_model_data.h"
+#elif defined(HMD1A)
+#include "third_party/xtensa/examples/micro_speech_lstm/kn_hmd1a_micro_speech_lstm_model_data.h"
+
 #else
 #include "third_party/xtensa/examples/micro_speech_lstm/micro_speech_lstm_model_data.h"
 #endif
@@ -54,9 +57,14 @@ TF_LITE_MICRO_TESTS_BEGIN
 TF_LITE_MICRO_TEST(TestInvoke) {
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
-  #ifdef DMX1A
+#if defined(DMX1A)
   const tflite::Model* model =
       ::tflite::GetModel(g_kn_dmx1a_micro_speech_lstm_model_data);
+
+#elif defined(HMD1A)
+  const tflite::Model* model =
+      ::tflite::GetModel(g_kn_hmd1a_micro_speech_lstm_model_data);
+
 #else
   const tflite::Model* model =
       ::tflite::GetModel(g_micro_speech_lstm_model_data);

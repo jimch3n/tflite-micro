@@ -53,9 +53,6 @@ XTENSA_TOOLS_VERSION=RI-2020.4-linux XTENSA_CORE=hmd1aRI04 XTENSA_BASE=/home/jim
 ***
 
 ***
-Known issues:
-* DMX/HMD DTLN test was fail due to rounding in FC was no compatible.
-* LSTM operator was not optimize in DMX/HMD core yet.
 ***
 
 # TensorFlow Lite for Microcontrollers

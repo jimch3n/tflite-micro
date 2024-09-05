@@ -36,7 +36,8 @@ TARGET_ARCH_DEFINES := -D$(shell echo $(TARGET_ARCH) | tr [a-z] [A-Z])
 ####### HMD TIE ####
 	TARGET_ARCH_CFLAGS := \
 	-DHMD1A \
-    -DAVL_HEMI 
+  -DHMD1A_HIFI3 \
+  -DAVL_HEMI 
 	CORE := Hmd1a
 
   ROME_SDK_ROOT := third_party/ia8201_sdk/Rome

@@ -15,10 +15,15 @@ limitations under the License.
 
 #if defined(XTENSA) || defined(HMD1A)
 #include "tensorflow/lite/micro/ia8201/config.h"
+
+#ifdef __XTENSA__
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
+#else
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#endif
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #endif
 #include "signal/src/complex.h"
@@ -41,7 +46,7 @@ void SpectrumToEnergy(const Complex<int16_t> *input, int start_index,
   ae_f24x2 vxf;
   ae_int32x2 vxw, vzw, vzw0, vzw1;
   ae_valign x_align, y_align;
-  const ae_int16x4 *restrict px = (const ae_int16x4 *)&input[start_index];
+  const ae_int16x4 *px = (const ae_int16x4 *)&input[start_index];
   ae_int32x2 *py = (ae_int32x2 *)&output[start_index];
 
   vzi = AE_ZERO64();
@@ -74,7 +79,7 @@ void SpectrumToEnergy(const Complex<int16_t> *input, int start_index,
       vxw = AE_MULP24X2(vxf, vxf);
 
       vzw = AE_ADD32_HL_LH(vxw, vxw);
-      AE_S32_L_I(vzw, py, 0);
+      AE_S32_L_I(vzw, (ae_int32 *)py, 0);
 
       break;
   }

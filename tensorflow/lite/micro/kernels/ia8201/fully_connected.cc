@@ -1902,7 +1902,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
       // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       // accExt
@@ -1920,7 +1920,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out2 = vmuls(VR_out2, VR_outMult, 0);
       VR_out2 = vadds(VR_out2, VR_outOffset, 0);
       // VR_out2 = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 1);
 
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out2, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
@@ -1945,7 +1945,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
       // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
@@ -1962,7 +1962,7 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       VR_out2 = vmuls(VR_out2, VR_outMult, 0);
       VR_out2 = vadds(VR_out2, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out2, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
       VR_out2 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRH);
@@ -2073,6 +2073,8 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
     }
 
     if (i != (loopLimRow - 1) || !processLastLoop) {
+      KN_PRINTD(i);
+      KN_PRINTX_VR64(VR_y);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
 
@@ -2084,7 +2086,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
       // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       // accExt
@@ -2102,7 +2104,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out2 = vmuls(VR_out2, VR_outMult, 0);
       VR_out2 = vadds(VR_out2, VR_outOffset, 0);
       // VR_out2 = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 1);
 
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out2, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
@@ -2127,7 +2129,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out = vmuls(VR_out, VR_outMult, 0);
       VR_out = vadds(VR_out, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
       // rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
       // VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
 
@@ -2143,7 +2145,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       VR_out2 = vmuls(VR_out2, VR_outMult, 0);
       VR_out2 = vadds(VR_out2, VR_outOffset, 0);
       // VR_out = vexp_adji(VR_out, 8);
-      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 0);
+      convert_32F_to_16I_x2(VR_out2, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out2, 1);
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
       VR_out2 = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRH);

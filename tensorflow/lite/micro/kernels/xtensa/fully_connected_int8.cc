@@ -514,7 +514,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
   right_shift = out_shift > 0 ? 0 : -out_shift;
   ae_int32x2 max_int8 = AE_MOVDA32(127);
   ae_int32x2 min_int8 = AE_MOVDA32(-128);
-
+  KN_PRINTD(right_shift); KN_PRINTD(output_offset);
   // replicate_ar(VR_inputOffset, 0x3, input_offset_int8x4);
   for (int i = 0; i < loopLimRow; i++) {
     if (inputOffsetW) {
@@ -557,6 +557,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
     }
 
     if (i != (loopLimRow - 1) || !processLastLoop) {
+      KN_PRINTD(i);
       KN_PRINTX_VR64(VR_y);
       VR_y = shift32_arith(VR_y, -b_shift, 0);
       KN_PRINTX_VR64(VR_y);
@@ -567,6 +568,8 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
       ae_int32x2 ae_out0 = AE_SLAA32S(ae_in, left_shift);
 
       ae_out0 = AE_MULFP32X2RAS(ae_out0, AE_MOVDA32(out_multiplier));
+      KN_PRINTX_AE32X2(ae_out0);
+
       ae_out0 =
           AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out0), right_shift),
                               AE_SRAA64(AE_CVT64F32_L(ae_out0), right_shift));
@@ -581,6 +584,8 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
 
       ae_int32x2 ae_out1 = AE_SLAA32S(ae_in, left_shift);
       ae_out1 = AE_MULFP32X2RAS(ae_out1, AE_MOVDA32(out_multiplier));
+
+      KN_PRINTX_AE32X2(ae_out1);
       ae_out1 =
           AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out1), right_shift),
                               AE_SRAA64(AE_CVT64F32_L(ae_out1), right_shift));
@@ -871,7 +876,7 @@ TfLiteStatus HmdPrepareFullyConnectedInt8(TfLiteContext *context,
 #endif
     {
       KN_PRINTD(map_coeff_size);
-      KN_PRINT_Q7_SIZE(filter_input, (output_depth * accum_depth));
+      KN_PRINT_Q7_SIZE_ATMOST(filter_input, (output_depth * accum_depth),64);
 
       p_fc_mapped_filter =
           (int32_t *)context->AllocatePersistentBuffer(context, map_coeff_size);
@@ -880,11 +885,11 @@ TfLiteStatus HmdPrepareFullyConnectedInt8(TfLiteContext *context,
                                             (int8_t *)filter_input,
                                             output_depth, accum_depth);
       }
-      KN_PRINT_Q7_SIZE(p_fc_mapped_filter, map_coeff_size);
+      KN_PRINT_Q7_SIZE_ATMOST(p_fc_mapped_filter, map_coeff_size, 64);
     } else {
       p_fc_mapped_filter = (int32_t *)filter_input;  // remapping
     }
-    // KN_PRINT_Q7_SIZE(p_dmx1a_fc_mapped_filter, map_coeff_size);
+     KN_PRINT_Q7_SIZE_ATMOST(p_fc_mapped_filter, map_coeff_size, 64);
     uint8_t offsetInput = (-data->input_zero_point) & 0xff;
     // uint32_t offsetVR=offsetInput;
     data_ex->input_offset_int8 = (offsetInput << 24) | (offsetInput << 16) |

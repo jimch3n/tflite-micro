@@ -19,11 +19,15 @@ limitations under the License.
 
 #if defined(XTENSA) || defined(HMD1A)
 #include "tensorflow/lite/micro/ia8201/config.h"
+#ifdef __XTENSA__
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
+#else
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 
+#endif
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #endif
 #ifndef REMOVE_TFLM_SIGNAL
