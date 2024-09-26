@@ -14,7 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-
+namespace tflite {
 using PytorchOpsResolver = tflite::MicroMutableOpResolver<128>;
 
 TfLiteStatus InitPytorchOpsResolver(PytorchOpsResolver& resolver);
+}  // namespace tflite

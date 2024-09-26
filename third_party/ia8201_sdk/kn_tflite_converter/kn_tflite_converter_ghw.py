@@ -51,6 +51,7 @@ from schema_py_generated import SVDFOptionsT
 from schema_py_generated import UnidirectionalSequenceLSTMOptionsT
 #from tflite.FullyConnectedOptionsWeightsFormat import FullyConnectedOptionsWeightsFormat
 
+from schema_py_generated import QuantizationParametersT
 import argparse
 
 import ctypes as ct
@@ -840,8 +841,15 @@ def model_float_coeff_to_8bit(model, enable_map_op, subgraph_idx = 0, FLAGS=None
             quantized8bit, scale = doubleToInt8Scale(weight, 7)
             model.buffers[buf_idx].data = np.array(tuple(struct.iter_unpack("<B",quantized8bit))).astype(np.uint8).squeeze()
             msg.tensors[operator.inputs[1]].type = 9  # kTfLiteFloat16 = 10,
-            msg.tensors[operator.inputs[1]].quantization.scale = [scale]
-            msg.tensors[operator.inputs[1]].quantization.zeroPoint = [int(0)]
+
+            if msg.tensors[operator.inputs[1]].quantization is not None:
+              msg.tensors[operator.inputs[1]].quantization.scale = [scale]
+              msg.tensors[operator.inputs[1]].quantization.zeroPoint = [int(0)]
+            else: # no quantization T
+              qt = QuantizationParametersT()
+              qt.scale = [scale]
+              qt.zeroPoint = [int(0)]
+              msg.tensors[operator.inputs[1]].quantization = qt
             if verbose:
                     print(f"fc idx: {buf_idx} tensor name: {tensor.name} dim: {tensor.shape.size} scale: {scale}")
             weight = np.array(model.buffers[buf_idx].data).reshape((tensor.shape[0], tensor.shape[1])).astype(np.int8)
@@ -868,8 +876,15 @@ def model_float_coeff_to_8bit(model, enable_map_op, subgraph_idx = 0, FLAGS=None
             quantized8bit, scale = doubleToInt8Scale(weight, 7)
             model.buffers[buf_idx].data = np.array(tuple(struct.iter_unpack("<B",quantized8bit))).astype(np.uint8).squeeze()
             msg.tensors[tensor_idx].type = 9 #
-            msg.tensors[operator.inputs[1]].quantization.scale = [scale]
-            msg.tensors[operator.inputs[1]].quantization.zeroPoint = [int(0)]
+
+            if msg.tensors[operator.inputs[1]].quantization is not None:
+              msg.tensors[operator.inputs[1]].quantization.scale = [scale]
+              msg.tensors[operator.inputs[1]].quantization.zeroPoint = [int(0)]
+            else: # no quantization T
+              qt = QuantizationParametersT()
+              qt.scale = [scale]
+              qt.zeroPoint = [int(0)]
+              msg.tensors[operator.inputs[1]].quantization = qt
             if verbose:
                 print(f"conv idx: {buf_idx} tensor name: {tensor.name} dim: {tensor.shape.size} scale: {scale}")
 
@@ -925,9 +940,15 @@ def model_float_coeff_to_8bit(model, enable_map_op, subgraph_idx = 0, FLAGS=None
             quantized8bit, scale = doubleToInt8Scale(weight_map_flt, 7)
             model.buffers[buf_idx].data = np.array(tuple(struct.iter_unpack("<B",quantized8bit))).astype(np.uint8).squeeze()
             msg.tensors[tensor_idx].type = 9 #
-            msg.tensors[operator.inputs[1]].quantization.scale = [scale]
-            msg.tensors[operator.inputs[1]].quantization.zeroPoint = [int(0)]
 
+            if msg.tensors[operator.inputs[1]].quantization is not None:
+              msg.tensors[operator.inputs[1]].quantization.scale = [scale]
+              msg.tensors[operator.inputs[1]].quantization.zeroPoint = [int(0)]
+            else:
+              qt = QuantizationParametersT()
+              qt.scale = [scale]
+              qt.zeroPoint = [int(0)]
+              msg.tensors[operator.inputs[1]].quantization = qt
             ops_mapped += str(opidx) + '.'
 
             if verbose:
@@ -1077,7 +1098,7 @@ if __name__ == '__main__':
        # action="count",
         type=str,
         nargs="+",
-        default=['svdf', 'fc', 'lstm'], #conv, ds_conv
+        default=['svdf', 'fc', 'lstm', 'conv', 'ds_conv'], #conv, ds_conv
         help="mapping coefficients op"
     )
     parser.add_argument('-q',

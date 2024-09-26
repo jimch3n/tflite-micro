@@ -25,9 +25,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_context.h"
 
 namespace tflite {
+#ifndef REMOVE_TFLM_SIGNAL
 namespace tflm_signal {
 // TODO(b/286250473): remove namespace once de-duped libraries above
-
+#endif
 constexpr int kInputTensor = 0;
 constexpr int kNoiseEstimateTensor = 1;
 constexpr int kGainLutTensor = 2;
@@ -130,6 +131,7 @@ TFLMRegistration* Register_PCAN() {
       tflite::micro::RegisterOp(PcanInit, PcanPrepare, PcanEval);
   return &r;
 }
-
+#ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal
+#endif
 }  // namespace tflite

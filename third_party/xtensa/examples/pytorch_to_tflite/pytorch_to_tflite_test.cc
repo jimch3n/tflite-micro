@@ -40,19 +40,34 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/testing/micro_test.h"
 #include "tensorflow/lite/schema/schema_generated.h"
+
+#if defined(DMX1A)
+#include "third_party/xtensa/examples/pytorch_to_tflite/kn_dmx1a_mobilenet_v2_quantized_1x3x224x224_model_data.h"
+
+#else
 #include "third_party/xtensa/examples/pytorch_to_tflite/mobilenet_v2_quantized_1x3x224x224_model_data.h"
+#endif
 #include "third_party/xtensa/examples/pytorch_to_tflite/pytorch_images_dog_jpg.h"
 #include "third_party/xtensa/examples/pytorch_to_tflite/pytorch_op_resolver.h"
 
+#include "tensorflow/lite/micro/ia8201/xt_profiler.h"
 TF_LITE_MICRO_TESTS_BEGIN
 
-#if defined(HIFI5)
+#if 1 //defined(HIFI5)
 
 TF_LITE_MICRO_TEST(TestInvoke) {
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
+#if defined(DMX1A)
+    const tflite::Model* model =
+      ::tflite::GetModel(g_kn_dmx1a_mobilenet_v2_quantized_1x3x224x224_model_data);
+
+#else
   const tflite::Model* model =
       ::tflite::GetModel(g_mobilenet_v2_quantized_1x3x224x224_model_data);
+#endif
+      
+
   if (model->version() != TFLITE_SCHEMA_VERSION) {
     MicroPrintf(
         "Model provided is schema version %d not equal "
@@ -63,17 +78,22 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   // Pull in only the eperation implementations we need.
   // This relies on a complete list of all the ops needed by this graph.
   tflite::PytorchOpsResolver resolver;
-
+  tflite::InitPytorchOpsResolver(resolver);
   // Create an area of memory to use for input, output, and intermediate arrays.
   constexpr int tensor_arena_size = 3 * 1024 * 1024;
 
-  uint8_t tensor_arena[tensor_arena_size];
+  // prevent stack overflow
+ static uint8_t tensor_arena[tensor_arena_size];
 
   // Build an interpreter to run the model with.
   tflite::MicroInterpreter interpreter(model, resolver, tensor_arena,
                                        tensor_arena_size);
-  interpreter.AllocateTensors();
+  TfLiteStatus alloc_status = interpreter.AllocateTensors();
 
+  
+  TF_LITE_MICRO_EXPECT_EQ(alloc_status, kTfLiteOk);
+
+  printf("allocate %d bytes\n", interpreter.arena_used_bytes());
   // Get information about the memory area to use for the model's input.
   TfLiteTensor* input = interpreter.input(0);
 
@@ -100,7 +120,14 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   memcpy(input->data.int8, g_pytorch_images_dog_jpg_data, input->bytes);
 
   // Run the model on this input and make sure it succeeds.
-  TfLiteStatus invoke_status = interpreter.Invoke();
+    TfLiteStatus invoke_status;
+  unsigned int c0,c1;
+  c0=c1=0;
+  KN_GET_ISS_CYCLES_IF_CC(1,
+  invoke_status = interpreter.Invoke(),c0, c1);
+  printf("invoke cycle: %d\n",c1-c0);
+
+  //TfLiteStatus invoke_status = interpreter.Invoke();
   if (invoke_status != kTfLiteOk) {
     MicroPrintf("Invoke failed\n");
   }

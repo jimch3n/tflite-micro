@@ -34,7 +34,7 @@ limitations under the License.
  * * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * */
-#if !defined(HIFI4)
+#if 1 //!defined(HIFI4)
 #include "third_party/xtensa/examples/pytorch_to_tflite/pytorch_images_dog_jpg.h"
 
 unsigned char g_pytorch_images_dog_jpg_data[] = {

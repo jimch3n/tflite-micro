@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello_world_test", "hello_world_test.vcxproj", "{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "model_benchmark", "..\..\third_party\ia8201_sdk\Rome\Src\Cores\Core_Dmx1a\TFLu\tools\model_benchmark\MSC\model_benchmark.vcxproj", "{120F617F-AC54-46B9-9E7F-0C27BFED65DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Dmx1a|x86 = Dmx1a|x86
@@ -28,6 +30,12 @@ Global
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Hmd1a|x86.ActiveCfg = Hmd1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Hmd1a|x86.Build.0 = Hmd1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a|x86.ActiveCfg = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a|x86.Build.0 = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Hmd1a|x86.ActiveCfg = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Hmd1a|x86.Build.0 = Dmx1a|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

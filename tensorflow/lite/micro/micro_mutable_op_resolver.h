@@ -182,8 +182,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddCustom("CIRCULAR_BUFFER", tflite::Register_CIRCULAR_BUFFER());
   }
 
-  TfLiteStatus AddConcatenation() {
-    return AddBuiltin(BuiltinOperator_CONCATENATION, Register_CONCATENATION(),
+  TfLiteStatus AddConcatenation(const TFLMRegistration& registration = Register_CONCATENATION()) {
+    return AddBuiltin(BuiltinOperator_CONCATENATION, registration,
                       ParseConcatenation);
   }
 
@@ -428,11 +428,16 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_MIRROR_PAD, tflite::Register_MIRROR_PAD(),
                       ParseMirrorPad);
   }
-
+  #if defined(IA8201) || defined(IA700)
+  TfLiteStatus AddMean( const TFLMRegistration& registration =  tflite::Register_MEAN()) {
+    return AddBuiltin(BuiltinOperator_MEAN,registration,
+                      ParseReducer);
+  }
+  #else
   TfLiteStatus AddMean() {
     return AddBuiltin(BuiltinOperator_MEAN, Register_MEAN(), ParseReducer);
   }
-
+#endif
   TfLiteStatus AddMinimum() {
     return AddBuiltin(BuiltinOperator_MINIMUM, Register_MINIMUM(),
                       ParseMinimum);
@@ -478,12 +483,17 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_PRELU, tflite::Register_PRELU(),
                       ParsePrelu);
   }
-
+#if defined(IA8201) || defined(IA700)
+  TfLiteStatus AddQuantize(const TFLMRegistration& registration = tflite::Register_QUANTIZE()) {
+    return AddBuiltin(BuiltinOperator_QUANTIZE,registration,
+                      ParseQuantize);
+  }
+#else
   TfLiteStatus AddQuantize() {
     return AddBuiltin(BuiltinOperator_QUANTIZE, Register_QUANTIZE(),
                       ParseQuantize);
   }
-
+#endif
   TfLiteStatus AddReadVariable() {
     return AddBuiltin(BuiltinOperator_READ_VARIABLE,
                       tflite::Register_READ_VARIABLE(), ParseReadVariable);
@@ -585,15 +595,23 @@ class MicroMutableOpResolver : public MicroOpResolver {
   TfLiteStatus AddSquare() {
     return AddBuiltin(BuiltinOperator_SQUARE, Register_SQUARE(), ParseSquare);
   }
+#if defined(IA8201) || defined(IA700)
 
+  TfLiteStatus AddSquaredDifference(const TFLMRegistration& registration =
+                                        tflite::Register_SQUARED_DIFFERENCE()) {
+    return AddBuiltin(BuiltinOperator_SQUARED_DIFFERENCE, registration,
+                      ParseSquaredDifference);
+  }
+#else
   TfLiteStatus AddSquaredDifference() {
     return AddBuiltin(BuiltinOperator_SQUARED_DIFFERENCE,
                       tflite::Register_SQUARED_DIFFERENCE(),
                       ParseSquaredDifference);
   }
-
-  TfLiteStatus AddStridedSlice() {
-    return AddBuiltin(BuiltinOperator_STRIDED_SLICE, Register_STRIDED_SLICE(),
+#endif
+  TfLiteStatus AddStridedSlice(
+      const TFLMRegistration& registration = Register_STRIDED_SLICE()) {
+    return AddBuiltin(BuiltinOperator_STRIDED_SLICE, registration,
                       ParseStridedSlice);
   }
 
@@ -602,10 +620,16 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddCustom("SignalStacker", tflite::tflm_signal::Register_STACKER());
   }
 
+#if defined(IA8201) || defined(IA700)
+  TfLiteStatus AddSub(
+      const TFLMRegistration& registration = tflite::Register_SUB()) {
+    return AddBuiltin(BuiltinOperator_SUB, registration, ParseSub);
+  }
+#else
   TfLiteStatus AddSub() {
     return AddBuiltin(BuiltinOperator_SUB, tflite::Register_SUB(), ParseSub);
   }
-
+#endif
   TfLiteStatus AddSum() {
     return AddBuiltin(BuiltinOperator_SUM, Register_SUM(), ParseReducer);
   }

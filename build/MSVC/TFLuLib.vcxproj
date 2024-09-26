@@ -78,7 +78,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logical_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logistic_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\log_softmax.cc" />
-
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\maximum_minimum.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\micro_tensor_utils.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mirror_pad.cc" />
@@ -203,7 +202,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\batch_matmul.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_context.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_graph.cc" />
-
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -242,13 +240,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Dmx1a|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(TFLM_ROOT)\..\..\Core_$(Configuration)\TFLu\Libs\</OutDir>
+    <OutDir>$(TFLM_ROOT)\third_party\ia8201_sdk\Rome\Src\Cores\Core_$(Configuration)\TFLu\Libs\</OutDir>
     <IntDir>$(ProjectName)\$(Configuration)\</IntDir>
     <TargetName>TFLuLib</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Hmd1a|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(TFLM_ROOT)\..\..\Core_$(Configuration)\TFLu\Libs\</OutDir>
+    <OutDir>$(TFLM_ROOT)\third_party\ia8201_sdk\Rome\Src\Cores\Core_$(Configuration)\TFLu\Libs\</OutDir>
     <IntDir>$(ProjectName)\$(Configuration)\</IntDir>
     <TargetName>TFLuLib</TargetName>
   </PropertyGroup>

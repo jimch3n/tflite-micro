@@ -53,8 +53,13 @@ TfLiteStatus TestPCAN(const unsigned char* init_data, int init_data_size,
   int outputs_array_data[] = {1, 3};
   TfLiteIntArray* outputs_array =
       ::tflite::testing::IntArrayFromInts(outputs_array_data);
-
+#ifndef REMOVE_TFLM_SIGNAL
   const TFLMRegistration* registration = tflite::tflm_signal::Register_PCAN();
+  #else
+const TFLMRegistration* registration = tflite::Register_PCAN();
+ 
+  #endif
+  
   micro::KernelRunner runner(*registration, tensors, kTensorsSize, inputs_array,
                              outputs_array,
                              /*builtin_data=*/nullptr);

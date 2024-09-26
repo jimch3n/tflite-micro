@@ -53,7 +53,7 @@ ifeq ($(TARGET), ia8201)
   ROME_AVL_INC   := $(ROME_SDK_ROOT)/Src/Cores/AVL
   ROME_CSTUBS_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Include
   ROME_DSP_LIB_PATH := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Libs
-
+  ROME_TFLU_LIB_PATH :=  $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/TFLu/Libs
   ROME_CSTUBS_LIB_PATH := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Libs
   ROME_CSTUBS_LIB := gccSimulationEnvironment.a
 ###
