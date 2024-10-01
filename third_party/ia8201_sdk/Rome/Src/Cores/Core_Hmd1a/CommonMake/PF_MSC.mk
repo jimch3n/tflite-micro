@@ -1,2 +1,0 @@
-PREFIX=
-SUFFIX=lib
