@@ -21,9 +21,9 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/integer_ops/fully_connected.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/kernels/fully_connected.h"
-#include "tensorflow/lite/micro/kernels/kernel_util.h"
 
+#include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/ia700/fully_connected.h" //keep at last
 namespace tflite {
 
 const int kFullyConnectedInputTensor = 0;
@@ -42,6 +42,17 @@ FullyConnectedParams FullyConnectedParamsQuantized(
   op_params.quantized_activation_min = op_data.output_activation_min;
   op_params.quantized_activation_max = op_data.output_activation_max;
   return op_params;
+}
+void FullyConnectedParamsQuantized(
+    const OpDataFullyConnectedEx& op_data, FullyConnectedParams *op_params) {
+  
+  op_params->mapped_filter     = op_data.mapped_filter; // remap address
+  op_params->input_offset_int8 = op_data.input_offset_int8;
+  op_params->inputOffsetWithW  = op_data.inputOffsetWithW;
+  op_params->outputMultipler   = *(uint32_t *)&op_data.outputMultipler;
+  op_params->outputOffset       = *(uint32_t *)&op_data.outputOffset;
+  op_params->opt_constraint     = op_data.opt_constraint;
+  op_params->bias_aflt          = (uint32_t *)op_data.bias_aflt;
 }
 
 FullyConnectedParams FullyConnectedParamsFloat(
@@ -84,4 +95,42 @@ TfLiteStatus CalculateOpDataFullyConnected(
   return kTfLiteOk;
 }
 #endif
+
+// ext version 
+
+TfLiteStatus CalculateOpDataFullyConnected(TfLiteContext *context,
+                             TfLiteFusedActivation activation,
+                             TfLiteType data_type, const TfLiteTensor *input,
+                             const TfLiteTensor *filter,
+                             const TfLiteTensor *bias, TfLiteTensor *output,
+                             OpDataFullyConnectedEx *data_ex) {
+  TfLiteStatus status = kTfLiteOk;
+  OpDataFullyConnected *data = &data_ex->FcOp;
+  // Set buffer index to a reset value
+  data_ex->buffer_idx = -1;
+  if (data_type != kTfLiteFloat32) {
+    double real_multiplier = 0.0;
+    TF_LITE_ENSURE_STATUS(GetQuantizedConvolutionMultipler(
+        context, input, filter, bias, output, &real_multiplier));
+    int exponent;
+    data_ex->outputMultipler = AScalar(real_multiplier);  // convert to afloat
+    QuantizeMultiplier(real_multiplier, &data->output_multiplier, &exponent);
+
+    // Work around for Int16 use reference ops
+    data->output_shift = exponent;  //-exponent;
+    TF_LITE_ENSURE_STATUS(CalculateActivationRangeQuantized(
+        context, activation, output, &data->output_activation_min,
+        &data->output_activation_max));
+
+    data->input_zero_point = input->params.zero_point;
+    data->filter_zero_point = filter->params.zero_point;
+    data->output_zero_point = output->params.zero_point;
+
+    return CalculateActivationRangeQuantized(context, activation, output,
+                                             &data->output_activation_min,
+                                             &data->output_activation_max);
+    //#endif
+  }
+  return status;
+}
 }  // namespace tflite

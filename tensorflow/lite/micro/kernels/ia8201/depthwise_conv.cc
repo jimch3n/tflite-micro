@@ -115,7 +115,7 @@ typedef enum {
 } ds_conv_opt_type;
 
 #define DS_CONV_OPT_MASK (DS_CONV_OPT_FLT_X_INT8 - 1)
-struct OpData {
+struct DSConvOpData {
   struct OpDataConv ConvOp;  // reference opdata
 
   // Index to buffer for optimizations if applicable.
@@ -199,11 +199,11 @@ int DepthWiseConvMapFloatCoeffs(
 }
 void *Init(TfLiteContext *context, const char *buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(DSConvOpData));
 }
 
 TfLiteStatus PrepareCommon(TfLiteContext *context, TfLiteNode *node) {
-  OpData *data_ex = static_cast<OpData *>(node->user_data);
+  DSConvOpData *data_ex = static_cast<DSConvOpData *>(node->user_data);
 
   OpDataConv *data = static_cast<OpDataConv *>(
       &data_ex->ConvOp);  // static_cast<OpDataConv*>(node->user_data);
@@ -500,7 +500,7 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  OpData *data_ex = static_cast<OpData *>(node->user_data);
+  DSConvOpData *data_ex = static_cast<DSConvOpData *>(node->user_data);
   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
 
   auto *params =
@@ -761,7 +761,7 @@ TfLiteStatus PrepareFloat(TfLiteContext *context, TfLiteNode *node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  OpData *data_ex = static_cast<OpData *>(node->user_data);
+  DSConvOpData *data_ex = static_cast<DSConvOpData *>(node->user_data);
   //   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
 
   auto *params =
@@ -2549,7 +2549,7 @@ int DepthWiseConvQuantizedInt8PerChInputOffset(
 
 #if defined(DMX1A_DW_CONV_OPT) || defined(HMD1A_DW_CONV_OPT)
 void DepthwiseConvFloatInt8VIP(TfLiteDepthwiseConvParams *params,
-                               const OpData *data, const float *input_data,
+                               const DSConvOpData *data, const float *input_data,
                                const int8_t *filter_data,
                                const float *bias_data, float *output_data,
                                int w_mapped_type = 0)
@@ -2632,7 +2632,7 @@ void DepthwiseConvFloatInt8VIP(TfLiteDepthwiseConvParams *params,
 }
 
 void DepthwiseConvFloat16VIP(TfLiteDepthwiseConvParams *params,
-                             const OpData *data, const float *input_data,
+                             const DSConvOpData *data, const float *input_data,
                              const TfLiteFloat16 *filter_data,
                              const float *bias_data, float *output_data,
                              int w_mapped_type = 0)
@@ -2711,7 +2711,7 @@ void DepthwiseConvFloat16VIP(TfLiteDepthwiseConvParams *params,
   }
 }
 void DepthwiseConvFloatVIP(TfLiteDepthwiseConvParams *params,
-                           const OpData *data, const float *input_data,
+                           const DSConvOpData *data, const float *input_data,
                            const float *filter_data, const float *bias_data,
                            float *output_data, int w_mapped_type = 0)
 
@@ -2794,7 +2794,7 @@ void DepthwiseConvFloatVIP(TfLiteDepthwiseConvParams *params,
 
 #if 0
 static void DepthwiseConvFloat(TfLiteDepthwiseConvParams *params,
-                               const OpData *data, const float *input_data,
+                               const DSConvOpData *data, const float *input_data,
                                const float *filter_data, const float *bias_data,
                                float *output_data)
 
@@ -2868,14 +2868,14 @@ static void DepthwiseConvFloat(TfLiteDepthwiseConvParams *params,
   }
 }
 #endif
-static void DepthwiseConvPerChannelPadding(OpData *data_ex,
+static void DepthwiseConvPerChannelPadding(DSConvOpData *data_ex,
                                            const int8_t *input_data,
                                            const int8_t *filter_data,
                                            const int32_t *bias_data,
                                            int8_t *output_data, int sign)
 
 {
-  // OpData *data_ex = static_cast<OpData *>(node->user_data);
+  // DSConvOpData *data_ex = static_cast<DSConvOpData *>(node->user_data);
   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
 #if defined(DMX1A_DW_CONV_OPT)
   constexpr int group = 8;
@@ -3029,7 +3029,7 @@ static void DepthwiseConvPerChannelPadding(OpData *data_ex,
 }
 TfLiteStatus DepthwiseConvPerChOpt(TfLiteContext *context, TfLiteNode *node,
                                    TfLiteDepthwiseConvParams *params,
-                                   OpData *data_ex,
+                                   DSConvOpData *data_ex,
                                    const TfLiteEvalTensor *input,
                                    const TfLiteEvalTensor *filter,
                                    const TfLiteEvalTensor *bias,
@@ -3068,7 +3068,7 @@ TfLiteStatus DepthwiseConvPerChOpt(TfLiteContext *context, TfLiteNode *node,
 #endif
 static TfLiteStatus EvalDepthWiseConvQuantizedPerChannel(
     TfLiteContext *context, TfLiteNode *node, TfLiteDepthwiseConvParams *params,
-    OpData *data_ex, const TfLiteEvalTensor *input,
+    DSConvOpData *data_ex, const TfLiteEvalTensor *input,
     const TfLiteEvalTensor *filter, const TfLiteEvalTensor *bias,
     TfLiteEvalTensor *output) {
   // Call to reference implementation can be removed when dilation is supported
@@ -3171,7 +3171,7 @@ void EvalQuantized(TfLiteContext *context, TfLiteNode *node,
 #endif
 
 static void EvalFloat(TfLiteContext *context, TfLiteNode *node,
-                      TfLiteDepthwiseConvParams *params, OpData *data_ex,
+                      TfLiteDepthwiseConvParams *params, DSConvOpData *data_ex,
                       const TfLiteEvalTensor *input,
                       const TfLiteEvalTensor *filter,
                       const TfLiteEvalTensor *bias, TfLiteEvalTensor *output) {
@@ -3295,7 +3295,7 @@ TfLiteStatus EvalDepthWiseConvFloatInt8(TfLiteContext *context,
 
   auto *params =
       reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
-  OpData &data_ex = *(static_cast<OpData *>(node->user_data));
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
 
   TfLiteEvalTensor *output =
       tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
@@ -3360,7 +3360,7 @@ TfLiteStatus EvalDepthWiseConvFloat16(TfLiteContext *context,
 
   auto *params =
       reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
-  OpData &data_ex = *(static_cast<OpData *>(node->user_data));
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
 
   TfLiteEvalTensor *output =
       tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
@@ -3429,7 +3429,7 @@ TfLiteStatus EvalDepthWiseConv(TfLiteContext *context, TfLiteNode *node) {
 
   auto *params =
       reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
-  OpData &data_ex = *(static_cast<OpData *>(node->user_data));
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
 
   TfLiteEvalTensor *output =
       tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
@@ -3476,7 +3476,7 @@ TfLiteStatus EvalDepthWiseConvInt8Opt(TfLiteContext *context,
 
   auto *params =
       reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
-  OpData &data_ex = *(static_cast<OpData *>(node->user_data));
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
 
   TfLiteEvalTensor *output =
       tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);

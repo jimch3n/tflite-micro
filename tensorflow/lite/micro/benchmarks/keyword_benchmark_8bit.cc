@@ -55,7 +55,11 @@ KeywordBenchmarkRunner* CreateBenchmarkRunner(MicroProfiler* profiler) {
   KeywordOpResolver* op_resolver = new (op_resolver_buffer) KeywordOpResolver();
   op_resolver->AddFullyConnected(tflite::Register_FULLY_CONNECTED_INT8());
   op_resolver->AddQuantize();
+  #if defined(XTENSA) || defined(CMSIS_NN)
   op_resolver->AddSoftmax(tflite::Register_SOFTMAX_INT8_INT16());
+  #else
+  op_resolver->AddSoftmax();
+#endif
   op_resolver->AddSvdf(tflite::Register_SVDF_INT8());
 
   return new (benchmark_runner_buffer)

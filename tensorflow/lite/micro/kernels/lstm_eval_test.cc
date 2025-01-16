@@ -24,6 +24,9 @@ limitations under the License.
 #if defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/kernels/ia8201/lstm_eval.h"
+#elif defined(IA700)
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/lstm_eval.h"
 #else
 #include "tensorflow/lite/micro/kernels/lstm_eval.h"
 #endif
@@ -36,7 +39,7 @@ limitations under the License.
 // kernel is reconciled with reference kernel
 #if !defined(XTENSA)
 namespace {
-  #if !defined(IA8201)
+  #if !defined(IA8201) && !defined(IA700)
   // Test Settings
 constexpr float kTestFloatTolerance = 1e-6f;
 #else
@@ -54,7 +57,7 @@ golden[i] (0.994514) near output_data[i] (0.994511)
 TF_LITE_MICRO_TESTS_BEGIN
 // TODO(b/230666079) enable below tests for xtensa when the xtensa
 // kernel is reconciled with reference kernel
-#if !defined(XTENSA) && !defined(IA8201) // bypass create gate param need update for additional
+#if !defined(XTENSA) && !defined(IA8201) && !defined(IA700)// bypass create gate param need update for additional
 // show go throught prepare to create it
 
 

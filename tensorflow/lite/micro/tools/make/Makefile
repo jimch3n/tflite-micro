@@ -133,9 +133,17 @@ ifeq ($(TOOLCHAIN), armclang)
 else
   CORE_OPTIMIZATION_LEVEL := -Os
 endif
-KERNEL_OPTIMIZATION_LEVEL := -O2
-THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O2
+ifneq ($(TARGET_PF),)
+KERNEL_OPTIMIZATION_LEVEL := -O0
+THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL := -O0
+endif
 ifeq ($(TARGET),ia8201)
+ifeq ($(TARGET_PF),) #skip cstub
+KERNEL_OPTIMIZATION_LEVEL += -Os
+THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL += -Os
+endif
+endif
+ifeq ($(TARGET),ia700)
 KERNEL_OPTIMIZATION_LEVEL += -Os
 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL += -Os
 endif
@@ -170,6 +178,7 @@ endif
 COMMON_FLAGS := \
   -Werror \
   -fno-unwind-tables \
+  -fno-asynchronous-unwind-tables \
   -ffunction-sections \
   -fdata-sections \
   -fmessage-length=0 \
@@ -185,7 +194,7 @@ ifeq ($(TARGET), $(HOST_OS))
 endif
 
 CXXFLAGS := \
-  -std=c++11 \
+  -std=c++17 \
   -fno-rtti \
   -fno-exceptions \
   -fno-threadsafe-statics \
@@ -194,7 +203,7 @@ CXXFLAGS := \
 
 CCFLAGS := \
   -Wimplicit-function-declaration \
-  -std=c11 \
+  -std=c17 \
   $(COMMON_FLAGS)
 
 ARFLAGS := -r
@@ -278,28 +287,40 @@ else ifeq ($(BUILD_TYPE), no_tf_lite_static_memory)
 	# https://github.com/tensorflow/tensorflow/issues/43076
 	CXXFLAGS := $(filter-out -DTF_LITE_STATIC_MEMORY, $(CXXFLAGS))
 	CCFLAGS := $(filter-out -DTF_LITE_STATIC_MEMORY, $(CCFLAGS))
-
-	# We are using C++17 for the no_tf_lite_static_memory_build to make it close
-	# to the TfLite bazel build.
-	CXXFLAGS := $(filter-out -std=c++11, $(CXXFLAGS))
-	CXXFLAGS += -std=c++17
-	CCFLAGS := $(filter-out -std=c11, $(CCLAGS))
-	CCFLAGS += -std=c17
 endif
 
 # This library is the main target for this makefile. It will contain a minimal
 # runtime that can be linked in to other programs.
 MICROLITE_LIB_NAME := libtensorflow-microlite.a
 
+# TFLM optional compression support (default disabled)
+ENABLE_COMPRESSION := no
+ifneq ($(USE_TFLM_COMPRESSION),)
+  # currently only Linux (x86), Xtensa targets supported
+  ifeq ($(TARGET), $(filter $(TARGET), linux xtensa))
+    CXXFLAGS += -DUSE_TFLM_COMPRESSION
+    CCFLAGS += -DUSE_TFLM_COMPRESSION
+    ENABLE_COMPRESSION := yes
+  endif
+endif
+
 # Where compiled objects are stored.
 BASE_GENDIR := gen
+ifneq ($(TARGET_PF),)
+GENDIR := $(BASE_GENDIR)/$(TARGET_ARCH)_$(BT)_$(TARGET_PF)/
+else
 GENDIR := $(BASE_GENDIR)/$(TARGET_ARCH)_$(BT)/
+endif
 #ifneq ($(OPTIMIZED_KERNEL_DIR),)
 #  GENDIR := $(GENDIR)_$(OPTIMIZED_KERNEL_DIR)
 #endif
 #ifneq ($(CO_PROCESSOR),)
 #  GENDIR := $(GENDIR)_$(CO_PROCESSOR)
 #endif
+
+ifeq ($(ENABLE_COMPRESSION), yes)
+  GENDIR := $(GENDIR)_compression
+endif
 #GENDIR := $(GENDIR)_$(TOOLCHAIN)/
 
 CORE_OBJDIR := $(GENDIR)obj/core/
@@ -358,6 +379,8 @@ $(TENSORFLOW_ROOT)tensorflow/lite/micro/micro_resource_variable_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/micro_time_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/micro_utils_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/recording_micro_allocator_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/span_test.cc \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/static_vector_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/arena_allocator/non_persistent_arena_buffer_allocator_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/arena_allocator/persistent_arena_buffer_allocator_test.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/arena_allocator/recording_single_arena_buffer_allocator_test.cc \
@@ -520,10 +543,10 @@ $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/*.h)
 # The explicitly specified list of sources and headers that are shared between
 # TfLite and TFLM are in the ci/sync_from_upstream_tf.sh script.
 TFL_CC_SRCS := \
-$(shell find $(TENSORFLOW_ROOT)tensorflow/lite -type d \( -path $(TENSORFLOW_ROOT)tensorflow/lite/experimental -o -path $(TENSORFLOW_ROOT)tensorflow/lite/micro \) -prune -false -o -name "*.cc" -o -name "*.c")
+$(shell find $(TENSORFLOW_ROOT)tensorflow -type d \( -path $(TENSORFLOW_ROOT)tensorflow/lite/experimental -o -path $(TENSORFLOW_ROOT)tensorflow/lite/micro \) -prune -false -o -name "*.cc" -o -name "*.c")
 
 TFL_CC_HDRS := \
-$(shell find $(TENSORFLOW_ROOT)tensorflow/lite -type d \( -path $(TENSORFLOW_ROOT)tensorflow/lite/experimental -o -path $(TENSORFLOW_ROOT)tensorflow/lite/micro \) -prune -false -o -name "*.h")
+$(shell find $(TENSORFLOW_ROOT)tensorflow -type d \( -path $(TENSORFLOW_ROOT)tensorflow/lite/experimental -o -path $(TENSORFLOW_ROOT)tensorflow/lite/micro \) -prune -false -o -name "*.h")
 
 ifneq ($(BUILD_TYPE), no_tf_lite_static_memory)
   EXCLUDED_TFL_CC_SRCS := \
@@ -657,7 +680,6 @@ TARGET_SPECIFIC_MAKE_TEST:=0
 ifeq ($(findstring $(TARGET),$(TARGETS_WITHOUT_MAKEFILES)),)
   include $(MAKEFILE_DIR)/targets/$(TARGET)_makefile.inc
 endif
-
 
 # Validate valid options.
 ifeq (,$(filter $(OPTIMIZE_KERNELS_FOR),KERNELS_OPTIMIZED_FOR_SPEED KERNELS_OPTIMIZED_FOR_SIZE))
@@ -872,14 +894,19 @@ $(MICROLITE_LIB_PATH): $(MICROLITE_LIB_OBJS) $(MICROLITE_KERNEL_OBJS) $(MICROLIT
 install: $(MICROLITE_LIB_PATH)
 ifeq ($(TARGET), ia8201)
   ifeq ($(BUILD_TYPE), release)
-	cp -f $(MICROLITE_LIB_PATH) $(ROME_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib.a
+	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib.a
   endif
   ifeq ($(BUILD_TYPE), remove_ref_ops)
-	cp -f $(MICROLITE_LIB_PATH) $(ROME_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib_tiny.a
+	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib_tiny.a
+  endif
+  
+  ifeq ($(TARGET_PF), CSTUBS)
+	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib.a
   endif
   ifeq ($(BUILD_TYPE), release_with_logs)
-	cp -f $(MICROLITE_LIB_PATH) $(ROME_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib_logs.a
+	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib_logs.a
   endif
+
 endif
 ifeq ($(TARGET), ia700)
  ifeq ($(BUILD_TYPE), release)
@@ -890,9 +917,9 @@ ifeq ($(TARGET), ia700)
  endif
 endif
 ifeq ($(TARGET), xtensa)
-  ifeq ($(BUILD_TYPE), release)
-	cp -f $(MICROLITE_LIB_PATH) ../../Core_Hmd1a/TFLu/Libs/xccTFLuLib-Hifi.a
-  endif
+  #ifeq ($(TARGET_ARCH), hifi)
+	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib-Hifi.a
+  #endif
 endif
 ## for those replace OBJ
 
@@ -912,10 +939,10 @@ SIGNAL_HACK_OBJS := $(addprefix $(TARGET_OBJ_SIG_DIR), energy.o filter_bank.o fi
 #$(info signal objs: $(SIGNAL_HACK_OBJS))
 BUILD_HK_OBJS := $(findstring $(TARGET_OBJS), $(MICROLITE_KERNEL_OBJS))
 ifeq ($(HOST_OS), linux)
-TARGET_TFLIB := /mnt/d/project/IA8201_SDK/Chelsea_SDK_7.0.0_TONLY/Knowles_IA8201_SDK/Rome/Src/Packages/HotWordTFLM/External/AndroidV/libraries/release/v4/libtensorflow-microlite-v4.1.a
+TARGET_TFLIB := $(SDK_ROOT_PACKAGE)/HotWordTFLM/External/AndroidV/libraries/release/v4/libtensorflow-microlite-v4.1.a
 
 else
-TARGET_TFLIB := d:/project/IA8201_SDK/Chelsea_SDK_7.0.0_TONLY/Knowles_IA8201_SDK/Rome/Src/Packages/HotWordTFLM/External/CLIB_True/libtensorflow-microlite_KERNELs.a
+TARGET_TFLIB := $(SDK_ROOT_PACKAGE)/HotWordTFLM/External/CLIB_True/libtensorflow-microlite_KERNELs.a
 endif
 #$(info hk $(BUILD_HK_OBJS))
 #$(info target lib $(TARGET_TFLIB))

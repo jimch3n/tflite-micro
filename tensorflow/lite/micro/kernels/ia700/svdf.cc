@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+#include "tensorflow/lite/micro/ia700/config.h"
 #include "tensorflow/lite/micro/kernels/svdf.h"
 
 #include <cmath>
@@ -25,10 +25,11 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
-#include "tensorflow/lite/micro/ia700/config.h"
+
 #include "tensorflow/lite/micro/kernels/activation_utils.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
 namespace tflite {

@@ -73,13 +73,17 @@ inline void ConcatenationEx(const ConcatenationParams& params,
     for (int i = 0; i < inputs_count; ++i) {
       const int copy_size = input_shapes[i]->Dims(axis) * base_inner_size;
       const Scalar* input_ptr = input_data[i] + k * copy_size;
-#if defined(IA8201) || defined(IA700)
+#if defined(IA8201)
       if (output_ptr) {
         block_copy_bytes((int8_t*)output_ptr, (const int8_t*)input_ptr,
                          copy_size * sizeof(Scalar));
       } else {
-        *input_offset++ = (input_ptr - input_data[i]);
-        *input_size++ = copy_size * sizeof(Scalar);
+        uint16_t cp_offset = (input_ptr - input_data[i]);
+        uint32_t cp_size = copy_size * sizeof(Scalar);
+        KN_PRINTD(cp_offset);
+        KN_PRINTD(cp_size);
+        *input_offset++ = cp_offset;
+        *input_size++ = cp_size;
       }
       if (output_ptr) output_ptr += copy_size;
 #else
@@ -167,7 +171,7 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const ConCatOpDataEx* data =
       static_cast<const ConCatOpDataEx*>(node->user_data);
-
+  KN_PRINTD(data->opt_constraint);
 #if defined(DMX1A_CONCATENATION_OPT) || defined(HMD1A_CONCATENATION_OPT)
   if (data->opt_constraint) {
     int8_t* output_ptr = tflite::micro::GetTensorData<int8_t>(output);
@@ -178,9 +182,13 @@ void EvalUnquantized(TfLiteContext* context, TfLiteNode* node) {
         const int copy_size =
             *cp_size;  // input_shapes[i]->Dims(axis) * base_inner_size;
         const data_type* input_ptr = inputs_data[i] + *cp_offset;
-
-        block_copy_bytes((int8_t*)output_ptr, (const int8_t*)input_ptr,
-                         copy_size);
+        KN_PRINTD(*cp_offset);
+        KN_PRINTD(copy_size);
+        if (copy_size > 0) { 
+          // FIXME: workaround cstub copy error align_load
+          block_copy_bytes((int8_t*)output_ptr, (const int8_t*)input_ptr,
+                           copy_size);
+        }
         cp_offset++;
         cp_size++;
         output_ptr += copy_size;  // use byte as pointer
@@ -403,7 +411,7 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
   }
 
   KN_PRINT_Q15_SIZE(data->input_offset, int(inputs_count * outer_size));
-  KN_PRINT_Q15_SIZE(data->input_size, int(inputs_count * outer_size));
+  KN_PRINT_Q31_SIZE(data->input_size, int(inputs_count * outer_size));
 #endif
 
   micro_context->DeallocateTempTfLiteTensor(output);

@@ -7,6 +7,7 @@
 #   - XTENSA_TOOLS_VERSION: For example: RI-2019.2-linux
 #   - XTENSA_CORE: The name of the Xtensa core to use
 #      For example: HIFI_190304_swupgrade
+IA8201_SDK_ROOT := third_party/ia8201_sdk/Rome
 
 TARGET_ARCH :=
 XTENSA_USE_LIBC := true
@@ -40,23 +41,22 @@ TARGET_ARCH_DEFINES := -D$(shell echo $(TARGET_ARCH) | tr [a-z] [A-Z])
   -DAVL_HEMI 
 	CORE := Hmd1a
 
-  ROME_SDK_ROOT := third_party/ia8201_sdk/Rome
-  ROME_CORE_INC := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/Include
-  #ROME_ML_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/MachineLearning/Include
-  ROME_UTILS_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/Utility/Include
-  ROME_DSP_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Include
-  ROME_AVL_INC   := $(ROME_SDK_ROOT)/Src/Cores/AVL
-  ROME_CSTUBS_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Include
-  ROME_DSP_LIB_PATH := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Libs
 
-  ROME_CSTUBS_LIB_PATH := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Libs
-  ROME_CSTUBS_LIB := gccSimulationEnvironment.a
+  SDK_CORE_INC := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/Include
+  SDK_ML_INC   := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/MachineLearning/Include
+  SDK_DSP_INC   := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Include
+  SDK_AVL_INC   := $(IA8201_SDK_ROOT)/Src/Cores/AVL
+  SDK_CSTUBS_INC   := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Include
+  SDK_DSP_LIB_PATH := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Libs
+  SDK_TFLU_LIB_PATH :=  $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/TFLu/Libs
+  SDK_CSTUBS_LIB_PATH := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Libs
+  SDK_CSTUBS_LIB := gccSimulationEnvironment.a
 
 
-HMD_FLAGS :=     -I$(ROME_CORE_INC) \
-    -I$(ROME_AVL_INC) \
-    -I$(ROME_DSP_INC) \
-    -I$(ROME_UTILS_INC) \
+
+HMD_FLAGS :=     -I$(SDK_CORE_INC) \
+    -I$(SDK_AVL_INC) \
+    -I$(SDK_DSP_INC) \
     $(TARGET_ARCH_CFLAGS)
 
 PLATFORM_FLAGS = \
@@ -73,7 +73,7 @@ export PATH := $(XTENSA_BASE)/tools/$(XTENSA_TOOLS_VERSION)/XtensaTools/bin:$(PA
 TARGET_TOOLCHAIN_PREFIX := xt-
 CXX_TOOL := clang++
 CC_TOOL := clang
-
+LIB_PREFIX := xcc
 # Unused exception related symbols make their way into a binary that links
 # against TFLM as described in https://github.com/tensorflow/tensorflow/issues/47575.
 # We have two options to avoid this. The first involves using -stdlib=libc++ and

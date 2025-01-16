@@ -669,13 +669,15 @@ def model_mapping_by_operators(model, enable_map_op,subgraph_idx=0, FLAGS=None):
             filter_size = filter_height* filter_width * input_depth
             if w_tensor.type == 0:
                 weight_as_float = struct.unpack(f'<{filter_size}f', bytes(model.buffers[w_buf_idx].data))
+                weight = np.array(weight_as_float).reshape((1,
+                                                            filter_height,
+                                                            filter_width,
+                                                            depth_multipler * input_depth)).astype(np.float32)
             else:
                 ##
                 print("WARN: ERROR cannot convert int8 wieghts for hybrid convolution is not supported")
-            weight = np.array(weight_as_float).reshape((1,
-                                                                      filter_height,
-                                                                      filter_width,
-                                                                      depth_multipler * input_depth)).astype(np.float32)
+                continue
+
             # check output channel multiple of 8 and channel multipler is 1
             # if mapped_type =
             if (out_tensor.shape[3] & 3) == 0 and depth_multipler == 1:

@@ -15,17 +15,22 @@ limitations under the License.
 //#define KN_DEBUG
 
 
-#if defined(XTENSA) || defined(HMD1A)
+#if defined(XTENSA) || defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/config.h"
-#ifdef __XTENSA__
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#if defined(HMD1A) && defined(__XTENSA__) 
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
-#else
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+
 #endif
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
+#elif defined(IA700)
+
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
 #endif
 #include "signal/src/filter_bank_spectral_subtraction.h"
 
@@ -41,6 +46,7 @@ void FilterbankSpectralSubtraction(const SpectralSubtractionConfig* config,
   const bool data_clamping = config->clamping;
   const int smoothing_bits = config->smoothing_bits;
   const int num_channels = config->num_channels;
+   // KN_PRINT_Q31_SIZE(input,num_channels);
 #if defined(SIG_FB_SS_OPT)
 
   int spectral_subtraction_bits = config->spectral_subtraction_bits;
@@ -154,6 +160,8 @@ void FilterbankSpectralSubtraction(const SpectralSubtractionConfig* config,
     output[i] = subtracted > floor ? subtracted : floor;
   }
 #endif
+ //   KN_PRINT_Q31_SIZE(noise_estimate,num_channels);
+ // KN_PRINT_Q31_SIZE(output,num_channels);
 }
 #ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal

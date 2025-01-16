@@ -21,7 +21,7 @@ endef
 
 define archive_target
 	@echo archiving: $(1)
-	$(AR) -cr $(1) $(2)
+	@$(AR) -cr $(1) $(2)
 endef
 
 define build_target

@@ -11,10 +11,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello_world_test", "hello_w
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "model_benchmark", "..\..\third_party\ia8201_sdk\Rome\Src\Cores\Core_Dmx1a\TFLu\tools\model_benchmark\MSC\model_benchmark.vcxproj", "{120F617F-AC54-46B9-9E7F-0C27BFED65DD}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TFLuLib_Shapiro", "TFLuLib_Shapiro.vcxproj", "{ED554AFB-FDF9-4E3D-8176-FB789E58C362}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Dmx1a|x86 = Dmx1a|x86
 		Dmx1a-Remove_ref_ops|x86 = Dmx1a-Remove_ref_ops|x86
+		HemiLite_RemoveRefOps|x86 = HemiLite_RemoveRefOps|x86
+		HemiLite|x86 = HemiLite|x86
 		Hmd1a|x86 = Hmd1a|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
@@ -22,20 +26,42 @@ Global
 		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a|x86.Build.0 = Dmx1a|Win32
 		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = Dmx1a|Win32
 		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.HemiLite_RemoveRefOps|x86.ActiveCfg = Hmd1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.HemiLite_RemoveRefOps|x86.Build.0 = Hmd1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.HemiLite|x86.ActiveCfg = Hmd1a|Win32
+		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.HemiLite|x86.Build.0 = Hmd1a|Win32
 		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Hmd1a|x86.ActiveCfg = Hmd1a|Win32
 		{D63DF0D9-22ED-4331-A0FB-D64645C35AF1}.Hmd1a|x86.Build.0 = Hmd1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a|x86.ActiveCfg = Dmx1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a|x86.Build.0 = Dmx1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = Dmx1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.HemiLite_RemoveRefOps|x86.ActiveCfg = Hmd1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.HemiLite_RemoveRefOps|x86.Build.0 = Hmd1a|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.HemiLite|x86.ActiveCfg = HemiLite|Win32
+		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.HemiLite|x86.Build.0 = HemiLite|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Hmd1a|x86.ActiveCfg = Hmd1a|Win32
 		{72D061E1-852E-4BF5-AE8D-69CA1FD4ECEC}.Hmd1a|x86.Build.0 = Hmd1a|Win32
 		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a|x86.ActiveCfg = Dmx1a|Win32
 		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a|x86.Build.0 = Dmx1a|Win32
 		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = Dmx1a|Win32
 		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Dmx1a-Remove_ref_ops|x86.Build.0 = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.HemiLite_RemoveRefOps|x86.ActiveCfg = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.HemiLite_RemoveRefOps|x86.Build.0 = Dmx1a|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.HemiLite|x86.ActiveCfg = HemiLite|Win32
+		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.HemiLite|x86.Build.0 = HemiLite|Win32
 		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Hmd1a|x86.ActiveCfg = Dmx1a|Win32
 		{120F617F-AC54-46B9-9E7F-0C27BFED65DD}.Hmd1a|x86.Build.0 = Dmx1a|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.Dmx1a|x86.ActiveCfg = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.Dmx1a|x86.Build.0 = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.Dmx1a-Remove_ref_ops|x86.ActiveCfg = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.Dmx1a-Remove_ref_ops|x86.Build.0 = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.HemiLite_RemoveRefOps|x86.ActiveCfg = HemiLite_RemoveRefOps|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.HemiLite_RemoveRefOps|x86.Build.0 = HemiLite_RemoveRefOps|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.HemiLite|x86.ActiveCfg = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.HemiLite|x86.Build.0 = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.Hmd1a|x86.ActiveCfg = HemiLite|Win32
+		{ED554AFB-FDF9-4E3D-8176-FB789E58C362}.Hmd1a|x86.Build.0 = HemiLite|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

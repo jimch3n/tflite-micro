@@ -72,7 +72,7 @@ void SoftMaxV(float* y, const float* x, int n) {
 
   // 1. Subtract max value from each unit to avoid overflow of exponential
   // function
-  load32x1_vr_idxR(VR_max, x, 0, VRQ0);
+  load32x1_vr_idxR(VR_max, (const unsigned int *)x, 0, VRQ0);
   convert_IEEE_float_to_32F_x2(VR_max);
   replicate(VR_max, 0x3, VR_max, VRQ0);
   xLocal = x;

@@ -20,6 +20,10 @@ limitations under the License.
 #include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#elif defined(IA700)
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #endif
 
 #include "signal/src/filter_bank_log.h"
@@ -35,7 +39,6 @@ void FilterbankLog(const uint32_t* input, int num_channels,
     const uint32_t scaled = input[i] << correction_bits;
     if (scaled > 1) {
 #if defined(SIG_FB_LOG_OPT)
-
       AScalar aflt = AScalar((int)scaled);
       AScalar ascale = AScalar(output_scale, 16);
       AScalar aflt_loge = aflt.f_log();
@@ -53,6 +56,8 @@ void FilterbankLog(const uint32_t* input, int num_channels,
       output[i] = 0;
     }
   }
+
+  //KN_PRINT_Q15_SIZE(output, num_channels);
 }
 #ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal

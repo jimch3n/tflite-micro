@@ -1,4 +1,4 @@
-/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,10 @@ struct OpDataFullyConnected {
   // A buffer used to store unpacked filter values. This is used if the source
   // tensor is of n-bit precision that cannot be easily processed by kernels.
   int filter_buffer_index;
+
+  int32_t* per_channel_output_multiplier;
+  int32_t* per_channel_output_shift;
+  bool is_per_channel;
 #endif
 };
 
@@ -78,10 +82,9 @@ TFLMRegistration Register_FULLY_CONNECTED();
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8.
 TFLMRegistration Register_FULLY_CONNECTED_INT8();
-//support float32
 TFLMRegistration Register_FULLY_CONNECTED_FLOAT32();
 
-//support float32 x float16 and float32 x int8 hybrid
+// support float32 x float16 and float32 x int8 hybrid
 TFLMRegistration Register_FULLY_CONNECTED_FLOAT16();
 TFLMRegistration Register_FULLY_CONNECTED_FLOATINT8();
 #else

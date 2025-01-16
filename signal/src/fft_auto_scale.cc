@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+//#define KN_DEBUG
 #include "signal/src/fft_auto_scale.h"
 
 #include <stddef.h>
@@ -20,22 +20,36 @@ limitations under the License.
 
 #include "signal/src/max_abs.h"
 #include "signal/src/msb.h"
+#if defined(IA8201)
+#include "tensorflow/lite/micro/ia8201/config.h"
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#endif
 
+#if defined(IA700)
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
+#endif
 // TODO(b/286250473): remove namespace once de-duped libraries
 namespace tflite {
 namespace tflm_signal {
 
 int FftAutoScale(const int16_t* input, int size, int16_t* output) {
   const int16_t max = MaxAbs16(input, size);
+  //KN_PRINTD(max);
   int scale_bits = (sizeof(int16_t) * 8) - MostSignificantBit32(max) - 1;
   if (scale_bits <= 0) {
     scale_bits = 0;
   }
+    //KN_PRINTD(scale_bits);
   for (int i = 0; i < size; i++) {
     // (input[i] << scale_bits) is undefined if input[i] is negative.
     // Multiply explicitly to make the code portable.
+    //KN_PRINTX(input[i]);
     output[i] = input[i] * (1 << scale_bits);
   }
+  //KN_PRINTD(scale_bits);
   return scale_bits;
 }
 }  // namespace tflm_signal

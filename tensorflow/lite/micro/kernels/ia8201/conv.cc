@@ -13,10 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
-
 #define ENABLE_DILATION_OPT  // enable dialtion optimization
 #include "tensorflow/lite/micro/ia8201/config.h"
-//#include "AVL.h"
 #ifndef REMOVE_REFOP_SUPPORT
 #include "tensorflow/lite/kernels/internal/reference/conv.h"
 #endif
@@ -71,7 +69,7 @@ struct OpData {
 
   int opt_constraint_float;
   ds_conv2d_layer_t conv2d;
-
+  AScalar *bias_aflt;
   uint32_t sizeScratchIm2Col;
   uint32_t sizeScratchOutput;
 };
@@ -231,8 +229,13 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
           tflite::micro::GetEvalInput(context, node, kConvBiasTensor);
       const int32_t *bias_input =
           tflite::micro::GetTensorData<int32_t>(biasEval);
-      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_input,
+      size_t bias_size = ElementCount(*biasEval->dims);
+      AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
+          context, sizeof(AScalar) * bias_size);
+
+      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_aflt,
                                  output_matVec, 17);
+      data_ex->bias_aflt = bias_aflt;
       tflite::ConvertQ31ToAfloat(data->output_zero_point, data_ex->outputOffset,
                                  17);
 
@@ -385,8 +388,13 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
           tflite::micro::GetEvalInput(context, node, kConvBiasTensor);
       const float *bias = tflite::micro::GetTensorData<float>(biasEval);
       if (bias) {
-        tflite::ConvertIEEEFloatToAfloat(bias, (AScalar *)bias,
-                                         ElementCount(*biasEval->dims));
+              size_t bias_size = ElementCount(*biasEval->dims);
+      AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
+          context, sizeof(AScalar) * bias_size);
+
+        tflite::ConvertIEEEFloatToAfloat(bias, (AScalar *)bias_aflt,
+                                         bias_size);
+      data_ex->bias_aflt = bias_aflt;
       }
     }  // constraint
 #endif
@@ -1481,7 +1489,7 @@ TfLiteStatus EvalConvFloat(TfLiteContext *context, TfLiteNode *node,
     while (batch) {
       ConvFloat(data_ex, (const float *)pInputLocal,
                 //  (const float *)data_ex.mapped_filter,
-                pFilter, tflite::micro::GetTensorData<float>(bias),
+                pFilter, (const float *)data_ex.bias_aflt,
                 pOutputLocal, afloat_activation_min, afloat_activation_max);
 
       // KN_PRINTD(batch);
@@ -1544,7 +1552,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
     const int batches = MatchingDim(tflite::micro::GetTensorShape(input), 0,
                                     tflite::micro::GetTensorShape(output), 0);
     int8_t *p_aligned_scratch = nullptr;
-
+    AScalar *bias_aflt = data_ex.bias_aflt;
     if (data_ex.buffer_idx > -1) {
       p_aligned_scratch =
           (int8_t *)context->GetScratchBuffer(context, data_ex.buffer_idx);
@@ -1570,7 +1578,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
         // KN_PRINT_Q7_SIZE(p_aligned_input,input_conv_depth );
         ConvPerChannelPadding(data_ex, (const int8_t *)pInputLocal,
                               (const int8_t *)data_ex.mapped_filter,
-                              tflite::micro::GetTensorData<int32_t>(bias),
+                              (const int32_t *)bias_aflt,
                               pOutputLocal, sign_in_offset);
       } else
 
@@ -1581,7 +1589,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
         ConvPerChannelPaddingInputOffset(
             data_ex, (const int8_t *)pInputLocal,
             (const int8_t *)data_ex.mapped_filter,
-            tflite::micro::GetTensorData<int32_t>(bias), pOutputLocal,
+            (const int32_t *)bias_aflt, pOutputLocal,
             data_ex.inputOffsetWithW, data_ex.input_offset_int8_neg,
             sign_in_offset);
       }
@@ -2778,7 +2786,7 @@ TfLiteStatus EvalConvFloatInt8(
     while (batch) {
       ConvFloatInt8(data_ex, (const float *)pInputLocal,
                     //  (const float *)data_ex.mapped_filter,
-                    pFilter, tflite::micro::GetTensorData<float>(bias),
+                    pFilter, (const float *)data_ex.bias_aflt,
                     pOutputLocal, afloat_activation_min, afloat_activation_max);
 
       // KN_PRINTD(batch);
@@ -2852,7 +2860,7 @@ TfLiteStatus EvalConvFloat16Internal(TfLiteContext *context, TfLiteNode *node,
     while (batch) {
       ConvFloat16(data_ex, (const float *)pInputLocal,
                   //  (const float *)data_ex.mapped_filter,
-                  pFilter, tflite::micro::GetTensorData<float>(bias),
+                  pFilter, (const float *)data_ex.bias_aflt,
                   pOutputLocal, afloat_activation_min, afloat_activation_max);
 
       // KN_PRINTD(batch);

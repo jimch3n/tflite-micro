@@ -2073,8 +2073,6 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
     }
 
     if (i != (loopLimRow - 1) || !processLastLoop) {
-      KN_PRINTD(i);
-      KN_PRINTX_VR64(VR_y);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ0);
       convert_32I_to_32F_x1(VR_y, exp_fxp, VRQ1);
 
@@ -2752,12 +2750,6 @@ TfLiteStatus EvalFloat32(TfLiteContext *context, TfLiteNode *node,
 
     AScalar act_min, act_max;
     CalculateActivationRangeAflt(activation, &act_min, &act_max);
-
-    // KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input),
-    //    ElementCount(*input->dims));
-
-    // KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(filter),
-    //    ElementCount(*filter->dims));
 
     accum_depth =
         XT_MIN(accum_depth,

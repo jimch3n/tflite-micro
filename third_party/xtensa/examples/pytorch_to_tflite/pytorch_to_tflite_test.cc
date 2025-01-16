@@ -44,6 +44,9 @@ limitations under the License.
 #if defined(DMX1A)
 #include "third_party/xtensa/examples/pytorch_to_tflite/kn_dmx1a_mobilenet_v2_quantized_1x3x224x224_model_data.h"
 
+#elif defined(HMD1A) && !defined(HIFI3)
+#include "third_party/xtensa/examples/pytorch_to_tflite/kn_hmd1a_mobilenet_v2_quantized_1x3x224x224_model_data.h"
+
 #else
 #include "third_party/xtensa/examples/pytorch_to_tflite/mobilenet_v2_quantized_1x3x224x224_model_data.h"
 #endif
@@ -61,6 +64,9 @@ TF_LITE_MICRO_TEST(TestInvoke) {
 #if defined(DMX1A)
     const tflite::Model* model =
       ::tflite::GetModel(g_kn_dmx1a_mobilenet_v2_quantized_1x3x224x224_model_data);
+#elif defined(HMD1A) && !defined(HIFI3)
+    const tflite::Model* model =
+      ::tflite::GetModel(g_kn_hmd1a_mobilenet_v2_quantized_1x3x224x224_model_data);
 
 #else
   const tflite::Model* model =
@@ -80,8 +86,12 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   tflite::PytorchOpsResolver resolver;
   tflite::InitPytorchOpsResolver(resolver);
   // Create an area of memory to use for input, output, and intermediate arrays.
-  constexpr int tensor_arena_size = 3 * 1024 * 1024;
 
+#if defined(HIFI3)
+  constexpr int  tensor_arena_size = 3*1024*1024+800*1024; // testing only
+#else
+  constexpr int tensor_arena_size = 3 * 1024 * 1024;
+#endif
   // prevent stack overflow
  static uint8_t tensor_arena[tensor_arena_size];
 

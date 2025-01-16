@@ -67,7 +67,19 @@ limitations under the License.
     }                                                                         \
     putchar('\n');                                                            \
   } while (0)
-
+#define KN_PRINT_Q7_SIZE_ATMOST(BUF, SIZE, PSIZE)                             \
+  do {                                                                        \
+    int8_t *pBuf = (int8_t *)BUF;                                             \
+    int print_size = (SIZE);                                                  \
+    printf("%s: %p size:%d %s:%d\n", #BUF, pBuf, SIZE, __FUNCTION__,          \
+           __LINE__);                                                         \
+    for (int ii = 0; (ii < print_size); ii++) {                               \
+      if (ii >= PSIZE) break;                                                 \
+      if ((ii & 7) == 0) printf("%3d\t", ii);                                 \
+      printf("[%02x] %c", pBuf[ii] & 0xff, ((ii + 1) & 7) == 0 ? '\n' : ' '); \
+    }                                                                         \
+    putchar('\n');                                                            \
+  } while (0)
 #define KN_PRINT_Q7_SIZE_CTABLE(BUF, SIZE)                                     \
   do {                                                                         \
     int8_t *pBuf = (int8_t *)BUF;                                              \
@@ -94,6 +106,37 @@ limitations under the License.
     }                                                                \
     putchar('\n');                                                   \
   } while (0)
+#define KN_PRINT_Q15_OFFSET_SIZE(BUF, SIZE, OFFSET)                  \
+  do {                                                               \
+    int16_t *pBuf = (int16_t *)BUF;                                  \
+    int print_size = (SIZE);                                         \
+    printf("%s: %p size:%d %s:%d\n", #BUF, pBuf, SIZE, __FUNCTION__, \
+           __LINE__);                                                \
+    for (int ii = 0; (ii < print_size); ii += OFFSET) {              \
+      if ((ii & 7) == 0) printf("%3d\t", ii);                        \
+      printf("%p\t0x%04x, %c", &pBuf[ii], pBuf[ii] & 0xffff,         \
+             ((ii)&7) == 0 ? '\n' : ' ');                            \
+    }                                                                \
+    putchar('\n');                                                   \
+  } while (0)
+#define KN_PRINT_Q15_OFFSET_CIRC_SIZE(BUF, BUF0, SIZE, OFFSET)          \
+  do {                                                                  \
+    int16_t *pBuf0 = (int16_t *)BUF0;                                   \
+    int16_t *pBuf1 = pBuf0 + SIZE;                                      \
+    int16_t *pBuf = BUF;                                                \
+    int print_size = (SIZE);                                            \
+    printf("%s: %p size:%d %s:%d %p %p offset: %d\n", #BUF, pBuf, SIZE, \
+           __FUNCTION__, __LINE__, BUF0, BUF, OFFSET);                  \
+    for (int ii = 0, k = 0; (ii < print_size); ii += OFFSET, k++) {     \
+      if (pBuf >= pBuf1) {                                              \
+        pBuf = (pBuf0);                                                 \
+      }                                                                 \
+      printf("%p\t0x%04x, %c", pBuf, pBuf[0] & 0xffff,                  \
+             ((ii)&7) == 0 ? '\n' : ' ');                               \
+      pBuf += OFFSET;                                                   \
+    }                                                                   \
+    putchar('\n');                                                      \
+  } while (0)
 #define KN_PRINT_Q8_SIZE(BUF, SIZE)                                  \
   do {                                                               \
     int8_t *pBuf = (int8_t *)BUF;                                    \
@@ -117,8 +160,12 @@ limitations under the License.
     printf("%s: %5d %s = 0x%08x\n", __FUNCTION__, __LINE__, #INTD, \
            (unsigned int)INTD);                                    \
   } while (0)
-
-#define KN_PRINT_FXP(INTD, EXP)                                             \
+#define KN_PRINTX_INT64(INTD)                                         \
+  do {                                                                \
+    printf("%s: %5d %s = 0x%016llx\n", __FUNCTION__, __LINE__, #INTD, \
+           (uint64_t)INTD);                                           \
+  } while (0)
+#define KN_PRINT_FXP(INTD	, EXP)                                             \
   do {                                                                      \
     float exp_fxp = powf(2.0, EXP);                                         \
     float flt_result = (float)INTD * exp_fxp;                               \
@@ -140,11 +187,10 @@ limitations under the License.
     float a = *(float *)&INTD;                                             \
     printf("%s: %5d %s = %f\n", __FUNCTION__, __LINE__, #INTD, (double)a); \
   } while (0)
-
-#define KN_PRINTAFLT(FTL)                                                      \
-  do {                                                                         \
-    AScalar *tmpAflt = (AScalar *)&(FTL);                                      \
-    printf("%s = %10d %.10f\n", #FTL, __LINE__, (double)tmpAflt->to_double()); \
+#define KN_PRINTAFLT(FTL)                                                     \
+  do {                                                                        \
+    AScalar *tmpAflt = (AScalar *)&(FTL);                                     \
+    printf("%s: %10d %.10f\n", #FTL, __LINE__, (double)tmpAflt->to_double()); \
   } while (0)
 #define KN_PRINT_CRC(BUF, SIZE)                                               \
   do {                                                                        \
@@ -163,6 +209,18 @@ limitations under the License.
     }                                                                \
     putchar('\n');                                                   \
   } while (0)
+#define KN_PRINT_Q63_SIZE(BUF, SIZE)                                 \
+  do {                                                               \
+    int64_t *pBuf = (int64_t *)BUF;                                  \
+    printf("%s: %p size:%d %s:%d\n", #BUF, pBuf, SIZE, __FUNCTION__, \
+           __LINE__);                                                \
+    for (int ii = 0; ii < (int)SIZE; ii++) {                         \
+      printf("[%3d]:  0x%016llx %c", ii, pBuf[ii],                   \
+             ((ii + 1) & 3) == 0 ? '\n' : ' ');                      \
+    }                                                                \
+    putchar('\n');                                                   \
+  } while (0)
+
 #ifdef DMX1A
 
 #define KN_PRINT_VR128(VR_IN)                                              \
@@ -247,6 +305,35 @@ limitations under the License.
     }                                                                        \
     printf(">\n");                                                           \
   } while (0)
+#define KN_PRINT_FLOAT_INT8(IN, SIZE, SCALE)                                   \
+  do {                                                                         \
+    int8_t *pTmp = (int8_t *)IN;                                               \
+    printf("%s: %4d: %-16s: %d PTR:%p scale: %.10f\n", __FUNCTION__, __LINE__, \
+           #IN, SIZE, IN, SCALE.to_float());                                   \
+    for (int ii = 0; ii < (int)SIZE; ii++) {                                   \
+      float flt_i8 = (float)pTmp[ii] * SCALE.to_float();                       \
+      printf("[%3d] %.11f %c", ii, (double)flt_i8,                             \
+             ((ii + 1) & 3) == 0 ? '\n' : ' ');                                \
+    }                                                                          \
+    printf(">\n");                                                             \
+  } while (0)
+#define KN_PRINT_FLOAT_INT8_PER_CH(IN, IN_SIZE, OUT_SIZE, SCALE)            \
+  do {                                                                      \
+    int8_t *pTmp = (int8_t *)IN;                                            \
+    AScalar *scale = (AScalar *)SCALE;                                      \
+    printf("%s: %4d: %-16s: %d PTR:%p scale: %p\n", __FUNCTION__, __LINE__, \
+           #IN, SIZE, IN, SCALE);                                           \
+    for (int ii = 0; ii < (int)OUT_SIZE; ii++) {                            \
+      AScalar scl = scale[ii];                                              \
+      for (int jj = 0; jj < IN_SIZE; jj++) {                                \
+        int out_idx = ii * IN_SIZE + jj;                                    \
+        float flt_i8 = (float)pTmp[out_idx] * scl.to_float();               \
+        printf("[%3d] %.11f %c", out_idx, (double)flt_i8,                   \
+               ((out_idx + 1) & 3) == 0 ? '\n' : ' ');                      \
+      }                                                                     \
+    }                                                                       \
+    printf(">\n");                                                          \
+  } while (0)
 #define KN_PRINT_SHAPE(SHAPE)                              \
   do {                                                     \
     printf("%s <", #SHAPE);                                \
@@ -258,27 +345,25 @@ limitations under the License.
   } while (0)
 #define KN_PRINTS(S)    \
   do {                  \
-    printf("%s \n", S); \
+    printf("%s:%5d [%s]\n", __FUNCTION__, __LINE__, S); \
   } while (0)
 
 #else
 // empy
-#define KN_TFLM_PRINT(CNTX, INTD) (static_cast<void>(0))
-#define KN_TFLM_PRINTX(CNTX, INTD) (static_cast<void>(0))
 #define KN_PRINTD(INTD)
 #define KN_PRINTX(INTD)
+#define KN_PRINTX_INT64(INTD)
 #define KN_PRINTDBL(INTD)
 #define KN_PRINTINT64(INTD)
 #define KN_PRINTF(INTD)
 #define KN_PRINT_Q7_SIZE(BUF, SIZE) (static_cast<void>(0))
+#define KN_PRINT_Q7_SIZE_ATMOST(BUF, SIZE, PSIZE) (static_cast<void>(0))
 #define KN_PRINT_Q7_SIZE_CTABLE(BUF, SIZE)
 #define KN_PRINT_Q15_SIZE(BUF, SIZE)
 #define KN_PRINT_CRC(BUF, SIZE)
 #define KN_PRINT_Q31_SIZE(BUF, SIZE)
-#define KN_TFLM_PRINTF(CNTX, INTD) (static_cast<void>(0))
+#define KN_PRINT_Q63_SIZE(BUF, SIZE)
 #define KN_PRINTAFLT(FTL)
-#define KN_TFLM_PRINT_Q7_SIZE(CNTX, BUF, SIZE) (static_cast<void>(0))
-#define KN_TFLM_PRINT_Q31_SIZE(CNTX, BUF, SIZE) (static_cast<void>(0))
 #define KN_TLFM_PRINT_VR128(VR_IN) (static_cast<void>(0))
 #define KN_PRINT_AFLOAT(IN, SIZE) (static_cast<void>(0))
 #define KN_PRINT_AFLOAT16(IN, SIZE) (static_cast<void>(0))
@@ -290,8 +375,10 @@ limitations under the License.
 #define KN_PRINT_VR(X)
 #define KN_PRINTX_VR(X)
 #define KN_PRINT_FLOAT(IN, SIZE)
+#define KN_PRINT_Q15_OFFSET_SIZE(IN, SIZE, OFFSET)
 #define KN_PRINT_Q8_SIZE(BUF, SIZE)
 #define KN_PRINTS(STR)
+#define KN_PRINT_FLOAT_INT8(IN, SIZE, SCALE)
 #endif
 #define CHECK_ALIGN_2(ADDR)                                                   \
   do {                                                                        \

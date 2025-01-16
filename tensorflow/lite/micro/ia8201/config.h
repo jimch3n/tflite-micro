@@ -51,7 +51,8 @@ limitations under the License.
 // signal kernel optimization
 //#define SIG_FB_LOG_OPT   //afloat
 //#define SIG_FB_SQRT_OPT  //afloat
-
+#define DMX1A_TRANSPOSE_OPT // only for float32
+#define DMX1A_SLICE_OPT // SLICE only for float32, begins, size
 #elif defined(HMD1A)
 
 #define HMD1A_CONV_OPT     // convolution
@@ -86,7 +87,7 @@ limitations under the License.
 
 // signal kernel optimization
 //#define SIG_FB_LOG_OPT   // afloat 
-#define SIG_FB_SQRT_OPT  // afloat
+//#define SIG_FB_SQRT_OPT  // afloat
 #define SIG_ENERGY_OPT   // hifi only
 #define SIG_FB_SS_OPT    // hifi only 
 #define SIG_FB_OPT       // hifi only

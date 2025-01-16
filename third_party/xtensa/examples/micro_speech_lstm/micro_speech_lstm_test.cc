@@ -42,7 +42,7 @@ limitations under the License.
 #include "tensorflow/lite/schema/schema_generated.h"
 #if defined(DMX1A)
 #include "third_party/xtensa/examples/micro_speech_lstm/kn_dmx1a_micro_speech_lstm_model_data.h"
-#elif defined(HMD1A)
+#elif defined(HMD1A) && !defined(HIFI3)
 #include "third_party/xtensa/examples/micro_speech_lstm/kn_hmd1a_micro_speech_lstm_model_data.h"
 
 #else
@@ -61,7 +61,7 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   const tflite::Model* model =
       ::tflite::GetModel(g_kn_dmx1a_micro_speech_lstm_model_data);
 
-#elif defined(HMD1A)
+#elif defined(HMD1A) && !defined(HIFI3)
   const tflite::Model* model =
       ::tflite::GetModel(g_kn_hmd1a_micro_speech_lstm_model_data);
 

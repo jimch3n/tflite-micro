@@ -52,6 +52,9 @@
     <Filter Include="Source Files\signal\src">
       <UniqueIdentifier>{b2b7e404-aeb1-4f7a-b4ea-e80a40b4896e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\compiler">
+      <UniqueIdentifier>{e347061a-0ac0-46a5-bfba-e5b0ae23bf0e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\fake_micro_context.cc">
@@ -154,9 +157,6 @@
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\depth_to_space.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose_conv.cc">
@@ -304,9 +304,6 @@
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\shape.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\slice.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\resize_bilinear.cc">
@@ -459,9 +456,6 @@
     <ClCompile Include="$(TFLM_ROOT)\signal\src\square_root_64.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\error_reporter.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\flatbuffer_conversions.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -514,9 +508,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\svdf_common.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\schema\schema_utils.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\strided_slice_common.cc">
@@ -626,6 +617,21 @@
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\signal\src\window.cc">
       <Filter>Source Files\signal\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\slice.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\transpose.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\hexdump.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc">
+      <Filter>Source Files\compiler</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\schema\schema_utils.cc">
+      <Filter>Source Files\compiler</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

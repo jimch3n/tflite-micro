@@ -139,7 +139,7 @@ template<typename T> std::string NumToString(T t) {
     ss << t;
     return ss.str();
   #else // FLATBUFFERS_PREFER_PRINTF
-    auto v = static_cast<long>(t); //static_cast<long long>(t);
+    auto v = static_cast<long long>(t); // static_cast<long>(t); 
     return NumToStringImplWrapper(v, "%.*lld");
   #endif // FLATBUFFERS_PREFER_PRINTF
   // clang-format on

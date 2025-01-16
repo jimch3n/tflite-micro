@@ -27,8 +27,9 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 namespace tflite {
 namespace {
@@ -83,8 +84,7 @@ static void SlicedCopyOptOffset(const T* src, T* dst, int nElement) {
   block_copy_bytes((int8_t*)dst, (int8_t*)src, sizeof(T) * nElement);
 }
 tflite::StridedSliceParams BuildStridedSliceParams(
-    StridedSliceContext* op_context) {
-  tflite::StridedSliceParams op_params;
+    StridedSliceContext* op_context, tflite::StridedSliceParams& op_params) {
   op_params.start_indices_count = op_context->dims;
   op_params.stop_indices_count = op_context->dims;
   op_params.strides_count = op_context->dims;
@@ -112,7 +112,9 @@ TfLiteStatus CheckOutputSize(TfLiteContext* context,
   using ::tflite::strided_slice::StopForAxis;
   TfLiteIntArray* output_shape = op_context->output->dims;
   int shape_size = 0;
-  auto op_params = BuildStridedSliceParams(op_context);
+  // from external
+  tflite::StridedSliceParams op_params;  // auto op_params = ;
+  BuildStridedSliceParams(op_context, op_params);
   auto input_shape = GetTensorShape(op_context->input);
   for (int idx = 0; idx < op_context->dims; ++idx) {
     int32_t stride = GetTensorData<int32_t>(op_context->strides)[idx];
@@ -157,7 +159,9 @@ TfLiteStatus PrepareStridedSlice(TfLiteContext* context, TfLiteNode* node) {
   StridedSliceContext op_context(context, node);
   TF_LITE_ENSURE_MSG(context, op_context.dims <= kMaxDim,
                      "input dim should not exceed 4");
-  auto params = BuildStridedSliceParams(&op_context);
+  // auto params =
+  tflite::StridedSliceParams params;
+  BuildStridedSliceParams(&op_context, params);
   memcpy(&op_data->op_params, &params, sizeof(StridedSliceParams));
   // allocate persist op data to store opt_context
 
@@ -234,11 +238,8 @@ TfLiteStatus PrepareStridedSlice(TfLiteContext* context, TfLiteNode* node) {
   //        sizeof(uint16_t) * output_size);
   // }
 #endif
-#ifndef REMOVE_REFOP_SUPPORT
+
   return CheckOutputSize(context, &op_context);
-#else
-  return kTfLiteOk;
-#endif
 }
 
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
@@ -328,6 +329,28 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
                        ElementCount(*output->dims));
       break;
 #ifndef REMOVE_REFOP_SUPPORT
+    case kTfLiteFloat16:
+
+#if defined(HEMILITE_STRIDED_SLICE_OPT) 
+      KN_PRINTD(op_data->opt_constraint);
+      if (op_data->opt_constraint > 0) {
+        const int16_t* Src =
+            tflite::micro::GetTensorData<int16_t>(input) + op_data->src_offset;
+        int nElement = ElementCount(*output->dims);
+
+        int16_t* Dst = tflite::micro::GetTensorData<int16_t>(output);
+        SlicedCopyOptOffset<int16_t>(Src, Dst, nElement);
+      } else
+#endif
+      {
+
+        reference_ops::StridedSlice(
+            op_params, tflite::micro::GetTensorShape(input),
+            tflite::micro::GetTensorData<int16_t>(input),
+            tflite::micro::GetTensorShape(output),
+            tflite::micro::GetTensorData<int16_t>(output));
+      }
+      break;
     case kTfLiteInt16:
       reference_ops::StridedSlice(
           op_params, tflite::micro::GetTensorShape(input),
@@ -336,11 +359,15 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int16_t>(output));
       break;
     case kTfLiteInt32:
+      KN_PRINTX(tflite::micro::GetTensorData<int32_t>(output));
       reference_ops::StridedSlice(
           op_params, tflite::micro::GetTensorShape(input),
           tflite::micro::GetTensorData<int32_t>(input),
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<int32_t>(output));
+
+      KN_PRINT_Q31_SIZE(output->data.i32,
+                        ElementCount(*output->dims));
       break;
     case kTfLiteBool:
       reference_ops::StridedSlice(op_params,

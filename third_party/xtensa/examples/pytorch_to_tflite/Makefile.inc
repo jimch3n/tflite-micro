@@ -6,6 +6,10 @@
     $(TENSORFLOW_ROOT)third_party/xtensa/examples/pytorch_to_tflite/pytorch_op_resolver.cc 
 ifeq ($(TARGET_ARCH), dmx1a)
     PYTORCH_TO_TFLITE_GENERATOR_INPUTS :=    $(TENSORFLOW_ROOT)third_party/xtensa/examples/pytorch_to_tflite/kn_dmx1a_mobilenet_v2_quantized_1x3x224x224.tflite
+else ifeq ($(TARGET_ARCH), hmd1a)
+#python third_party/ia8201_sdk/kn_tflite_converter/kn_tflite_converter_ghw.py \
+# -i mobilenet_v2_quantized_1x3x224x224.tflite -o kn_hmd1a_mobilenet_v2_quantized_1x3x224x224.tflite --arch hmd -v
+    PYTORCH_TO_TFLITE_GENERATOR_INPUTS :=    $(TENSORFLOW_ROOT)third_party/xtensa/examples/pytorch_to_tflite/kn_hmd1a_mobilenet_v2_quantized_1x3x224x224.tflite
 else
     PYTORCH_TO_TFLITE_GENERATOR_INPUTS :=   $(TENSORFLOW_ROOT)third_party/xtensa/examples/pytorch_to_tflite/mobilenet_v2_quantized_1x3x224x224.tflite
 endif

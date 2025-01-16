@@ -84,7 +84,7 @@ build_hml()
 	#
   core=hml
 	local target=$1
-	  if [[ "$target" =~ test ]]; then
+  if [[ "$target" =~ test ]]; then
     BUILD_TYPE=release_with_logs
     RTS=0
   else
@@ -99,8 +99,8 @@ build_hml()
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG clean
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG clean
 	elif [ "$target" == "test" ]; then
-	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -k
-	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG test -j3
+	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -j8 && \
+	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -k test 
 	elif [ "$target" == "install" ]; then
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1 -j4 install
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=0 -j4 install
@@ -130,8 +130,11 @@ build_hifi3_hmd1a()
   else
   ## kernel_hack mode, replacing svdf/fc
     BUILD_TYPE=release
-    RTS=1
-    TM=0
+    #### for compliance google 's tflm branch
+    #RTS=1
+    #TM=0
+    RTS=0
+    TM=1
   fi
   echo BUILD: $BUILD_TYPE
 	cd ../

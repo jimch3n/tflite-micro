@@ -1,4 +1,4 @@
-/* Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -238,49 +238,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // }
 #endif
 #if 0
-  if (op_data->srcIdx)
-  {
-      switch (op_context.output->type)
-      {
-      case kTfLiteFloat32:
-          // reference _op get source index, and check dst is linear
-      {
-          reference_ops::StridedSliceSrcIndx<float>(params,
-              input_shape,
-              output_shape,
-              op_data->srcIdx);
-      }
-      break;
-      case kTfLiteInt8:
-      case kTfLiteUInt8:
-          {
-              reference_ops::StridedSliceSrcIndx<int8_t>(params,
-                  input_shape,
-                  output_shape,
-                  op_data->srcIdx);
-          }
-          break;
-      case kTfLiteInt32:
-      reference_ops::StridedSliceSrcIndx<int32_t>(params,
-                  input_shape,
-                  output_shape,
-                  op_data->srcIdx);
-      break;
-    case kTfLiteBool:
-      reference_ops::StridedSliceSrcIndx<bool>(params,
-                  input_shape,
-                  output_shape,
-                  op_data->srcIdx);
-      break;
-      default:
-          //TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
-         //     TfLiteTypeGetName(op_context.output), iop_context.output);
-          return kTfLiteError;
-      }
-      KN_PRINT_Q15_SIZE(op_data->srcIdx, output_size);
-  }
-  //KN_PRINTD(pOpStridedSliceData->srcIdx);
-
+  
 #endif
   return CheckOutputSize(context, &op_context);
 }
@@ -401,11 +359,15 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
           tflite::micro::GetTensorData<int16_t>(output));
       break;
     case kTfLiteInt32:
+      KN_PRINTX(tflite::micro::GetTensorData<int32_t>(output));
       reference_ops::StridedSlice(
           op_params, tflite::micro::GetTensorShape(input),
           tflite::micro::GetTensorData<int32_t>(input),
           tflite::micro::GetTensorShape(output),
           tflite::micro::GetTensorData<int32_t>(output));
+
+      KN_PRINT_Q31_SIZE(output->data.i32,
+                        ElementCount(*output->dims));
       break;
     case kTfLiteBool:
       reference_ops::StridedSlice(op_params,

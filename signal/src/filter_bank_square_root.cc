@@ -21,17 +21,22 @@ limitations under the License.
 #include "signal/src/filter_bank_square_root.h"
 #include "signal/src/square_root.h"
 
-#if defined(XTENSA) || defined(HMD1A)
+#if defined(XTENSA) || defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/config.h"
-#ifdef __XTENSA__
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#if defined(HMD1A) && defined(__XTENSA__)
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
 #endif
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
+#elif defined(IA700)
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
 #endif
 
 #ifndef REMOVE_TFLM_SIGNAL
@@ -41,7 +46,9 @@ namespace tflm_signal {
 void FilterbankSqrt(const uint64_t* input, int num_channels,
                     int scale_down_bits, uint32_t* output) {
   for (int i = 0; i < num_channels; ++i) {
-#if defined(SIG_FB_SQRT_OPT)
+    
+ // KN_PRINT_Q63_SIZE(input,num_channels );
+#if defined(SIG_FB_SQRT_OPT) 
     int nsa = 32 - AE_NSA64(input[i]);
 
     if (nsa < 0) nsa = 0;
@@ -59,9 +66,13 @@ void FilterbankSqrt(const uint64_t* input, int num_channels,
 
 #else
     uint32_t sqrt_out = Sqrt64(input[i]);
+    //KN_PRINTX(sqrt_out);
+    //  KN_PRINTD(scale_down_bits);
     output[i] = sqrt_out >> scale_down_bits;
 #endif
   }
+ // KN_PRINTD(scale_down_bits);
+ // KN_PRINT_Q31_SIZE(output,num_channels );
 }
 #ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal

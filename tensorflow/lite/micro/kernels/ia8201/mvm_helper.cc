@@ -242,8 +242,7 @@ void ConvertQ31ToAfloat(const int32_t* input, AScalar* output, int size,
   }
 }
 
-// a+ const(integer) =c
-// float 32 out
+
 int AddConstQuantizedInt8(int8_t* input, int32_t const_offset, uint8_t* output,
                           int size) {
   int ii;  // convert to 1 to afloat and vadd return int32

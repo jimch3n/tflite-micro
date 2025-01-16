@@ -140,7 +140,7 @@ public:
         convert_32F_to_32I_x1(v, 31 - fractional_bits, 1, VRQ0);
         return move32_ar_vr(v, VRQ0);
     }
-	    _AI int16_t to_int16(uint32_t fractional_bits = 0) const {
+    _AI int16_t to_int16(uint32_t fractional_bits = 0) const {
         vr128 v;
         set_VRQ0(v, fr);
         convert_32F_to_16I_x1(v, 15 - fractional_bits, 1, VRQ0);

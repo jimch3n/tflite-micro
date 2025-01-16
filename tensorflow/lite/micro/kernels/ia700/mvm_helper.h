@@ -14,12 +14,9 @@ limitations under the License.
 ==============================================================================*/
 #ifndef TENSORFLOW_LITE_KERNELS_MVM_HELPER_H_
 #define TENSORFLOW_LITE_KERNELS_MVM_HELPER_H_
-//#include <math.h> //prevent AVL macro override
+#include <math.h> //prevent AVL macro override
 #include "AVL.h"
-//#include "TIE_DSPInternal.h"  // from ROME dsp include
 #include "DeltaPlatform.h"
-//#include "TIE_defs.h"
-//#include "TIE_include.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 
 // enumute depthwise conv optimization type
@@ -43,7 +40,7 @@ typedef enum _DEPTHWISE_OPT_TYPE {
 /// alternate names for vr64 half-register selects
 
 typedef enum { VRL = 0, VRH } REG_HALF_t;
-#ifdef HEMILITE
+
 #define BLOCK_SIZE 8
 #define LOG2_ROWS_PER_GROUP 2
 #define ROWS_PER_GROUP (1 << LOG2_ROWS_PER_GROUP)
@@ -57,14 +54,17 @@ typedef enum { VRL = 0, VRH } REG_HALF_t;
 #define LOG2_COLS_PER_BLOCK_FLT 1
 #define COLS_PER_BLOCK_FLT (1 << LOG2_COLS_PER_BLOCK_FLT)
 
-#endif
 
+#ifndef ALIGN_COEFF_SIZE
+#define ALIGN_COEFF_SIZE(IN_SIZE, OUT_SIZE) \
+     ((((IN_SIZE + COLS_PER_BLOCK - 1) >> LOG2_COLS_PER_BLOCK)   << LOG2_COLS_PER_BLOCK) * \
+      (((OUT_SIZE + ROWS_PER_GROUP - 1) >> LOG2_ROWS_PER_GROUP)  << LOG2_ROWS_PER_GROUP))
 #endif
 // move this to somewhere header
 #include "tensorflow/lite/micro/ia700/debug_helper.h"
 #include "tensorflow/lite/micro/ia700/platform.h"
 
-#ifdef HEMILITE
+
 #define load8x2_vr_postI_unalign(VRX, ADDR, POSTI) \
   load8x1_vr_postI(VRX, ADDR, POSTI, VRQ0);        \
   load8x1_vr_postI(VRX, ADDR, POSTI, VRQ1);

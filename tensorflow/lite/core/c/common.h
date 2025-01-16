@@ -100,8 +100,9 @@ typedef struct TfLiteExternalContext {
   TfLiteStatus (*Refresh)(struct TfLiteContext* context);
 } TfLiteExternalContext;
 
+// LINT.IfChange(optional_tensor)
 #define kTfLiteOptionalTensor (-1)
-
+// LINT.ThenChange(//tensorflow/compiler/mlir/lite/flatbuffer_export.cc:optional_tensor)
 #ifdef _MSC_VER
 #define __restrict__ __restrict
 #endif
@@ -283,6 +284,17 @@ void TfLiteFloatArrayFree(TfLiteFloatArray* a);
       return s;                            \
     }                                      \
   } while (0)
+
+// `std::unreachable` not available until CC23.
+#ifdef __GNUC__  // GCC, Clang, ICC
+
+#define TFL_UNREACHABLE() (__builtin_unreachable())
+
+#elif defined(_MSC_VER)  // MSVC
+
+#define TFL_UNREACHABLE() (__assume(false))
+
+#endif
 
 /// Single-precision complex data type compatible with the C99 definition.
 typedef struct TfLiteComplex64 {
@@ -1018,7 +1030,7 @@ typedef struct TfLiteContext {
   TfLiteStatus (*ReleaseSubgraphContext)(struct TfLiteContext* context,
                                          int subgraph_index);
 #if defined(IA8201) || defined(IA700)
-  uint8_t mappedOps[256];
+  uint16_t mappedOps[256];
   uint16_t mappedOpsCount;
   bool mappedCoeffFlag;
 #endif

@@ -23,9 +23,11 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow/lite/micro/ia700/config.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+
 #include "tensorflow/lite/micro/micro_utils.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 namespace tflite {
 // namespace ops {
 // namespace micro {
@@ -145,7 +147,7 @@ void* LogisticInit(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 
-TfLiteStatus LogisticPrepare(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus IA700_LogisticPrepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   OpData* data = static_cast<OpData*>(node->user_data);
 
@@ -440,7 +442,7 @@ void EvalLogisticFloat(const TfLiteEvalTensor* input,
 #endif
   KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), flat_size);
 }
-TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus IA700_LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
   TfLiteEvalTensor* output =
@@ -525,8 +527,8 @@ TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
 
 TFLMRegistration Register_LOGISTIC() {
   return tflite::micro::RegisterOp(LogisticInit,
-                                   /*prepare=*/LogisticPrepare,
-                                   /*invoke=*/LogisticEval);
+                                   /*prepare=*/IA700_LogisticPrepare,
+                                   /*invoke=*/IA700_LogisticEval);
 }
 //}  // namespace micro
 //}  // namespace ops

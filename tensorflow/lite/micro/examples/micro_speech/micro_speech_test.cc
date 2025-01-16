@@ -1,4 +1,4 @@
-/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -202,12 +202,15 @@ TfLiteStatus GenerateFeatures(const int16_t* audio_data,
   TF_LITE_MICRO_CHECK_FAIL();
 
   AudioPreprocessorOpResolver op_resolver;
-  TF_LITE_MICRO_EXPECT(RegisterOps(op_resolver) == kTfLiteOk);
+  TfLiteStatus op_status = RegisterOps(op_resolver);
+  //printf("op_status: %d\n", op_status);
+  TF_LITE_MICRO_EXPECT( op_status== kTfLiteOk);
   TF_LITE_MICRO_CHECK_FAIL();
 
   tflite::MicroInterpreter interpreter(model, op_resolver, g_arena, kArenaSize);
-
-  TF_LITE_MICRO_EXPECT(interpreter.AllocateTensors() == kTfLiteOk);
+ TfLiteStatus alloc_status = interpreter.AllocateTensors();
+ //printf("op_status: %d\n", alloc_status);
+  TF_LITE_MICRO_EXPECT( alloc_status == kTfLiteOk);
   TF_LITE_MICRO_CHECK_FAIL();
 
   MicroPrintf("AudioPreprocessor model arena size = %u",
@@ -251,6 +254,7 @@ TF_LITE_MICRO_TEST(NoFeatureTest) {
   TF_LITE_ENSURE_STATUS(GenerateFeatures(
       g_no_30ms_audio_data, g_no_30ms_audio_data_size, &g_features));
   for (size_t i = 0; i < kFeatureSize; i++) {
+    //printf("feat[%3d]: %d expected: %d \n",i ,g_features[0][i],  expected_feature[i]);
     TF_LITE_MICRO_EXPECT_EQ(g_features[0][i], expected_feature[i]);
     TF_LITE_MICRO_CHECK_FAIL();
   }

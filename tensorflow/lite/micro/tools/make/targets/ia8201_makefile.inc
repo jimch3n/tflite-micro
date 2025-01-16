@@ -8,6 +8,8 @@
 #   - XTENSA_CORE: The name of the Xtensa core to use
 #      For example: hifi3
 
+IA8201_SDK_ROOT := third_party/ia8201_sdk/Rome
+
 ifeq ($(TARGET), ia8201)
   ifeq ($(HOST_OS), linux)
     XTENSA_SYSTEM_BASE := ${HOME}/xtensa/XtDevTools/install/tools
@@ -46,16 +48,15 @@ ifeq ($(TARGET), ia8201)
     $(error XTENSA_CORE is undefined)
   endif
 
-  ROME_SDK_ROOT := third_party/ia8201_sdk/Rome
-  ROME_CORE_INC := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/Include
-  ROME_ML_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/MachineLearning/Include
-  ROME_DSP_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Include
-  ROME_AVL_INC   := $(ROME_SDK_ROOT)/Src/Cores/AVL
-  ROME_CSTUBS_INC   := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Include
-  ROME_DSP_LIB_PATH := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Libs
-  ROME_TFLU_LIB_PATH :=  $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/TFLu/Libs
-  ROME_CSTUBS_LIB_PATH := $(ROME_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Libs
-  ROME_CSTUBS_LIB := gccSimulationEnvironment.a
+  SDK_CORE_INC := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/Include
+  SDK_ML_INC   := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/MachineLearning/Include
+  SDK_DSP_INC   := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Include
+  SDK_AVL_INC   := $(IA8201_SDK_ROOT)/Src/Cores/AVL
+  SDK_CSTUBS_INC   := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Include
+  SDK_DSP_LIB_PATH := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/DSP/Libs
+  SDK_TFLU_LIB_PATH :=  $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/TFLu/Libs
+  SDK_CSTUBS_LIB_PATH := $(IA8201_SDK_ROOT)/Src/Cores/Core_$(CORE)/SimulationEnvironment/Libs
+  SDK_CSTUBS_LIB := gccSimulationEnvironment.a
 ###
 #XtensaTools\config
    XTENSA_FLAGS := --xtensa-system=$(XTENSA_SYSTEM_BASE)/$(XTENSA_TOOLS_VERSION)/XtensaTools/config \
@@ -76,9 +77,9 @@ ifeq ($(TARGET), ia8201)
   TF_LITE_MICRO_FLAGS = \
     $(TARGET_ARCH_CFLAGS) \
     -DTF_LITE_MCU_DEBUG_LOG \
-    -I$(ROME_CORE_INC) \
-    -I$(ROME_AVL_INC) \
-    -I$(ROME_DSP_INC)
+    -I$(SDK_CORE_INC) \
+    -I$(SDK_AVL_INC) \
+    -I$(SDK_DSP_INC)
 ### release build kernel exclude reference op macro in optimized kernels###
    #ifeq ($(BUILD_TYPE), release)
    #  TF_LITE_MICRO_FLAGS += -DREMOVE_REFOP_SUPPORT 
@@ -97,10 +98,10 @@ ifeq ($(TARGET), ia8201)
      CXXFLAGS := $(filter-out -Wnon-virtual-dtor, $(CXXFLAGS))
      LIB_PREFIX := xcc
    else
-      TF_LITE_MICRO_FLAGS +=    -I$(ROME_CSTUBS_INC) -m32 -D__int64="long long" -g
+      TF_LITE_MICRO_FLAGS +=    -I$(SDK_CSTUBS_INC) -m32 -D__int64="long long" -g
       CXX_TOOL := g++
       CC_TOOL := gcc
-      LDFLAGS += $(ROME_CSTUBS_LIB_PATH)/$(ROME_CSTUBS_LIB)
+      LDFLAGS += $(SDK_CSTUBS_LIB_PATH)/$(SDK_CSTUBS_LIB)
       LIB_PREFIX := gcc
   endif
 ## remove TFLM_SIGNAL namespace in signal processing
@@ -114,11 +115,11 @@ endif
   ## disable warning for cstubs
   ifeq ($(TARGET_PF),CSTUBS)
   WARN_AS_ERROR :=  -Werror -Wall
-  CXXFLAGS := $(filter-out $(WARN_AS_ERROR), $(CXXFLAGS))
-  CCFLAGS := $(filter-out $(WARN_AS_ERROR), $(CCFLAGS))
+  CXXFLAGS := $(filter-out $(WARN_AS_ERROR), $(CXXFLAGS)) -Wno-deprecated-copy
+  CCFLAGS := $(filter-out $(WARN_AS_ERROR), $(CCFLAGS)) -Wno-deprecated-copy
   endif
   TEST_SCRIPT := tensorflow/lite/micro/testing/test_xtensa_ia8201_binary.sh
-  #LDFLAGS += -l:$(ROME_DSP_LIB_PATH)/xccDSPLib.a
+  #LDFLAGS += -l:$(SDK_DSP_LIB_PATH)/xccDSPLib.a
   EXCLUDED_EXAMPLE_TESTS := \
     tensorflow/lite/micro/examples/image_recognition_experimental/Makefile.inc \
     tensorflow/lite/micro/examples/person_detection/Makefile.inc \

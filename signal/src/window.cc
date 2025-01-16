@@ -17,19 +17,22 @@ limitations under the License.
 
 #include <cstdint>
 
+//#define KN_DEBUG
 
-
-#if defined(XTENSA) || defined(HMD1A)
+#if defined(XTENSA) || defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/config.h"
-#if __XTENSA__
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#if defined(HMD1A) && defined(__XTENSA__)
 #include <xtensa/config/core-isa.h>
 #include <xtensa/tie/xt_core.h>
 #include <xtensa/tie/xt_hifi3.h>
 #include <xtensa/tie/xt_misc.h>
-#else
-#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+
 #endif
-#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+
+#elif defined(HEMILITE)
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
 #endif
 // TODO(b/286250473): remove namespace once de-duped libraries
 #ifndef REMOVE_TFLM_SIGNAL
@@ -114,6 +117,7 @@ void ApplyWindow(const int16_t *__restrict input,
     }
   }
 #endif
+//KN_PRINT_Q15_SIZE(output, size);
 }
 #ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal

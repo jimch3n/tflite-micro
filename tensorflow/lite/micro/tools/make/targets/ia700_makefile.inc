@@ -7,12 +7,12 @@
 #   - XTENSA_TOOLS_VERSION: For example: RI-2019.2-linux
 #   - XTENSA_CORE: The name of the Xtensa core to use
 #      For example: hifi3
-
+IA700_SDK_ROOT=third_party/ia700_sdk/
 ifeq ($(TARGET), ia700)
   ifeq ($(HOST_OS), linux)
-  SDK_ROOT := /home/jimchen/P4WS/AlgoSW/Product/shapiro-sdk-support-TFLu-dev/SDK/Audience_SDK_IA61x/DSPDev/
-    XTENSA_SYSTEM_BASE := /home/jimchen/xtensa/XtDevTools/install/tools
-    XTENSA_TOOLS_VERSION := RI-2020.4-linux
+    SDK_ROOT := $(IA700_SDK_ROOT)/DSPDev/
+    XTENSA_SYSTEM_BASE ?= ${HOME}/xtensa/XtDevTools/install/tools
+    XTENSA_TOOLS_VERSION ?= RI-2020.4-linux
   else
   SDK_ROOT := p:/AlgoSW/Product/shapiro-sdk-support-TFLu-dev/SDK/Audience_SDK_IA61x/DSPDev/
   XTENSA_SYSTEM_BASE := c:/usr/xtensa/XtDevTools/install/tools
@@ -40,10 +40,9 @@ ifeq ($(TARGET), ia700)
   endif
 
 
-  #D:/src/SDK/IA700_SDK/Knowles_IA700_SDK/DSPDev/
+
   SDK_CORE_INC := $(SDK_ROOT)/Source/HemiLitePlatform
-#remove ML due to arguments too long
-#  SDK_ML_INC   := $(SDK_ROOT)/Dist/MVM_VIPLib/Include
+
   SDK_DSP_INC  := $(SDK_ROOT)/Dist/CoreDSPLib/Include
   SDK_AVL_INC   := $(SDK_ROOT)/Dist/AVL
   SDK_DSP_LIB_PATH := $(SDK_ROOT)/Dist/CoreDSPLib/Libs/
@@ -91,7 +90,8 @@ ifneq ($(TARGET_PF),CSTUBS)
      --stdlib=libc++
      CXX_TOOL := clang++
      CC_TOOL := clang
-
+	 ##filter out for clang crash
+     CXXFLAGS := $(filter-out -Wnon-virtual-dtor, $(CXXFLAGS))
      LIB_PREFIX := xcc
    else
       TF_LITE_MICRO_FLAGS +=    -I$(SDK_CSTUBS_INC) -m32 -D__int64="long long" -g
@@ -110,9 +110,9 @@ ifneq ($(TARGET_PF),CSTUBS)
   WARN_AS_ERROR :=  -Werror -Wall
   CXXFLAGS := $(filter-out $(WARN_AS_ERROR), $(CXXFLAGS))
   CCFLAGS := $(filter-out $(WARN_AS_ERROR), $(CCFLAGS))
-  else
+  #else
   ## exp remove virtual dtor
-  CXXFLAGS := $(filter-out -Wnon-virtual-dtor, $(CXXFLAGS))
+  #CXXFLAGS := $(filter-out -Wnon-virtual-dtor, $(CXXFLAGS))
   endif
   TEST_SCRIPT := tensorflow/lite/micro/testing/test_xtensa_ia700_binary.sh
   #LDFLAGS += -l:$(SDK_DSP_LIB_PATH)/$(SDK_DSP_LIB)

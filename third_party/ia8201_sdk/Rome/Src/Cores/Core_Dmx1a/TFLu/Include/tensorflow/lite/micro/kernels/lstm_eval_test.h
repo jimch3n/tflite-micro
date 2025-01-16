@@ -18,9 +18,14 @@ limitations under the License.
 
 #include <algorithm>
 #include <limits>
+#include "tensorflow/lite/kernels/internal/quantization_util.h"
+#include "tensorflow/lite/kernels/kernel_util.h"
 #if defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/config.h"
 #include "tensorflow/lite/micro/kernels/ia8201/lstm_eval.h"
+#elif defined(IA700)
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/lstm_eval.h"
 #else
 #include "tensorflow/lite/micro/kernels/lstm_eval.h"
 #endif
@@ -454,7 +459,7 @@ void TestUpdateLstmCellFloat(
   CellStateInfo cell_state_info;
   cell_state_info.cell_clip = node_content.BuiltinData().cell_clip;
   // Call the function to be tested
-  #if defined(IA8201)
+  #if defined(IA8201) || defined(IA700)
   tflite::lstm_internal::UpdateLstmCell(
       step_info, cell_state, forget_gate,
       gate_output_data.expected_input_gate_output,
@@ -523,7 +528,7 @@ void TestUpdateLstmCellInteger(
   tflite::lstm_internal::LstmStepManager step_info(&size_info);
 
   // Call the function to be tested
-  #if defined(IA8201)
+  #if defined(IA8201) || defined(IA700)
   tflite::lstm_internal::UpdateLstmCell(
       step_info, cell_state, quantized_forget_gate, quantized_input_gate,
       quantized_cell_gate, forget_cell_mul_params, input_mul_params,

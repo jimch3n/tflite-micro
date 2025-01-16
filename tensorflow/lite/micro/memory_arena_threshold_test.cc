@@ -57,24 +57,24 @@ constexpr int kKeywordModelNodeAndRegistrationCount = 15;
 // Total size contributed by the keyword model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kKeywordModelOnlyTotalSize = 14304;
+constexpr int kKeywordModelOnlyTotalSize = 14472;
 // Tail size contributed by the kdyword model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kKeywordModelOnlyTailSize = 13632;
+constexpr int kKeywordModelOnlyTailSize = 13800;
 constexpr int kKeywordModelPersistentTfLiteTensorDataSize = 128;
-constexpr int kKeywordModelPersistentBufferDataSize = 756;
+constexpr int kKeywordModelPersistentBufferDataSize = 832;
 #else
 // Total size contributed by the keyword model excluding the
 // RecordingMicroAllocator's overhead.
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kKeywordModelOnlyTotalSize = 14752;
+constexpr int kKeywordModelOnlyTotalSize = 14936;
 // Tail size contributed by the keyword model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kKeywordModelOnlyTailSize = 14080;
+constexpr int kKeywordModelOnlyTailSize = 14264;
 constexpr int kKeywordModelPersistentTfLiteTensorDataSize = 224;
-constexpr int kKeywordModelPersistentBufferDataSize = 764;
+constexpr int kKeywordModelPersistentBufferDataSize = 840;
 #endif
 constexpr int kKeywordModelHeadSize = 672;
 constexpr int kKeywordModelTfLiteTensorVariableBufferDataSize = 10240;
@@ -93,24 +93,24 @@ constexpr int kTestConvModelNodeAndRegistrationCount = 7;
 // Total size contributed by the conv model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kTestConvModelOnlyTotalSize = 9488;
+constexpr int kTestConvModelOnlyTotalSize = 9576;
 // Tail size contributed by the conv model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kTestConvModelOnlyTailSize = 1816;
+constexpr int kTestConvModelOnlyTailSize = 1832;
 constexpr int kTestConvModelPersistentTfLiteTensorDataSize = 128;
-constexpr int kTestConvModelPersistentBufferDataSize = 728;
+constexpr int kTestConvModelPersistentBufferDataSize = 748;
 #else
 // Total size contributed by the conv model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
-constexpr int kTestConvModelOnlyTotalSize = 9760;
+constexpr int kTestConvModelOnlyTotalSize = 9832;
 // Tail size contributed by the conv model excluding the
 // RecordingMicroAllocator's overhead
 // TODO(b/207157610): replace magic number that depends on OPs
 constexpr int kTestConvModelOnlyTailSize = 2088;
 constexpr int kTestConvModelPersistentTfLiteTensorDataSize = 224;
-constexpr int kTestConvModelPersistentBufferDataSize = 720;
+constexpr int kTestConvModelPersistentBufferDataSize = 740;
 #endif
 constexpr int kTestConvModelHeadSize = 7744;
 constexpr int kTestConvModelOpRuntimeDataSize = 136;
@@ -227,8 +227,13 @@ TF_LITE_MICRO_TEST(TestKeywordModelMemoryThreshold) {
       op_resolver.AddFullyConnected(tflite::Register_FULLY_CONNECTED_INT8()),
       kTfLiteOk);
   TF_LITE_MICRO_EXPECT_EQ(op_resolver.AddQuantize(), kTfLiteOk);
+    #if defined(XTENSA) || defined(CMSIS_NN)
   TF_LITE_MICRO_EXPECT_EQ(
       op_resolver.AddSoftmax(tflite::Register_SOFTMAX_INT8_INT16()), kTfLiteOk);
+      #else
+  TF_LITE_MICRO_EXPECT_EQ(
+      op_resolver.AddSoftmax(), kTfLiteOk);
+      #endif
   TF_LITE_MICRO_EXPECT_EQ(op_resolver.AddSvdf(tflite::Register_SVDF_INT8()),
                           kTfLiteOk);
   tflite::RecordingMicroInterpreter interpreter(

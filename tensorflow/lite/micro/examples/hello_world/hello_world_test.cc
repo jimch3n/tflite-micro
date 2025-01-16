@@ -76,12 +76,15 @@ TfLiteStatus LoadFloatModelAndPerformInference() {
 
   // Arena size just a round number. The exact arena usage can be determined
   // using the RecordingMicroInterpreter.
-  constexpr int kTensorArenaSize = 3000;
+  constexpr int kTensorArenaSize = 15000;
   uint8_t tensor_arena[kTensorArenaSize];
 
   tflite::MicroInterpreter interpreter(model, op_resolver, tensor_arena,
                                        kTensorArenaSize);
-  TF_LITE_ENSURE_STATUS(interpreter.AllocateTensors());
+  TfLiteStatus alloc_status = interpreter.AllocateTensors();
+ //   printf("allocate tensor status: %d size: %d bytes\n",
+ // alloc_status, interpreter.arena_used_bytes());
+  TF_LITE_ENSURE_STATUS(alloc_status);
 
   // Check if the predicted output is within a small range of the
   // expected output

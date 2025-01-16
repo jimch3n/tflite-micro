@@ -20,6 +20,10 @@ limitations under the License.
 #include <cstdint>
 #include <initializer_list>
 #include <new>
+// DBG
+#include <fstream>
+#include <ios>
+
 
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/c/common.h"
@@ -1038,6 +1042,24 @@ const Model* BuildSimpleModelWithIfAndEmptySubgraph() {
   return model;
 }
 
+#if 0
+bool SaveFile(const char* name, const char* buf, size_t len) {
+  std::ofstream ofs(name, std::ofstream::binary);
+  if (!ofs.is_open()) return false;
+  ofs.write(buf, len);
+  return !ofs.bad();
+}
+
+bool WriteToFile(const char* output_file_name,flatbuffers::FlatBufferBuilder &fbb) {
+  //flatbuffers::DefaultAllocator allocator;
+  //flatbuffers::FlatBufferBuilder fbb{2048, &allocator};
+  //auto new_model = Model::Pack(fbb, &output_data);
+  //fbb.Finish(new_model);
+  return SaveFile(output_file_name,
+                  reinterpret_cast<char*>(fbb.GetBufferPointer()),
+                  fbb.GetSize());
+}
+#endif
 const Model* BuildSimpleModelWithSubgraphsAndWhile() {
   using flatbuffers::Offset;
   flatbuffers::FlatBufferBuilder* builder = BuilderInstance();
@@ -1152,6 +1174,9 @@ const Model* BuildSimpleModelWithSubgraphsAndWhile() {
   FinishModelBuffer(*builder, model_offset);
   void* model_pointer = builder->GetBufferPointer();
   const Model* model = flatbuffers::GetRoot<Model>(model_pointer);
+
+  // write to file 
+  //WriteToFile("simpleSubgraphWhile.tflite",*builder);
   return model;
 }
 

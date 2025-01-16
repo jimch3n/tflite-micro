@@ -20,7 +20,8 @@ limitations under the License.
 #ifdef KN_DEBUG
 #include <stdio.h>
 #endif
-
+#include "tensorflow/lite/micro/micro_log.h"
+#if defined(IA700)
 #include "platform.h"
 
 namespace tflite {
@@ -54,7 +55,7 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
     {
       pMappedOps = (uint8_t *)current_arch_ptr + opsLength - 1 -
                    KN_TFL_MODEL_ARCH_LEN - 1;
-      int opNumber = 0;  // string to integer
+      uint32_t opNumber = 0;  // string to integer
       int parse_op_len =
           opsLength - (KN_TFL_MODEL_ARCH_LEN + KN_TFL_MODEL_LEN + 1);
       // while(*pMappedOps == '.') pMappedOps++;
@@ -67,6 +68,11 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
 #ifdef KN_DEBUG
           printf("Mapped[%d] = %d\n", idx, opNumber);
 #endif
+          if (opNumber > 0xffffU) {
+            // op number too large ERROR
+            return -3;
+            //break;
+          }
           ctx->mappedOps[idx++] = opNumber;
           dec = 0;
           opNumber = 0;
@@ -80,8 +86,13 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
         dec++;
       }
     }
+    if (idx < 256) {
     ctx->mappedOpsCount = idx;
     return 0;
+    } else {
+      MicroPrintf("error! map ops count: %d over %d\n", idx, 1024);
+      return -2;
+    }
   } else {
     // reset mopedOps to zero
     memset(ctx->mappedOps, 0, sizeof(ctx->mappedOps));
@@ -110,3 +121,4 @@ bool is_current_ops_coeffs_mapped(int opIdx, TfLiteContext *ctx) {
 bool is_coeffs_mapped(TfLiteContext *ctx) { return (ctx->mappedCoeffFlag); }
 
 }  // namespace tflite
+#endif

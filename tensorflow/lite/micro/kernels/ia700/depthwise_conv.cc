@@ -31,8 +31,9 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
 #include "tensorflow/lite/micro/kernels/depthwise_conv.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
 namespace tflite {
 namespace {
@@ -86,7 +87,7 @@ struct DSConvOpData {
   uint32_t input_offset_int8;
   uint32_t input_offset_int8_neg;
   int32_t *inputOffsetWithW;
-
+  AScalar *bias_aflt;
   int opt_constraint;  // FOR each tensor?
   int opt_constraint_float;
   AScalar filter_scale;
@@ -485,11 +486,14 @@ TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
           tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor);
       const int32_t *bias_input =
           tflite::micro::GetTensorData<int32_t>(biasEval);
-      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_input,
+      AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
+          context, sizeof(AScalar) * output_matVec);
+
+      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_aflt,
                                  output_matVec, 17);
       tflite::ConvertQ31ToAfloat(data->output_zero_point, data_ex->outputOffset,
                                  17);
-
+      data_ex->bias_aflt = bias_aflt;
       // data->outputMultiplerPerCh = (AScalar
       // *)context->AllocatePersistentBuffer(context,
       // output_matVec*sizeof(AScalar));
@@ -1481,7 +1485,7 @@ int DepthWiseConvSparseInt8PerCh(
   int filter_dim_align2 = (((filter_dim + 1) >> 1)
                            << 1);  // to align next block input A is 16 bytes,
                                    // unaligned load can ignore alignment
-  for (int g = 0; g<m> > 2; g++) {
+  for (int g = 0; g<(m>> 2); g++) {
     // output 8 of n input
     int32_t *scratchPerGroup = pScratch + 4 * g;
     int8_t *pBuffer = (int8_t *)x + (g)*4;  // +f*nPerFilter*channel;
@@ -2097,7 +2101,8 @@ TfLiteStatus DepthwiseConvPerChOpt(TfLiteContext *context, TfLiteNode *node,
   DepthwiseConvPerChannelPadding(
       data_ex, tflite::micro::GetTensorData<int8_t>(input),
       (const int8_t *)data_ex->mapped_filter,
-      tflite::micro::GetTensorData<int32_t>(bias),
+      // tflite::micro::GetTensorData<int32_t>(bias),
+      (int32_t *)data_ex->bias_aflt,
       tflite::micro::GetTensorData<int8_t>(output), sign);
 
   // KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),

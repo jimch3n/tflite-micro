@@ -18,6 +18,8 @@ limitations under the License.
 #include "signal/src/msb.h"
 #if defined(IA8201)
 #include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#elif defined(IA700)
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
 #endif
 #ifndef REMOVE_TFLM_SIGNAL
 namespace tflite {

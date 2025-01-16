@@ -28,7 +28,8 @@ limitations under the License.
 
 #elif defined(HMD1A) && !defined(HMD1A_HIFI3)
 #include "tensorflow/lite/micro/examples/dtln/kn_hmd1a_dtln_noise_suppression_model_data.h"
-
+#elif defined(HEMILITE)
+#include "tensorflow/lite/micro/examples/dtln/kn_hmd1a_dtln_noise_suppression_model_data.h"
 #else
 #include "tensorflow/lite/micro/examples/dtln/dtln_noise_suppression_model_data.h"
 #endif
@@ -44,6 +45,8 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   #if defined( DMX1A)
   const tflite::Model* model = ::tflite::GetModel(g_kn_dmx1a_dtln_noise_suppression_model_data);
   #elif defined(HMD1A) && !defined(HMD1A_HIFI3)
+  const tflite::Model* model = ::tflite::GetModel(g_kn_hmd1a_dtln_noise_suppression_model_data);
+  #elif defined(HEMILITE) 
   const tflite::Model* model = ::tflite::GetModel(g_kn_hmd1a_dtln_noise_suppression_model_data);
   
   #else
@@ -70,7 +73,7 @@ TF_LITE_MICRO_TEST(TestInvoke) {
 #if defined(HMD1A_HIFI3)
   constexpr int tensor_arena_size = 216 * 1024;  // remap coefficients
 #else
-  constexpr int tensor_arena_size = 16 * 1024;
+  constexpr int tensor_arena_size = 20 * 1024;
 #endif
   alignas(16) uint8_t tensor_arena[tensor_arena_size];
 
@@ -78,9 +81,10 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   tflite::MicroInterpreter interpreter(model, micro_op_resolver, tensor_arena,
                                        tensor_arena_size);
   TfLiteStatus alloc_status =  interpreter.AllocateTensors();
-
+  //printf("allocate tensor status: %d size: %d bytes\n",
+  //alloc_status, interpreter.arena_used_bytes());
   TFLITE_CHECK_EQ(alloc_status, kTfLiteOk);
-  printf("allocate tensor size: %d bytes\n",interpreter.arena_used_bytes());
+
   // Get information about the memory area to use for the model's input.
   TfLiteTensor* input = interpreter.input(0);
 

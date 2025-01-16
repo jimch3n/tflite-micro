@@ -110,10 +110,13 @@ void MicroInterpreter::Init(MicroProfilerInterface* profiler) {
     defined(IA700)  // FIXME: get description identify kn tfl model
   if (nullptr != model_->description()) {
     const char* model_description = model_->description()->c_str();
-    tflite::check_kn_tflite_model(model_description, &context_);
-  }
+    int return_model_descr = tflite::check_kn_tflite_model(model_description, &context_);
+    initialization_status_ = (return_model_descr < 0) ? kTfLiteError : kTfLiteOk;
+  } else
 #endif
-  initialization_status_ = kTfLiteOk;
+  {
+    initialization_status_ = kTfLiteOk;
+  }
 }
 
 TfLiteStatus MicroInterpreter::PrepareNodeAndRegistrationDataFromFlatbuffer() {

@@ -12,7 +12,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
 //#define KN_DEBUG
 #define ENABLE_DILATION_OPT  // enable dialtion optimization
 #include "tensorflow/lite/micro/ia700/config.h"
@@ -30,9 +29,10 @@ limitations under the License.
 #include "tensorflow/lite/kernels/kernel_util.h"
 #include "tensorflow/lite/kernels/padding.h"
 #include "tensorflow/lite/micro/kernels/conv.h"
-#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
 namespace tflite {
 namespace {
 

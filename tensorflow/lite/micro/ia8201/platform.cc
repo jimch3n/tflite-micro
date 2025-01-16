@@ -16,7 +16,9 @@ limitations under the License.
 // struct, global flag
 #include <stdint.h>
 #include <string.h>
-//#define KN_DEBUG
+#ifdef _MSC_VER
+#define KN_DEBUG
+#endif
 #ifdef KN_DEBUG
 #include <stdio.h>
 #endif
@@ -46,7 +48,7 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
     {
       pMappedOps = (uint8_t *)current_arch_ptr + opsLength - 1 -
                    KN_TFL_MODEL_ARCH_LEN - 1;
-      int opNumber = 0;  // string to integer
+      uint32_t opNumber = 0;  // string to integer
       int parse_op_len =
           opsLength - (KN_TFL_MODEL_ARCH_LEN + KN_TFL_MODEL_LEN + 1);
       // while(*pMappedOps == '.') pMappedOps++;
@@ -57,8 +59,15 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
         if (*pMappedOps == '.') {
 //    if (opNumber != 0)
 #ifdef KN_DEBUG
-          printf("Mapped[%d] = %d\n", idx, opNumber);
+          MicroPrintf("Mapped[%d] = %d", idx, opNumber);
+          //   MicroPrintf("Missing registration for opcode_index %d\n", index);
 #endif
+          if (opNumber > 0xffffU) {
+            // op number too large ERROR
+            MicroPrintf("error! map opNumber: %d over %d", idx, opNumber);
+            return -3;
+            //break;
+          }
           ctx->mappedOps[idx++] = opNumber;
           dec = 0;
           opNumber = 0;
@@ -67,7 +76,7 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
         }
         opNumber += (*pMappedOps - '0') * decimals[dec];
 #ifdef KN_DEBUG
-        printf("parsing = %c dec table: %d\n", *pMappedOps, decimals[dec]);
+        //MicroPrintf("parsing = %c dec table: %d", *pMappedOps, decimals[dec]);
 #endif
         dec++;
       }
@@ -76,14 +85,15 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
       ctx->mappedOpsCount = idx;
       return 0;
     } else {
-      MicroPrintf("error! map ops count: %d over %d\n", idx, 1024);
+      MicroPrintf("error! map ops count: %d over %d", idx, 1024);
       return -2;
     }
   } else {
     // reset mopedOps to zero
     memset(ctx->mappedOps, 0, sizeof(ctx->mappedOps));
-    return -1;
+    return 0;
   }
+  return 0;
 }
 
 // before prepare
@@ -95,7 +105,7 @@ bool is_current_ops_coeffs_mapped(int opIdx, TfLiteContext *ctx) {
     if (opIdx == ctx->mappedOps[ii]) {
       result = true;
 #ifdef KN_DEBUG
-      printf("MAPPED COEFFS %d, opIdx: %d\n", ii, opIdx);
+    //  MicroPrintf("MAPPED COEFFS %d, opIdx: %d", ii, opIdx);
 #endif
       ctx->mappedCoeffFlag = true;
       break;
