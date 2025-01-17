@@ -633,5 +633,11 @@
     <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\schema\schema_utils.cc">
       <Filter>Source Files\compiler</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress_common.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

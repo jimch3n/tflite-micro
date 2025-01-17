@@ -75,6 +75,7 @@ void* Relu6Init(TfLiteContext* context, const char* buffer, size_t length) {
 
 TfLiteStatus Relu6Eval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
+
   const Relu6OpData& data = *(static_cast<const Relu6OpData*>(node->user_data));
 
   const TfLiteEvalTensor* input =

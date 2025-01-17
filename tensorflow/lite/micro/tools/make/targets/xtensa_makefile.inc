@@ -60,12 +60,11 @@ HMD_FLAGS :=     -I$(SDK_CORE_INC) \
     $(TARGET_ARCH_CFLAGS)
 
 PLATFORM_FLAGS = \
+  -stdlib=libc++ \
   -DTF_LITE_MCU_DEBUG_LOG \
   -DTF_LITE_USE_CTIME \
   --xtensa-core=$(XTENSA_CORE) \
   -mcoproc \
-  -DMAX_RFFT_PWR=9 \
-  -DMIN_RFFT_PWR=MAX_RFFT_PWR \
   $(TARGET_ARCH_DEFINES) \
   -mlongcalls
 
@@ -140,4 +139,10 @@ ifeq ($(OPTIMIZED_KERNEL_DIR), xtensa)
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/xtensa/lstm_eval_hifi.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/xtensa/unidirectional_sequence_lstm.cc \
   $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/xtensa/mvm_helper.cc
+
+  # override KERNEL_OPTIMIZATION_LEVEL to enable higher performance
+  # Xtensa intrinsics.
+$(KERNEL_OBJDIR)$(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/xtensa/decompress.o: $(TENSORFLOW_ROOT)tensorflow/lite/micro/kernels/xtensa/decompress.cc
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -O3 -LNO:simd $(INCLUDES) -c $< -o $@
 endif

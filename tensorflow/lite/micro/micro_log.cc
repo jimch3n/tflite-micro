@@ -59,6 +59,4 @@ int MicroVsnprintf(char* buffer, size_t buf_size, const char* format,
                    va_list vlist) {
   return DebugVsnprintf(buffer, buf_size, format, vlist);
 }
-
-
 #endif  // !defined(TF_LITE_STRIP_ERROR_STRINGS)

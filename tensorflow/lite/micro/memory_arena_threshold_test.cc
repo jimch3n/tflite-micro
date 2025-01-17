@@ -63,7 +63,6 @@ constexpr int kKeywordModelOnlyTotalSize = 14472;
 // TODO(b/207157610): replace magic number that depends on OPs
 constexpr int kKeywordModelOnlyTailSize = 13800;
 constexpr int kKeywordModelPersistentTfLiteTensorDataSize = 128;
-constexpr int kKeywordModelPersistentBufferDataSize = 832;
 #else
 // Total size contributed by the keyword model excluding the
 // RecordingMicroAllocator's overhead.
@@ -74,7 +73,6 @@ constexpr int kKeywordModelOnlyTotalSize = 14936;
 // TODO(b/207157610): replace magic number that depends on OPs
 constexpr int kKeywordModelOnlyTailSize = 14264;
 constexpr int kKeywordModelPersistentTfLiteTensorDataSize = 224;
-constexpr int kKeywordModelPersistentBufferDataSize = 840;
 #endif
 constexpr int kKeywordModelHeadSize = 672;
 constexpr int kKeywordModelTfLiteTensorVariableBufferDataSize = 10240;
@@ -86,6 +84,12 @@ uint8_t test_conv_tensor_arena[kTestConvModelArenaSize];
 
 constexpr int kTestConvModelTensorCount = 15;
 constexpr int kTestConvModelNodeAndRegistrationCount = 7;
+
+#if defined(USE_TFLM_COMPRESSION)
+constexpr int kKeywordModelPersistentBufferDataSize = 920;
+#else
+constexpr int kKeywordModelPersistentBufferDataSize = 840;
+#endif
 
 // NOTE: These values are measured on x86-64:
 // TODO(b/158651472): Consider auditing these values on non-64 bit systems.
@@ -136,10 +140,6 @@ void EnsureAllocatedSizeThreshold(const char* allocation_type, size_t actual,
     // 64-bit systems should check floor and ceiling to catch memory savings:
     TF_LITE_MICRO_EXPECT_NEAR(actual, expected,
                               expected * kAllocationThreshold);
-    if (actual != expected) {
-      MicroPrintf("%s threshold failed: %d != %d", allocation_type, actual,
-                  expected);
-    }
   } else {
     // Non-64 bit systems should just expect allocation does not exceed the
     // ceiling:
@@ -227,13 +227,8 @@ TF_LITE_MICRO_TEST(TestKeywordModelMemoryThreshold) {
       op_resolver.AddFullyConnected(tflite::Register_FULLY_CONNECTED_INT8()),
       kTfLiteOk);
   TF_LITE_MICRO_EXPECT_EQ(op_resolver.AddQuantize(), kTfLiteOk);
-    #if defined(XTENSA) || defined(CMSIS_NN)
   TF_LITE_MICRO_EXPECT_EQ(
       op_resolver.AddSoftmax(tflite::Register_SOFTMAX_INT8_INT16()), kTfLiteOk);
-      #else
-  TF_LITE_MICRO_EXPECT_EQ(
-      op_resolver.AddSoftmax(), kTfLiteOk);
-      #endif
   TF_LITE_MICRO_EXPECT_EQ(op_resolver.AddSvdf(tflite::Register_SVDF_INT8()),
                           kTfLiteOk);
   tflite::RecordingMicroInterpreter interpreter(

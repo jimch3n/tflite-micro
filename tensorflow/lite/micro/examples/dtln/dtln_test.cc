@@ -56,7 +56,7 @@ TF_LITE_MICRO_TEST(TestInvoke) {
   #endif
   if (model->version() != TFLITE_SCHEMA_VERSION) {
     MicroPrintf(
-        "Model pr ovided is schema version %d not equal "
+        "Model provided is schema version %d not equal "
         "to supported version %d.\n",
         model->version(), TFLITE_SCHEMA_VERSION);
   }

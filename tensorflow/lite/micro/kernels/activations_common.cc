@@ -126,6 +126,7 @@ TfLiteStatus ReluPrepare(TfLiteContext* context, TfLiteNode* node) {
 
 TfLiteStatus Relu6Prepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
+
   Relu6OpData* data = static_cast<Relu6OpData*>(node->user_data);
 
   MicroContext* micro_context = GetMicroContext(context);

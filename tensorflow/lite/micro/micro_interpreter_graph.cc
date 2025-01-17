@@ -30,6 +30,12 @@ limitations under the License.
 #elif defined(IA700)
 #include "tensorflow/lite/micro/ia700/platform.h"
 #endif
+#ifdef USE_TFLM_COMPRESSION
+
+#include "tensorflow/lite/micro/micro_context.h"
+
+#endif  // USE_TFLM_COMPRESSION
+
 namespace tflite {
 namespace {
 
@@ -129,6 +135,9 @@ TfLiteStatus MicroInterpreterGraph::PrepareSubgraphs() {
                       current_operator_index_, prepare_status);
           return kTfLiteError;
         }
+#ifdef USE_TFLM_COMPRESSION
+        GetMicroContext(context_)->ResetDecompressionMemoryAllocations();
+#endif  // USE_TFLM_COMPRESSION
       }
       allocator_->FinishPrepareNodeAllocations(
           /*node_id=*/current_operator_index_);
@@ -231,6 +240,9 @@ TfLiteStatus MicroInterpreterGraph::InvokeSubgraph(int subgraph_idx) {
 
     TFLITE_DCHECK(registration->invoke);
     TfLiteStatus invoke_status = registration->invoke(context_, node);
+#ifdef USE_TFLM_COMPRESSION
+    GetMicroContext(context_)->ResetDecompressionMemoryAllocations();
+#endif  // USE_TFLM_COMPRESSION
 
     // All TfLiteTensor structs used in the kernel are allocated from temp
     // memory in the allocator. This creates a chain of allocations in the

@@ -20,6 +20,7 @@ limitations under the License.
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/micro/kernels/fully_connected.h"
+// this is for ia8201 hmd core
 #include "tensorflow/lite/micro/kernels/xtensa/mvm_helper.h"
 #include "tensorflow/lite/micro/micro_log.h"
 namespace tflite {

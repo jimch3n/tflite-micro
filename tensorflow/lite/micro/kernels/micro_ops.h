@@ -176,7 +176,7 @@ TFLMRegistration Register_UNPACK();
 TFLMRegistration Register_VAR_HANDLE();
 TFLMRegistration Register_WHILE();
 TFLMRegistration Register_ZEROS_LIKE();
-TFLMRegistration Register_TOPK_V2();
+
 // TODO(b/295174388): Add the rest of inference only registration functions.
 TFLMInferenceRegistration RegisterInference_FULLY_CONNECTED();
 

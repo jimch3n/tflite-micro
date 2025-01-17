@@ -201,6 +201,8 @@
     <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc" />
     <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\schema\schema_utils.cc" />
     <ClCompile Include="..\..\tensorflow\lite\micro\hexdump.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress_common.cc" />
     <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\slice.cc" />
     <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\transpose.cc" />
   </ItemGroup>
