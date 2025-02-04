@@ -91,9 +91,9 @@ $(hotword_dsp_api_BINARY): $(hotword_local_obj) $(GOOFLE_TF_MICROLITE_LIB)  $(MI
 	-o $(hotword_dsp_api_BINARY) $(hotword_local_obj) $(LDFLAGS) \
 	 -Wl,--start-group $(GOOFLE_TF_MICROLITE_LIB)  $(MICROLITE_LIBS) $(MICROSPEECH_LIB) $(MODE_CONFIG_LIB)  -Wl,--end-group 
 
-hotword_dsp_api_test: $(hotword_dsp_api_BINARY)
+hotword_dsp_api_test: $(hotword_dsp_api_BINARY)  $(MODEL_INPUT)
 	@test -f $(TEST_SCRIPT) || (echo 'Unable to find the test script. Is the software emulation available in $(TARGET)?'; exit 1)
-	xt-run $<  $(MODEL_INTPUT)
+	xt-run $<  $(MODEL_INPUT)
 
 ###############
 # convert model this suppose run offline, pre converting first.
