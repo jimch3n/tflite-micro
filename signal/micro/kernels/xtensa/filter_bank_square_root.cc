@@ -22,10 +22,29 @@ limitations under the License.
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
 #include "tensorflow/lite/micro/memory_helpers.h"
 #include "tensorflow/lite/micro/micro_utils.h"
+#include "signal/src/square_root.h"
 
+#if defined(XTENSA) || defined(IA8201)
+#include "tensorflow/lite/micro/ia8201/config.h"
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#if defined(HMD1A) && defined(__XTENSA__)
+#include <xtensa/config/core-isa.h>
+#include <xtensa/tie/xt_core.h>
+#include <xtensa/tie/xt_hifi3.h>
+#include <xtensa/tie/xt_misc.h>
+#endif
+
+
+#elif defined(IA700)
+#include "tensorflow/lite/micro/ia700/config.h"
+#include "tensorflow/lite/micro/kernels/ia700/mvm_helper.h"
+#include "tensorflow/lite/micro/ia700/debug_helper.h"
+#endif
+#if !defined(SIG_FB_SQRT_OPT) 
 // Defined in square_root.S
 extern "C" uint32_t xtensa_sqrt_64(const uint64_t num);
-
+#endif
 namespace tflite {
 namespace {
 
@@ -33,10 +52,15 @@ constexpr int kInputTensor = 0;
 constexpr int kScaleBitsTensor = 1;
 constexpr int kOutputTensor = 0;
 
+
 void ApplyFilterbankSqrt(const uint64_t* input, int num_channels,
                          int scale_down_bits, uint32_t* output) {
   for (int i = 0; i < num_channels; ++i) {
+#if  defined(SIG_FB_SQRT_OPT) 
+    output[i] = tflite::tflm_signal::SqrtAfloat(input[i]) >> scale_down_bits;
+#else
     output[i] = xtensa_sqrt_64(input[i]) >> scale_down_bits;
+#endif
   }
 }
 
@@ -58,15 +82,15 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 }
 
 }  // namespace
-
+#ifndef REMOVE_TFLM_SIGNAL
 namespace tflm_signal {
-
+#endif
 TFLMRegistration* Register_FILTER_BANK_SQUARE_ROOT() {
   static TFLMRegistration r =
       tflite::micro::RegisterOp(nullptr, FilterBankSquareRootPrepare, Eval);
   return &r;
 }
-
+#ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal
-
+#endif
 }  // namespace tflite

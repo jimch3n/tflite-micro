@@ -25,20 +25,20 @@ int main(int argc, char *argv[]) {
 
   printf("model size: %d bytes\n", fsize);
   // std::cout << "Hello World!\n";
-  int frs = fread(model_data, 1, fsize, fp_model);
+  size_t frs = fread(model_data, 1, fsize, fp_model);
   if (frs != fsize) { return -4; }
 
   uint32_t kn_model_size =
       iaxxx_tflite_model_converter(model_data, kn_model_data, 1, 1);
 
   std::ofstream ofs(argv[2], std::ofstream::binary);
-  if (!ofs.is_open()) return false;
+  if (!ofs.is_open()) return -2;
   ofs.write(reinterpret_cast<char *>(kn_model_data), kn_model_size);
 
   ofs.close();
 
   free(model_data);
   free(kn_model_data);
-  fprintf(stderr, "knowles converted model size: %d\n", kn_model_data);
+  fprintf(stderr, "knowles converted model size: %d\n", kn_model_size);
   return 0;
 }

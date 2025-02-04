@@ -382,13 +382,13 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
 
       ae_int32x2 ae_in =
           AE_MOVDA32X2(move32_ar_vr(VR_y, VRQ1), move32_ar_vr(VR_y, VRQ0));
-      KN_PRINTX_AE32X2(ae_in);
+     // KN_PRINTX_AE32X2(ae_in);
       ae_int32x2 ae_out0 = AE_SLAA32S(ae_in, left_shift);
       ae_out0 = AE_MULFP32X2RAS(ae_out0, ae_out_multiplier);
       ae_out0 =
           AE_ROUND32X2F64SSYM(AE_SRAA64(AE_CVT64F32_H(ae_out0), right_shift),
                               AE_SRAA64(AE_CVT64F32_L(ae_out0), right_shift));
-      KN_PRINTX_AE32X2(ae_out0);
+      //KN_PRINTX_AE32X2(ae_out0);
       VR_y = mov_vr_AccExtend();
       VR_y = shift32_arith(VR_y, -b_shift, 0);
       // AE_L32X2_IP(d_bias, (ae_int32x2 *)pB, 2*sizeof(WORD32));
@@ -417,8 +417,8 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
       ae_out1 = AE_MAX32(ae_out1, min_int8);
       ae_out1 = AE_MIN32(ae_out1, max_int8);
 
-      KN_PRINTX_AE32X2(ae_out0);
-      KN_PRINTX_AE32X2(ae_out1);
+      //KN_PRINTX_AE32X2(ae_out0);
+      //KN_PRINTX_AE32X2(ae_out1);
 
       set_VRL(VR_out, AE_MOVAD32_L(ae_out1));
       set_VRH(VR_out, AE_MOVAD32_H(ae_out1));
@@ -737,18 +737,14 @@ static void FullyConnectedQuantizedInt8(
       status = FullyConnectedKernel(
           (int32_t *)inputLocal, (int32_t *)p_fc_mapped_filter,
           (AScalar *)baisMVM, (int8_t *)outputLocal, output_depth, accum_depth,
-          // data.outputOffset,
           data.input_offset_int8, sign, b_shift, op_params.output_offset,
           op_params.output_multiplier, op_params.output_shift);
     } else {
-      // KN_PRINTF("ERROR!");
+
       status = FullyConnectedKernelInputOffset(
           (int32_t *)inputLocal, (int32_t *)p_fc_mapped_filter,
-          // (AScalar *)baisMVM,
           (int8_t *)outputLocal, output_depth, accum_depth,
-          // data.outputOffset,
           data.inputOffsetWithW,
-          // data.outputMultipler,
           sign, b_shift, op_params.output_offset, op_params.output_multiplier,
           op_params.output_shift);
     }
@@ -963,7 +959,7 @@ TfLiteStatus HmdPrepareFullyConnectedInt8(TfLiteContext *context,
                                17);
     KN_PRINTAFLT(data_ex->outputOffset);
   }
-
+  KN_PRINTD(data_ex->opt_constraint);
   micro_context->DeallocateTempTfLiteTensor(input);
   micro_context->DeallocateTempTfLiteTensor(filter);
   if (bias) micro_context->DeallocateTempTfLiteTensor(bias);

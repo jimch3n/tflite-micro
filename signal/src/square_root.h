@@ -25,7 +25,8 @@ namespace tflm_signal {
 // Square root
 uint16_t Sqrt32(uint32_t num);
 uint32_t Sqrt64(uint64_t num);
-
+// afloat/IA8201
+uint32_t SqrtAfloat(uint64_t num);
 }  // namespace tflm_signal
 }  // namespace tflite
 

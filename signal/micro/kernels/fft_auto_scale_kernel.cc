@@ -14,6 +14,11 @@ limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
 #include "signal/micro/kernels/fft_auto_scale_kernel.h"
+
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "signal/src/fft_auto_scale.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
@@ -53,9 +58,6 @@ TfLiteStatus FftAutoScaleEval(TfLiteContext* context, TfLiteNode* node) {
 
   *scale_bit_data =
       tflm_signal::FftAutoScale(input_data, output->dims->data[0], output_data);
-
-  //KN_PRINTX(scale_bit_data);
-  //KN_PRINTX(*scale_bit_data);
   return kTfLiteOk;
 }
 

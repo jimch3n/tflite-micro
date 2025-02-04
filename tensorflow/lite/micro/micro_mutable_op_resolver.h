@@ -203,7 +203,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddDelay() {
     // TODO(b/286250473): change back name to "Delay" and remove namespace
+  #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalDelay", tflite::tflm_signal::Register_DELAY());
+  #else
+    return AddCustom("SignalDelay", tflite::Register_DELAY());
+  #endif
   }
 
   TfLiteStatus AddDepthToSpace() {
@@ -238,7 +242,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddEnergy() {
     // TODO(b/286250473): change back name to "Energy" and remove namespace
+    #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalEnergy", tflite::tflm_signal::Register_ENERGY());
+    #else
+    return AddCustom("SignalEnergy", tflite::Register_ENERGY());
+    #endif
   }
 
   TfLiteStatus AddElu() {
@@ -268,8 +276,13 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddFftAutoScale() {
     // TODO(b/286250473): change back name and remove namespace
+    #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalFftAutoScale",
                      tflite::tflm_signal::Register_FFT_AUTO_SCALE());
+    #else
+    return AddCustom("SignalFftAutoScale",
+                     tflite::Register_FFT_AUTO_SCALE());
+    #endif
   }
 
   TfLiteStatus AddFill() {
@@ -278,27 +291,46 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddFilterBank() {
     // TODO(b/286250473): change back name to "FilterBank" and remove namespace
+        #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalFilterBank",
                      tflite::tflm_signal::Register_FILTER_BANK());
+            #else
+    return AddCustom("SignalFilterBank",
+                     tflite::Register_FILTER_BANK());
+            #endif
   }
   TfLiteStatus AddFilterBankLog() {
     // TODO(b/286250473): change back name to "FilterBankLog" and remove
     // namespace
+        #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalFilterBankLog",
                      tflite::tflm_signal::Register_FILTER_BANK_LOG());
+                     #else
+                     #endif
   }
   TfLiteStatus AddFilterBankSquareRoot() {
     // TODO(b/286250473): change back name to "FilterBankSquareRoot" and remove
     // namespace
+            #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalFilterBankSquareRoot",
                      tflite::tflm_signal::Register_FILTER_BANK_SQUARE_ROOT());
+                     #else
+      return AddCustom("SignalFilterBankSquareRoot",
+                     tflite::Register_FILTER_BANK_SQUARE_ROOT());
+                     #endif
   }
   TfLiteStatus AddFilterBankSpectralSubtraction() {
     // TODO(b/286250473): change back name to "FilterBankSpectralSubtraction"
     // and remove namespace
+            #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom(
         "SignalFilterBankSpectralSubtraction",
         tflite::tflm_signal::Register_FILTER_BANK_SPECTRAL_SUBTRACTION());
+        #else
+    return AddCustom(
+        "SignalFilterBankSpectralSubtraction",
+        tflite::Register_FILTER_BANK_SPECTRAL_SUBTRACTION());
+        #endif
   }
 
   TfLiteStatus AddFloor() {
@@ -317,7 +349,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddFramer() {
     // TODO(b/286250473): change back name to "Framer" and remove namespace
+#ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalFramer", tflite::tflm_signal::Register_FRAMER());
+    #else
+    return AddCustom("SignalFramer", tflite::Register_FRAMER());
+    #endif
   }
 
   TfLiteStatus AddFullyConnected(
@@ -458,8 +494,13 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddOverlapAdd() {
     // TODO(b/286250473): change back name to "OverlapAdd" and remove namespace
+            #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalOverlapAdd",
                      tflite::tflm_signal::Register_OVERLAP_ADD());
+                     #else
+                         return AddCustom("SignalOverlapAdd",
+                     tflite::Register_OVERLAP_ADD());
+                     #endif
   }
 
   TfLiteStatus AddPack() {
@@ -476,7 +517,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddPCAN() {
     // TODO(b/286250473): change back name to "PCAN" and remove namespace
+            #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalPCAN", tflite::tflm_signal::Register_PCAN());
+    #else
+    return AddCustom("SignalPCAN", tflite::Register_PCAN());
+    #endif
   }
 
   TfLiteStatus AddPrelu() {
@@ -617,7 +662,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddStacker() {
     // TODO(b/286250473): change back name to "Stacker" and remove namespace
+            #ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalStacker", tflite::tflm_signal::Register_STACKER());
+    #else
+    return AddCustom("SignalStacker", tflite::Register_STACKER());
+    #endif
   }
 
 #if defined(IA8201) || defined(IA700)
@@ -675,7 +724,11 @@ class MicroMutableOpResolver : public MicroOpResolver {
 
   TfLiteStatus AddWindow() {
     // TODO(b/286250473): change back name to "Window" and remove namespace
+#ifndef REMOVE_TFLM_SIGNAL
     return AddCustom("SignalWindow", tflite::tflm_signal::Register_WINDOW());
+    #else
+    return AddCustom("SignalWindow", tflite::Register_WINDOW());
+    #endif
   }
 
   TfLiteStatus AddZerosLike() {

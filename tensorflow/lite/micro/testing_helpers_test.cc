@@ -65,7 +65,7 @@ TF_LITE_MICRO_TEST(PackInt4BasicOddLength) {
     TF_LITE_MICRO_EXPECT_EQ(expect_output[i], input[i]);
   }
 }
-
+ 
 TF_LITE_MICRO_TEST(CreatePerChannelQuantizedBiasTensor) {
   float input_scale = 0.5;
   float weight_scales[] = {0.5, 1, 2, 4};

@@ -129,7 +129,7 @@ static void write_model_buffers(const tflite::Model *model,
   //fprintf(stderr, "buffers: 0x%p\n", buffers);
   const flatbuffers::Vector<flatbuffers::Offset<tflite::Buffer>>
       &buffer_offsets = *buffers;
-  int number_of_buffers = buffer_offsets.size();
+//  int number_of_buffers = buffer_offsets.size();
   //fprintf(stderr, "number of buffers: %d\n", buffer_offsets.size());
   //for (int i = 0; i < number_of_buffers; ++i)
   int i = buffer_idx;
@@ -235,10 +235,10 @@ iaxxx_tflite_model_converter(uint8_t *model_data, uint8_t *output, int verbose, 
 
         const tflite::Tensor *tensor = subgraph->tensors()->Get(tensor_idx);
 
-        tflite::TensorT *tt = tensor->UnPack();
+//        tflite::TensorT *tt = tensor->UnPack();
         if (tensor->type() == tflite::TensorType_INT8) {
-          if (verbose)
-            printf("tensor : %d name: %s\n", tensor->buffer(), tensor->name());
+          if (verbose && tensor->name())
+            printf("tensor : %d name: %s\n", tensor->buffer(), tensor->name()->c_str());
           const ::flatbuffers::Vector<int32_t> *shape = tensor->shape();
           auto *shape_array = shape->data();
           const int32_t *shape_data =
@@ -289,9 +289,10 @@ iaxxx_tflite_model_converter(uint8_t *model_data, uint8_t *output, int verbose, 
 
         const tflite::Tensor *tensor = subgraph->tensors()->Get(tensor_idx);
 
-        tflite::TensorT *tt = tensor->UnPack();
+//        tflite::TensorT *tt = tensor->UnPack();
         if (tensor->type() == tflite::TensorType_INT8) {
-          printf("tensor : %d name: %s\n", tensor->buffer(), tensor->name());
+          if(verbose && tensor->name())
+              printf("tensor : %d name: %s\n", tensor->buffer(), tensor->name()->c_str());
           const ::flatbuffers::Vector<int32_t> *shape = tensor->shape();
           auto *shape_array = shape->data();
           const int32_t *shape_data =

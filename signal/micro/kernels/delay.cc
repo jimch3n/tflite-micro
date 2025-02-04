@@ -142,13 +142,15 @@ void DelayReset(TfLiteContext* context, void* buffer) {
 }
 
 }  // namespace
-
+#ifndef REMOVE_TFLM_SIGNAL
 namespace tflm_signal {
+#endif
 TFLMRegistration* Register_DELAY() {
   static TFLMRegistration r = micro::RegisterOp(DelayInit, DelayPrepare,
                                                 DelayEval, nullptr, DelayReset);
   return &r;
 }
+#ifndef REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal
-
+#endif
 }  // namespace tflite

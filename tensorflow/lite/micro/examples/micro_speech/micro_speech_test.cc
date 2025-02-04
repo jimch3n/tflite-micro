@@ -243,7 +243,7 @@ TfLiteStatus TestAudioSample(const char* label, const int16_t* audio_data,
 }  // namespace
 
 TF_LITE_MICRO_TESTS_BEGIN
-
+ 
 TF_LITE_MICRO_TEST(NoFeatureTest) {
   int8_t expected_feature[kFeatureSize] = {
       126, 103, 124, 102, 124, 102, 123, 100, 118, 97, 118, 100, 118, 98,

@@ -54,8 +54,7 @@ const float simple_weights_data[] = {
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,  // u = 2
 };
 float simple_weights_data_flt[sizeof(simple_weights_data) / sizeof(float)];
-int simple_bias_dims[] = {1, 3};
-const float simple_bias_data[] = {1, 2, 3};
+
 
 #ifdef USE_TFLM_COMPRESSION
 

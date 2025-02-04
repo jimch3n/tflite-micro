@@ -64,6 +64,9 @@ typedef enum {
   kTfLiteUInt16 = 17,
   kTfLiteInt4 = 18,
   kTfLiteBFloat16 = 19,
+#if defined(IA8201) || defined(IA700)
+  kTfLiteAfloat32 = 20  // KNOWLES DSP
+#endif
 } TfLiteType;
 // LINT.ThenChange(//tensorflow/lite/profiling/proto/model_runtime_info.proto:EdgeDataType)
 

@@ -147,6 +147,11 @@ ifeq ($(TARGET),ia700)
 KERNEL_OPTIMIZATION_LEVEL += -Os
 THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL += -Os
 endif
+### xtensa hmd core
+ifeq ($(TARGET),xtensa)
+KERNEL_OPTIMIZATION_LEVEL += -O2 -Os
+THIRD_PARTY_KERNEL_OPTIMIZATION_LEVEL += -O2 -Os
+endif
 # Warn if deprecated optimization level is set.
 OPTIMIZATION_LEVEL :=
 ifneq ($(OPTIMIZATION_LEVEL),)
@@ -539,6 +544,10 @@ $(TENSORFLOW_ROOT)signal/src/square_root_32.cc \
 $(TENSORFLOW_ROOT)signal/src/square_root_64.cc \
 $(TENSORFLOW_ROOT)signal/src/window.cc
 
+ifeq ($(TARGET), xtensa)
+  MICROLITE_CC_SIGNAL_KERNEL_SRCS +=$(TENSORFLOW_ROOT)signal/src/square_root_afloat.cc 
+endif
+
 MICROLITE_TEST_HDRS := \
 $(wildcard $(TENSORFLOW_ROOT)tensorflow/lite/micro/testing/*.h)
 
@@ -925,42 +934,6 @@ ifeq ($(TARGET), xtensa)
 endif
 ## for those replace OBJ
 
-######## IA8201 HMD Core use MVM ############
-ifeq ($(TARGET), xtensa)
-TARGET_OBJ_DIR := $(KERNEL_OBJDIR)/tensorflow/lite/micro/kernels/
-TARGET_OBJS := $(addprefix $(TARGET_OBJ_DIR), xtensa/svdf.o svdf_common.o xtensa/fully_connected_int8.o)
-
-TARGET_OBJ_SIG_DIR := $(KERNEL_OBJDIR)/signal/src/
-TARGET_SRC_DIR := $(TENSORFLOW_ROOT)/signal/src/
-#SIGNAL_HACK_SRC := $(addprefix $(TARGET_OBJ_SIG_DIR), energy.cc filter_bank_spectral_subtraction.cc filter_bank_square_root.cc window.cc)
-
-SIGNAL_HACK_OBJS := $(addprefix $(TARGET_OBJ_SIG_DIR), energy.o filter_bank.o filter_bank_spectral_subtraction.o filter_bank_square_root.o window.o filter_bank_log.o)
-
-#TARGET_OBJS += $(SIGNAL_HACK_OBJS)
-#$(info TARGET_OBJS : $(TARGET_OBJS) $(HOST_OS))
-#$(info signal objs: $(SIGNAL_HACK_OBJS))
-BUILD_HK_OBJS := $(findstring $(TARGET_OBJS), $(MICROLITE_KERNEL_OBJS))
-ifeq ($(HOST_OS), linux)
-TARGET_TFLIB := $(SDK_ROOT_PACKAGE)/HotWordTFLM/External/AndroidV/libraries/release/v4/libtensorflow-microlite-v4.1.a
-
-else
-TARGET_TFLIB := $(SDK_ROOT_PACKAGE)/HotWordTFLM/External/CLIB_True/libtensorflow-microlite_KERNELs.a
-endif
-#$(info hk $(BUILD_HK_OBJS))
-#$(info target lib $(TARGET_TFLIB))
-$(TARGET_OBJS): $(TARGET_TFLIB)   $(MICROLITE_LIB_PATH)
-	@echo archieve  $< $@
-	$(AR) d $< $(notdir $@) && \
-  $(AR) rcu $< $@
-### replace x.2.o
-$(SIGNAL_HACK_OBJS): $(MICROLITE_LIB_PATH)
-	@echo archieve  IN $@  OUT $(subst .o,.2.o,$(notdir $@))
-	cp $@ $(subst .o,.2.o,$(notdir $@)) && \
-  $(AR) rcu $(TARGET_TFLIB) $(subst .o,.2.o,$(notdir $@)) 
-kernel_hack: $(TARGET_TFLIB)  $(TARGET_OBJS)
-signal_hack: $(TARGET_TFLIB)  $(SIGNAL_HACK_OBJS)
-
-endif
 ##################3
 $(BINDIR)%_test : $(CORE_OBJDIR)%_test.o $(MICROLITE_LIB_PATH)
 	@mkdir -p $(dir $@)

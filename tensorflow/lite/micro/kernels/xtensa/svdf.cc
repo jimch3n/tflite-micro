@@ -45,7 +45,7 @@ limitations under the License.
 namespace tflite {
 namespace {
 
-struct OpData {
+struct OpDataSvdfEx {
   OpDataSvdf SvdfOp;
 
   int32_t* map_weight_feat;
@@ -146,7 +146,7 @@ void* Init(TfLiteContext* context, const char* buffer, size_t length) {
 #else
 void* InitHmd(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataSvdfEx));
 }
 #endif
 #ifndef USE_HMD_MVM_OPT
@@ -501,7 +501,7 @@ TfLiteStatus PrepareHmdInt8(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_EQ(context, node->inputs->size, 5);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  OpData* data_ex = static_cast<OpData*>(node->user_data);
+  OpDataSvdfEx* data_ex = static_cast<OpDataSvdfEx*>(node->user_data);
 
   OpDataSvdf* data = static_cast<OpDataSvdf*>(&data_ex->SvdfOp);
   if (input->type == kTfLiteInt8) {
@@ -594,6 +594,7 @@ TfLiteStatus PrepareHmdInt8(TfLiteContext* context, TfLiteNode* node) {
 
         KN_PRINTD(map_coeff_size);
 #ifdef KERNEL_COEFF_MAP_ENABLE
+KN_PRINTS("!! KERNEL_COEFF_MAP_ENABLE always use internal weight without online conversion!!!")
         if (true)
 #else
         if (use_internal_persist_weight)
@@ -608,11 +609,12 @@ TfLiteStatus PrepareHmdInt8(TfLiteContext* context, TfLiteNode* node) {
                 (int8_t*)p_dmx1a_fc_mapped_filter, (int8_t*)filter_input,
                 num_filters, input_size);
           }
-          KN_PRINT_Q7_SIZE_ATMOST(p_dmx1a_fc_mapped_filter, map_coeff_size, 64);
+          //KN_PRINT_Q7_SIZE_ATMOST(p_dmx1a_fc_mapped_filter, map_coeff_size, 64);
         } else {
           p_dmx1a_fc_mapped_filter = (int32_t*)filter_input;  // remapping
-          KN_PRINT_Q7_SIZE_ATMOST(p_dmx1a_fc_mapped_filter, map_coeff_size, 64);
+          
         }
+        KN_PRINT_Q7_SIZE_ATMOST(p_dmx1a_fc_mapped_filter, map_coeff_size, 64);
         // KN_PRINTX(data->activation_state_zero_point);
         data_ex->map_weight_feat = (int32_t*)p_dmx1a_fc_mapped_filter;
         // const TfLiteEvalTensor* biasEval =
@@ -1022,7 +1024,7 @@ int SVDFFeatMatInt8(int32_t* x, const int32_t* A, int16_t* output, int n_filter,
 }
 #ifndef USE_HIFI_TIME_DOT
 // BatchVectorBatchVectorDotProduct
-void SVDFTimeInt16(OpData* data, const int16_t* weight_time,
+void SVDFTimeInt16(OpDataSvdfEx* data, const int16_t* weight_time,
                    const int16_t* activation_state, int feature_batch,
                    int time_batches, int32_t* output) {
   int loopLim = time_batches >> 1;
@@ -1081,7 +1083,7 @@ void SVDFTimeInt16(OpData* data, const int16_t* weight_time,
 }
 
 #else
-void SVDFTimeInt16HifiAddBias(OpData* data, const int16_t* weight_time,
+void SVDFTimeInt16HifiAddBias(OpDataSvdfEx* data, const int16_t* weight_time,
                               const int16_t* activation_state,
                               int feature_batch, int time_batches,
                               const int32_t* bias, int32_t out_multiplier,
@@ -1179,7 +1181,7 @@ void SVDFTimeInt16HifiAddBias(OpData* data, const int16_t* weight_time,
 
 #endif
 
-void SVDFQauntizedInt8(OpData* data, const TfLiteSVDFParams* params,
+void SVDFQauntizedInt8(OpDataSvdfEx* data, const TfLiteSVDFParams* params,
                        const int8_t* input, const int32_t input_batches,
                        const int32_t input_height, const int8_t* weight_feature,
                        const int32_t feature_batches,
@@ -1288,7 +1290,7 @@ void EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
                      const TfLiteEvalTensor* bias_tensor,
                      const TfLiteSVDFParams* params,
                      TfLiteEvalTensor* activation_state_tensor,
-                     TfLiteEvalTensor* output_tensor, OpData* data_ex) {
+                     TfLiteEvalTensor* output_tensor, OpDataSvdfEx* data_ex) {
   TFLITE_DCHECK(context != nullptr);
   TFLITE_DCHECK(context->GetScratchBuffer != nullptr);
 
@@ -1296,6 +1298,7 @@ void EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
 #if 1  // defined(DMX1A_SVDF_OPT) || defined(HMD1A_SVDF_OPT)
 
   OpDataSvdf* data = static_cast<OpDataSvdf*>(&data_ex->SvdfOp);
+  KN_PRINTD(data_ex->opt_constraint);
   if (data_ex->opt_constraint > 0) {
     // SIZE: batch_size * num_filters * sizeof(int32_t)
     data_ex->pScratch = static_cast<int32_t*>(
@@ -1344,7 +1347,7 @@ void EvalIntegerSVDF(TfLiteContext* context, TfLiteNode* node,
 TfLiteStatus EvalInt8Hmd(TfLiteContext* context, TfLiteNode* node) {
   auto* params = reinterpret_cast<TfLiteSVDFParams*>(node->builtin_data);
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpData& data = *(static_cast<const OpData*>(node->user_data));
+  const OpDataSvdfEx& data = *(static_cast<const OpDataSvdfEx*>(node->user_data));
 
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kSvdfInputTensor);
@@ -1367,7 +1370,7 @@ TfLiteStatus EvalInt8Hmd(TfLiteContext* context, TfLiteNode* node) {
     return kTfLiteError;
   }
   EvalIntegerSVDF(context, node, input, weights_feature, weights_time, bias,
-                  params, activation_state, output, (OpData*)&data);
+                  params, activation_state, output, (OpDataSvdfEx*)&data);
 
   return kTfLiteOk;
 }

@@ -1070,6 +1070,9 @@ void EvalSubFloat(TfLiteContext* context, TfLiteNode* node,
                            &output_activation_max);
   tflite::ArithmeticParams op_params;
   SetActivationParams(output_activation_min, output_activation_max, &op_params);
+
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input1), ElementCount(*input1->dims));
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input2), ElementCount(*input2->dims));
   if (data->requires_broadcast) {
     tflite::reference_ops::BroadcastSubSlow(
         op_params, tflite::micro::GetTensorShape(input1),
@@ -1087,6 +1090,8 @@ void EvalSubFloat(TfLiteContext* context, TfLiteNode* node,
         tflite::micro::GetTensorShape(output),
         tflite::micro::GetTensorData<float>(output));
   }
+
+  KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), ElementCount(*output->dims));
 }
 #ifndef REMOVE_REFOP_SUPPORT
 TfLiteStatus EvalSubQuantized(TfLiteContext* context, TfLiteNode* node,
@@ -1304,9 +1309,9 @@ TfLiteStatus EvalSubFloat32(TfLiteContext* context, TfLiteNode* node,
                              tflite::micro::GetTensorShape(output));
 
     const float* input1Flt = tflite::micro::GetTensorData<float>(input1);
-    KN_PRINTF(input2Flt[0]);
+    //KN_PRINTF(input2Flt[0]);
     input1Element = AScalar(input1Flt[0]);
-    KN_PRINTAFLT(input2Element);
+    //KN_PRINTAFLT(input2Element);
     SubFloatConstI1(tflite::micro::GetTensorData<float>(output), input1Element,
                     tflite::micro::GetTensorData<float>(input2), act_min,
                     act_max, flat_size);

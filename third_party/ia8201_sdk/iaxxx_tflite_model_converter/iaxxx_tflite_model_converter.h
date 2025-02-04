@@ -3,7 +3,7 @@
 #  define _IAXXX_TFLITE_MODEL_CONVERTER_H_
 #include <iostream>
 #include <fstream>
-#include "schema_generated.h" // tflite 23.5.26
+#include "tensorflow/lite/schema/schema_generated.h" // tflite 23.5.26
 #include "flatbuffers/idl.h"
 #include "flatbuffers/util.h"
 

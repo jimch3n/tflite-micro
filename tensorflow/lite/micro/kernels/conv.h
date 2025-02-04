@@ -91,7 +91,7 @@ TfLiteStatus ConvPrepare(TfLiteContext* context, TfLiteNode* node);
 // implementation (reference or optimized) must define this function.
 TFLMRegistration Register_CONV_2D();
 
-#if defined(XTENSA)
+#if defined(XTENSA) || defined(IA8201) || defined(IA700)
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8 activations and int8 weights and always calls the reference
 // implementation.

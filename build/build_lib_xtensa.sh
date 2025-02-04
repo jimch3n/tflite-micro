@@ -123,7 +123,7 @@ build_hifi3_hmd1a()
   local target=$1
   #regexp='^test[0-9a-z_]+$'
   echo target: [$target]
-  if [[ "$target" =~ test ]]; then
+  if [[ "$target" = "test" ]]; then
     BUILD_TYPE=release_with_logs
     RTS=0
     TM=1
@@ -131,19 +131,30 @@ build_hifi3_hmd1a()
   ## kernel_hack mode, replacing svdf/fc
     BUILD_TYPE=release
     #### for compliance google 's tflm branch
-    #RTS=1
-    #TM=0
-    RTS=0
-    TM=1
+    RTS=1
+    TM=0
+    #RTS=0
+    #TM=1
   fi
   echo BUILD: $BUILD_TYPE
 	cd ../
 	echo make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 \
   XTENSA_TOOLS_VERSION=$XTENSA_VER XTENSA_CORE=hmd1aRI04 XTENSA_BASE=${XTENSA_SYSTEM_BASE%tools} BUILD_TYPE=$BUILD_TYPE RM_TFLM_SIGNAL=$RTS TEST_MODE=$TM $target
 
-	make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 \
-  XTENSA_TOOLS_VERSION=$XTENSA_VER XTENSA_CORE=hmd1aRI04 XTENSA_BASE=${XTENSA_SYSTEM_BASE%tools} BUILD_TYPE=$BUILD_TYPE RM_TFLM_SIGNAL=$RTS TEST_MODE=$TM $target
-	cd -
+	if [ "$target" == "test" ]; then
+	  make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 \
+    XTENSA_TOOLS_VERSION=$XTENSA_VER XTENSA_CORE=hmd1aRI04 XTENSA_BASE=${XTENSA_SYSTEM_BASE%tools} BUILD_TYPE=$BUILD_TYPE RM_TFLM_SIGNAL=$RTS TEST_MODE=$TM -j8
+	  make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 -k \
+    XTENSA_TOOLS_VERSION=$XTENSA_VER XTENSA_CORE=hmd1aRI04 XTENSA_BASE=${XTENSA_SYSTEM_BASE%tools} BUILD_TYPE=$BUILD_TYPE RM_TFLM_SIGNAL=$RTS TEST_MODE=$TM test
+	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -j8 && \
+	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -k test 
+  else
+	  make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 \
+    XTENSA_TOOLS_VERSION=$XTENSA_VER XTENSA_CORE=hmd1aRI04 XTENSA_BASE=${XTENSA_SYSTEM_BASE%tools} BUILD_TYPE=$BUILD_TYPE RM_TFLM_SIGNAL=$RTS TEST_MODE=$TM -j8
+	  make -f tensorflow/lite/micro/tools/make/Makefile TARGET=xtensa OPTIMIZED_KERNEL_DIR=xtensa TARGET_ARCH=hifi3 \
+    XTENSA_TOOLS_VERSION=$XTENSA_VER XTENSA_CORE=hmd1aRI04 XTENSA_BASE=${XTENSA_SYSTEM_BASE%tools} BUILD_TYPE=$BUILD_TYPE RM_TFLM_SIGNAL=$RTS TEST_MODE=$TM $target
+	fi
+  cd -
 }
 
 case "$1" in

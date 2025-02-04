@@ -27,7 +27,7 @@ limitations under the License.
 
 // TODO(b/286250473): remove namespace once de-duped libraries
 namespace tflm_signal {
-static int g_fft_length = 0;
+
 size_t RfftInt16GetNeededMemory(int32_t fft_length) {
   size_t state_size = 0;
   kiss_fft_fixed16::kiss_fftr_alloc(fft_length, 0, nullptr, &state_size);
@@ -35,7 +35,6 @@ size_t RfftInt16GetNeededMemory(int32_t fft_length) {
 }
 
 void* RfftInt16Init(int32_t fft_length, void* state, size_t state_size) {
-  g_fft_length = fft_length; // dbg
   return kiss_fft_fixed16::kiss_fftr_alloc(fft_length, 0, state, &state_size);
 }
 
@@ -45,9 +44,6 @@ void RfftInt16Apply(void* state, const int16_t* input,
       static_cast<kiss_fft_fixed16::kiss_fftr_cfg>(state),
       reinterpret_cast<const kiss_fft_scalar*>(input),
       reinterpret_cast<kiss_fft_fixed16::kiss_fft_cpx*>(output));
-
-      //KN_PRINT_Q15_SIZE(reinterpret_cast<kiss_fft_fixed16::kiss_fft_cpx*>(output),
-      //g_fft_length);
 }
 
 }  // namespace tflm_signal

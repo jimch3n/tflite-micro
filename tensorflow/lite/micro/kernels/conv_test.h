@@ -123,6 +123,26 @@ TfLiteStatus TestConvFloat(
 #endif  // USE_TFLM_COMPRESSION
 );
 
+// todo compression
+TfLiteStatus TestConvFloatInt8(int* input_dims_data, const float* input_data,
+                               int* filter_dims_data, const float* filter_data,
+                               int* bias_dims_data, const float* bias_data,
+                               int* output_dims_data,
+                               const float* expected_output_data,
+                               TfLiteConvParams* conv_params,
+                               TFLMRegistration registration,
+                               float* output_data);
+                            
+
+                            
+TfLiteStatus TestConvFloat16(int* input_dims_data, const float* input_data,
+                             int* filter_dims_data, const float* filter_data,
+                             int* bias_dims_data, const float* bias_data,
+                             int* output_dims_data,
+                             const float* expected_output_data,
+                             TfLiteConvParams* conv_params,
+                             TFLMRegistration registration, float* output_data);
+
 TfLiteStatus TestConvQuantizedPerChannel(
     int* input_dims_data, const float* input_data, int8_t* input_quantized,
     float input_scale, int input_zero_point, int* filter_dims_data,
