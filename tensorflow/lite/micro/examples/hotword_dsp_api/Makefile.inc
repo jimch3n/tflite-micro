@@ -1,38 +1,3 @@
-# Arguments are:
-# 1 - Name of target. "nb" "wb_small" "wb_large" "y_google_small" "y_google_large" 
-# 2 - C/C++ source files
-# 3 - C/C++ header files
-# 4 - Model sources and model test inputs in.tflite, .wav, .bmp or .csv format.
-# Calling eval on the output will create the targets that you need.
-define hotword_model_test
-
-$(info hotword input target: [$(1)])
-$(1)_HOTWORD_DSP_API_TEST_SRCS := \
-$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/common.cc \
-$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/hotword_dsp_api_$(1).cc \
-
-
-#HOTWORD_DSP_API_SRCS := \
-#$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/hotword_dsp_api_y_google_large.cc
-
-#HOTWORD_DSP_API_HDRS :=
-
-$(1)_HOTWORD_DSP_API_GENERATOR_INPUTS := \
-$$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/$(1)_en_all.tflite 
-
-$(1)_HOTWORD_DSP_API_GENERATED_SRCS := \
-$$(GENERATED_SRCS_DIR)$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/hotword_$(1)_models/$(1)_en_all_data.cc
-
-$(1)_HOTWORD_DSP_API_GENERATED_HDRS := \
-$$(GENERATED_SRCS_DIR)$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/$(1)_model_data.h \
-$$(GENERATED_SRCS_DIR)$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/$(1)_model_data.h
-
-# Tests loading and running the hotword model.
-$(info target $$($(1)_HOTWORD_DSP_API_TEST_SRCS), $$($(1)_HOTWORD_DSP_API_GENERATOR_INPUTS))
-$(eval $(call microlite_test,hotword_dsp_api_$(1)_test,\
-$($(1)_HOTWORD_DSP_API_TEST_SRCS),, $($(1)_HOTWORD_DSP_API_GENERATOR_INPUTS)))
-endef
-
 
 ######## IA8201 HMD Core use MVM optimization and signal HIFI/afloat opt ############
 ifeq ($(TARGET), xtensa)
@@ -76,7 +41,7 @@ $(SIGNAL_OPT_OBJS): $(MICROLITE_LIB_PATH)
 	cp $@ $(subst .o,.2.o,$(notdir $@)) &&   $(AR) dN 2 $(TARGET_TFLIB) $(notdir $@) && \
   $(AR) rcu $(TARGET_TFLIB) $(subst .o,.2.o,$(notdir $@))
 
-## replace XTENSA ###
+## replace xtensa filter bank square root in optimized xtensa dir ###
 $(SIGNAL_OPT_OBJS_2): $(MICROLITE_LIB_PATH)
 	@echo archieve  IN $@  OUT $(subst .o,.4.o,$(notdir $@))
 	@echo delete all other object
@@ -94,23 +59,30 @@ signal_replace: $(TARGET_TFLIB)  $(SIGNAL_OPT_OBJS) $(SIGNAL_OPT_OBJS_2)
 
 endif
 
-y_google_large_HOTWORD_DSP_API_TEST_SRCS := \
+HOTWORD_DSP_API_TEST_SRCS := \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/common.cc \
 $(TENSORFLOW_ROOT)google/application/crc32/crc32.cc \
 $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/hotword_dsp_api_file.cc \
 $(TENSORFLOW_ROOT)tensorflow/python/graphs/testdata/okgoogle_audio_data.cc 
 
-MODEL_INTPUT := \
-$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/hotword_large_y_google_models/y_google_large_en_all.tflite 
+MODEL_INPUT_DIR := \
+$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models
 
+#MODEL_FILE := \
+#hotword_large_y_google_models/y_google_large_en_all.tflite 
+
+MODEL_FILE := \
+hotword_wb_small_x_google_models/wb_small_en_all.tflite
+
+MODEL_INPUT := $(MODEL_INPUT_DIR)/$(MODEL_FILE)
 CXXFLAGS += -DMEASURE_CYCLES=1 -DDISABLE_LOG=0
 
 ifeq ($(TARGET),xtensa)
 # Tests loading and running the hotword model.
-#$(info target $(y_google_large_HOTWORD_DSP_API_TEST_SRCS), $(y_google_large_HOTWORD_DSP_API_GENERATOR_INPUTS))
-#$(eval $(call microlite_test,hotword_dsp_api_y_google_large_test,$(y_google_large_HOTWORD_DSP_API_TEST_SRCS),,))
+#$(info target $(HOTWORD_DSP_API_TEST_SRCS), $(y_google_large_HOTWORD_DSP_API_GENERATOR_INPUTS))
+#$(eval $(call microlite_test,hotword_dsp_api_y_google_large_test,$(HOTWORD_DSP_API_TEST_SRCS),,))
 hotword_local_obj = $(addprefix $(CORE_OBJDIR), \
-$(patsubst %.S,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(y_google_large_HOTWORD_DSP_API_TEST_SRCS)))))
+$(patsubst %.S,%.o,$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(HOTWORD_DSP_API_TEST_SRCS)))))
 
 hotword_dsp_api_BINARY := $(BINDIR)/hotword_dsp_api_test
 $(hotword_dsp_api_BINARY): $(hotword_local_obj) $(GOOFLE_TF_MICROLITE_LIB)  $(MICROSPEECH_LIB) $(MODE_CONFIG_LIB)
@@ -124,8 +96,8 @@ hotword_dsp_api_test: $(hotword_dsp_api_BINARY)
 	xt-run $<  $(MODEL_INTPUT)
 
 ###############
-# convert model
-##############
+# convert model this suppose run offline, pre converting first.
+###############
 IAXXX_MODEL_CONVERTER_SRC :=  $(TENSORFLOW_ROOT)third_party/ia8201_sdk/iaxxx_tflite_model_converter/iaxxx_tflite_model_converter.cpp \
 $(TENSORFLOW_ROOT)third_party/ia8201_sdk/iaxxx_tflite_model_converter/test_app.cpp
 
@@ -134,7 +106,8 @@ $(CORE_OBJDIR)%.o: %.cpp $(THIRD_PARTY_TARGETS)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(CORE_OPTIMIZATION_LEVEL) $(INCLUDES) -c $< -o $@
 
-TFLITE_MODEL := $(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/hotword_large_y_google_models/y_google_large_en_all.tflite
+TFLITE_MODEL := $(MODEL_INPUT)
+#$(TENSORFLOW_ROOT)tensorflow/lite/micro/examples/hotword_dsp_api/models/hotword_large_y_google_models/y_google_large_en_all.tflite
 #native compile
 KN_TFLITE_MODEL := $(addprefix $(BINDIR), $(subst  .tflite,_kn.tflite,$(notdir $(TFLITE_MODEL))))
 model_converter_obj = $(addprefix $(CORE_OBJDIR), \
@@ -145,7 +118,7 @@ hotword_model_convert := $(BINDIR)/iaxxx_model_converter
 $(hotword_model_convert): $(model_converter_obj)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS)  $(INCLUDES) $(model_converter_obj) -o $@  $(LDFLAGS)
-
+$(info kn_modeol_tflite: $(KN_TFLITE_MODEL))
 $(KN_TFLITE_MODEL): $(hotword_model_convert) $(TFLITE_MODEL)
 	xt-run $(hotword_model_convert) $(TFLITE_MODEL) $(KN_TFLITE_MODEL)
 
