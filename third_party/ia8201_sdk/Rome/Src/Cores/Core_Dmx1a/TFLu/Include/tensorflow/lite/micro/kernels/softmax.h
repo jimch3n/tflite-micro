@@ -38,7 +38,7 @@ TfLiteStatus SoftmaxPrepareInt8(TfLiteContext* context, TfLiteNode* node);
 // may still be target dependent. The only requirement is that every
 // implementation (reference or optimized) must define this function.
 TFLMRegistration Register_SOFTMAX();
-
+//for keyword_benchmark
 #if defined(XTENSA) || defined(CMSIS_NN)
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8 input and int16 output.

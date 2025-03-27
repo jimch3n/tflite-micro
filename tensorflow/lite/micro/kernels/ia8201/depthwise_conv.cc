@@ -3038,9 +3038,7 @@ TfLiteStatus DepthwiseConvPerChOpt(TfLiteContext *context, TfLiteNode *node,
 
   // get scratch buffer
   int32_t *p_aligned_scratch = nullptr;
-  if (0 == data_ex->opt_constraint) {
-    return kTfLiteError;
-  }
+
   if (data_ex->buffer_idx > -1) {
     p_aligned_scratch =
         (int32_t *)context->GetScratchBuffer(context, data_ex->buffer_idx);

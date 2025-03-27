@@ -16,7 +16,7 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_REDUCE_H_
 
 #include <algorithm>
-
+//#define KN_DEBUG
 #include "ruy/profiler/instrumentation.h"  // from @ruy
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/cppmath.h"
@@ -25,6 +25,8 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 
+
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
 // Check if the reduction at index is the first one along the dimensions given
 // in axis.
 inline bool IsFirstReduction(const int* index, const int num_axis,
@@ -372,6 +374,9 @@ inline bool QuantizedMeanOrSum(const T* input_data, int32_t input_zero_point,
     return false;
   }
 
+#ifdef KN_DEBUG
+  KN_PRINTD_SIZE(temp_sum, 20);
+#endif 
   // Calculate mean by dividing output_data by num of aggregated element.
   int64_t num_elements_in_axis = 1;
   for (int idx = 0; idx < num_resolved_axis; ++idx) {
@@ -405,14 +410,26 @@ inline bool QuantizedMeanOrSum(const T* input_data, int32_t input_zero_point,
     output_shift = output_shift - shift;
   }
 
+  KN_PRINTD(input_zero_point);
+  KN_PRINTD(output_multiplier);
+  KN_PRINTD(output_shift);
+  KN_PRINTD(output_zero_point);
+
   for (size_t idx = 0; idx < num_outputs; ++idx) {
     const U shifted_sum =
         static_cast<U>(temp_sum[idx] - input_zero_point * num_elements_in_axis);
-    int32_t output = MultiplyByQuantizedMultiplier(
-                         shifted_sum, output_multiplier, output_shift) +
+    KN_PRINTD(shifted_sum);
+
+    int32_t mult_out = MultiplyByQuantizedMultiplier(
+      shifted_sum, output_multiplier, output_shift);
+    KN_PRINTD(mult_out);
+    int32_t output = mult_out +
                      output_zero_point;
+    KN_PRINTD(output);
     output = std::min(std::max(output, kMinValue), kMaxValue);
+
     output_data[idx] = static_cast<T>(output);
+    KN_PRINTX(output_data[idx]);
   }
   return true;
 }

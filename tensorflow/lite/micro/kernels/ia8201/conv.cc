@@ -207,12 +207,14 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
       const int output_depth = conv2d.out_ch;
       int32_t output_matVec = output_depth;
       const int8_t *pfilter_val = &filter_input[0];
-      const int32_t map_coeff_size = tflite::ConvMap8bitCoeffs(
-          NULL, conv2d.ker_y, conv2d.ker_x, NULL, output_depth, input_depth);
+
 
       if (!tflite::is_coeffs_mapped(context)) {
         // const int32_t map_coeff_size = tflite::dmx1a::ConvMap8bitCoeffs(NULL,
         // conv2d.ker_y, conv2d.ker_x, NULL,  output_depth ,input_depth );
+        const int32_t map_coeff_size = tflite::ConvMap8bitCoeffs(
+          NULL, conv2d.ker_y, conv2d.ker_x, NULL, output_depth, input_depth);
+
         p_mapped_filter = (int32_t *)context->AllocatePersistentBuffer(
             context, map_coeff_size * sizeof(int8_t));
         if (p_mapped_filter) {
@@ -1546,6 +1548,10 @@ TfLiteStatus EvalConvQuantizedPerChannel(
   op_params.quantized_activation_min = data.output_activation_min;
   op_params.quantized_activation_max = data.output_activation_max;
   KN_PRINTD(data_ex.opt_constraint);
+  
+  KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input),
+    ElementCount(*input->dims), 1024);
+
 #if defined(DMX1A_CONV_OPT) || defined(HMD1A_CONV_OPT)
   if (data_ex.opt_constraint) {
     int32_t input_offset = -data.input_zero_point;
@@ -1619,8 +1625,8 @@ TfLiteStatus EvalConvQuantizedPerChannel(
     return kTfLiteError;
 #endif
   }
-  KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
-                   ElementCount(*output->dims));
+  KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(output),
+                   ElementCount(*output->dims),1024);
   return kTfLiteOk;
 }
 

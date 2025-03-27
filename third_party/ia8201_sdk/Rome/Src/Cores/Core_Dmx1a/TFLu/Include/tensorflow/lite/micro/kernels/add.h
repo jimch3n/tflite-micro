@@ -69,11 +69,11 @@ TFLMRegistration Register_ADD_INT8();
 TFLMRegistration Register_ADD_INT16();
 #else
 // Fallback registration
-#if !defined(IA8201)  && !defined(IA700)
+#if !defined(IA8201) && !defined(IA700)
 inline TFLMRegistration Register_ADD_INT8() { return Register_ADD(); }
 
 inline TFLMRegistration Register_ADD_INT16() { return Register_ADD(); }
-#endif // use internal ia8201/add.cc
+#endif  // use internal ia8201/add.cc
 #endif
 }  // namespace tflite
 

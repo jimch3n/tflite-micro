@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+//#define KN_DEBUG
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
@@ -26,6 +27,7 @@ limitations under the License.
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 
+#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
 namespace tflite {
 
 const int kMaxNumberOfAxis = 5;
@@ -220,6 +222,9 @@ TfLiteStatus EvalMeanHelper(TfLiteContext* context, TfLiteNode* node,
       TF_LITE_ENSURE_OK(
           context, EvalIntegerMean<int8_t>(context, node, num_axis, op_data,
                                            temp_index, resolved_axis));
+
+      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
+
     } break;
     case kTfLiteInt16: {
       TF_LITE_ENSURE_OK(

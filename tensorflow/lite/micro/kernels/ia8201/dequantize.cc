@@ -24,86 +24,27 @@ limitations under the License.
 #include "tensorflow/lite/kernels/internal/reference/requantize.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
-
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
-#include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/kernels/dequantize.h"
+
+#include "tensorflow/lite/micro/micro_utils.h"
+
 namespace tflite {
 // namespace ops {
 // namespace micro {
 // namespace dequantize {
 
-struct OpData {
-  tflite::DequantizationParams quantization_params;
-  // The scaling factor from input to output (aka the 'real multiplier') can
-  // be represented as a fixed point multiplier plus a left shift.
-  int32_t output_multiplier;
-  int output_shift;
-  int32_t output_zero_point;
 
-  AScalar scale;
-  AScalar zero_point;
-
-  // requantize
-  // AScalar Requantize;
-  // AScalar inZeroPoint;
-  // AScalar outZeroPoint;
-};
 
 void* DequantizeInit(TfLiteContext* context, const char* buffer,
                      size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
-}
-
-TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node) {
-  TFLITE_DCHECK(node->user_data != nullptr);
-  OpData* data = static_cast<OpData*>(node->user_data);
-
-  TF_LITE_ENSURE_EQ(context, NumInputs(node), 1);
-  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-
-  // TODO(b/140515557): Add cached dequant to improve hybrid model performance.
-
-  MicroContext* micro_context = GetMicroContext(context);
-
-  // TODO(b/140515557): Add cached dequant to improve hybrid model performance.
-  TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, 0);
-  TF_LITE_ENSURE(context, input != nullptr);
-  TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
-  TF_LITE_ENSURE(context, output != nullptr);
-
-  TF_LITE_ENSURE(context, input->type == kTfLiteUInt8 ||
-                              input->type == kTfLiteInt8 ||
-                              input->type == kTfLiteInt16 ||
-                              input->type == kTfLiteFloat16);
-  TF_LITE_ENSURE(context, output->type == kTfLiteFloat32);
-  if (input->type != kTfLiteFloat16) {  // bypass float16-> float32
-    if (output->type == kTfLiteInt32) {
-      const double effective_output_scale =
-          static_cast<double>(input->params.scale) /
-          static_cast<double>(output->params.scale);
-      QuantizeMultiplier(effective_output_scale, &data->output_multiplier,
-                         &data->output_shift);
-    }
-
-    data->quantization_params.zero_point = input->params.zero_point;
-    data->quantization_params.scale = static_cast<double>(input->params.scale);
-    data->output_zero_point = output->params.zero_point;
-
-    data->scale = AScalar(data->quantization_params.scale);
-    data->zero_point =
-        AScalar(data->quantization_params
-                    .zero_point);  // / CONST_ASCALAR(128.0); //Q7 for INT8
-  }
-
-  micro_context->DeallocateTempTfLiteTensor(input);
-  micro_context->DeallocateTempTfLiteTensor(output);
-  return kTfLiteOk;
+  return context->AllocatePersistentBuffer(context, sizeof(DequantizeOpDataEx));
 }
 
 #ifdef DMX1A_DEQUANTIZE_OPT
-void DequantizeInt8ToFloat32(struct OpData* op_data,
+void DequantizeInt8ToFloat32(struct DequantizeOpDataEx* op_data,
                              const RuntimeShape& input_shape,
                              const int8_t* input_data,
                              const RuntimeShape& output_shape,
@@ -156,7 +97,7 @@ void DequantizeInt8ToFloat32(struct OpData* op_data,
   }
 }
 
-void DequantizeFloat16ToFloat32(struct OpData* op_data,
+void DequantizeFloat16ToFloat32(struct DequantizeOpDataEx* op_data,
                                 const RuntimeShape& input_shape,
                                 const int16_t* input_data,
                                 const RuntimeShape& output_shape,
@@ -204,7 +145,7 @@ void DequantizeFloat16ToFloat32(struct OpData* op_data,
 #endif
 
 #ifdef HMD1A_DEQUANTIZE_OPT
-void DequantizeInt8ToFloat32(struct OpData* op_data,
+void DequantizeInt8ToFloat32(struct DequantizeOpDataEx* op_data,
                              const RuntimeShape& input_shape,
                              const int8_t* input_data,
                              const RuntimeShape& output_shape,
@@ -258,7 +199,7 @@ void DequantizeInt8ToFloat32(struct OpData* op_data,
   }
 }
 
-void DequantizeFloat16ToFloat32(struct OpData* op_data,
+void DequantizeFloat16ToFloat32(struct DequantizeOpDataEx* op_data,
                                 const RuntimeShape& input_shape,
                                 const int16_t* input_data,
                                 const RuntimeShape& output_shape,
@@ -306,7 +247,7 @@ void DequantizeFloat16ToFloat32(struct OpData* op_data,
 
 TfLiteStatus DequantizeEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
-  OpData* data = static_cast<OpData*>(node->user_data);
+  DequantizeOpDataEx* data = static_cast<DequantizeOpDataEx*>(node->user_data);
 
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
   TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);

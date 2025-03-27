@@ -60,6 +60,7 @@ TFLMRegistration* Register_CIRCULAR_BUFFER();
 TFLMRegistration Register_CONCATENATION();
 #if defined(IA8201)  || defined(IA700)
 TFLMRegistration Register_CONCATENATION_FLOAT32();
+TFLMRegistration Register_CONCATENATION_INT8();
 #endif
 TFLMRegistration Register_CONV_2D();
 #if defined(IA8201)  || defined(IA700)

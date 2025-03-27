@@ -100,7 +100,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split_v.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\squeeze.cc" />
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\strided_slice_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose_conv.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\unpack.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\var_handle.cc" />
@@ -198,13 +197,15 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\batch_matmul.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_context.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_graph.cc" />
-    <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc" />
-    <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\schema\schema_utils.cc" />
-    <ClCompile Include="..\..\tensorflow\lite\micro\hexdump.cc" />
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress.cc" />
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress_common.cc" />
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\slice.cc" />
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\transpose.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\compiler\mlir\lite\schema\schema_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\hexdump.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\decompress.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\decompress_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\slice.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\strided_slice_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\transpose.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\dequantize_common.cc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

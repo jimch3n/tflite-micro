@@ -40,7 +40,7 @@ namespace tflite {
 // constexpr int kMaxNumberOfAxis = 4;
 // constexpr int kMaxNumberOfReducedAxis = 2;
 #endif
-struct OpData {
+struct OpDataReduceEx {
   struct OpDataReduce ReduceOp;
 
   tflite::MeanParams op_params;  // Prepare - once
@@ -49,15 +49,16 @@ struct OpData {
   AScalar output_scale_aflt;
   AScalar bias_aflt;
   AScalar scale_aflt;  // input/output
-  AScalar inv_count;
+  AScalar inv_count; 
   int num_elements_in_axis;
   int num_input_dim0;  // per next
+  int input_last_dim;
   int opt_constraint;
   int opt_constraint_float;
 };
 
 void* InitReduce(TfLiteContext* context, const char* buffer, size_t length) {
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataReduceEx));
 }
 
 TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node) {
@@ -81,7 +82,7 @@ TfLiteStatus PrepareSimple(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_TYPES_EQ(context, axis->type, kTfLiteInt32);
 
   if (input->type == kTfLiteInt8) {
-    OpData* data_ex = static_cast<OpData*>(node->user_data);
+    OpDataReduceEx* data_ex = static_cast<OpDataReduceEx*>(node->user_data);
     OpDataReduce* data = &data_ex->ReduceOp;
     TfLiteTensor* output = micro_context->AllocateTempOutputTensor(node, 0);
     const double real_multiplier = static_cast<double>(input->params.scale) /
@@ -109,7 +110,7 @@ static void ResolveAxis(const int* axis_data, int axis_count,
 TfLiteStatus PrepareMax(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_OK(context, PrepareSimple(context, node));
 
-  OpData* op_data_ex = static_cast<OpData*>(node->user_data);
+  OpDataReduceEx* op_data_ex = static_cast<OpDataReduceEx*>(node->user_data);
 
   OpDataReduce* op_data = static_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
 
@@ -122,7 +123,7 @@ TfLiteStatus PrepareMax(TfLiteContext* context, TfLiteNode* node) {
   op_data->output_scale = output->params.scale;
   op_data->num_output_elements = NumElements(output);
   //
-  int output_size = NumElements(output);
+
   RuntimeShape input_shape = GetTensorShape(input);
   // const TfLiteEvalTensor* axis = tflite::micro::GetEvalInput(context, node,
   // 1);
@@ -146,6 +147,7 @@ TfLiteStatus PrepareMax(TfLiteContext* context, TfLiteNode* node) {
   op_data_ex->opt_constraint = 0;
 
 #if defined(DMX1A_REDUCE_MAX_OPT) || defined(HMD1A_REDUCE_MAX_OPT)
+  int output_size = NumElements(output);
   op_data_ex->opt_constraint = (output_size & 3) == 0 &&
                                (input->type == kTfLiteInt8) &&
                                op_data_ex->special_case_4d_axes_1_and_2;
@@ -178,7 +180,7 @@ TfLiteStatus PrepareMax(TfLiteContext* context, TfLiteNode* node) {
 }
 
 TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
-  OpData* op_data_ex = reinterpret_cast<OpData*>(node->user_data);
+  OpDataReduceEx* op_data_ex = reinterpret_cast<OpDataReduceEx*>(node->user_data);
 
   OpDataReduce* op_data =
       reinterpret_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
@@ -203,7 +205,10 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
   ResolveAxis(tflite::micro::GetTensorData<int>(axis_eval), op_data->num_axis,
               &op_data_ex->op_params);
   op_data_ex->special_case_4d_axes_1_and_2 =
-      input->dims->size == 4 && op_data_ex->op_params.axis_count == 2 &&
+    // FIXME: == 2 -> <=2
+      input->dims->size == 4 &&
+    
+    (op_data_ex->op_params.axis_count == 2 ) &&
       ((op_data_ex->op_params.axis[0] == 1 &&
         op_data_ex->op_params.axis[1] == 2) ||
        (op_data_ex->op_params.axis[0] == 2 &&
@@ -227,19 +232,38 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
     context->RequestScratchBufferInArena(context, output_size * sizeof(int32_t),
                                          &op_data->temp_buffer_idx);
+    int input_last_dim = input_shape.Dims(input_shape.DimensionsCount() - 1);
     op_data->input_zp = input->params.zero_point;
     op_data->input_scale = input->params.scale;
     op_data->output_zp = output->params.zero_point;
     op_data->output_scale = output->params.scale;
 
     op_data_ex->num_input_dim0 = input_shape.Dims(0);  // odd at-least
-
+    op_data_ex->input_last_dim = input_last_dim;
 #if defined(DMX1A_MEAN_OPT) || defined(HMD1A_MEAN_OPT)
-    op_data_ex->opt_constraint = (output_size & 7) == 0 &&
-                                 (input->type == kTfLiteInt8) &&
-                                 op_data_ex->special_case_4d_axes_1_and_2;
+    if ((output_size & 7) == 0 &&
+      (input->type == kTfLiteInt8))
+    {
 
-    if (op_data_ex->opt_constraint) {
+      if (op_data_ex->special_case_4d_axes_1_and_2)
+      {
+        op_data_ex->opt_constraint = 1;
+      }
+      else if (input->dims->size == 4 &&
+        (op_data_ex->op_params.axis_count == 1) &&
+        (op_data_ex->op_params.axis[0] == 2) )//&& (input_last_dim &4)==0)
+      {
+#if        !defined(HMD1A_MEAN_OPT)
+        op_data_ex->opt_constraint = (input_last_dim & 7) == 0 ? 2:
+          (input_last_dim & 3) == 0 ? 3: -1;
+#else
+        op_data_ex->opt_constraint = (input_last_dim & 3) == 0 ? 2 : -1;
+#endif
+        KN_PRINTD(input_last_dim);
+        // 2: align 8, 3 other, ..
+      }
+    }
+    if (op_data_ex->opt_constraint > 0) {
       // const TfLiteTensor* axis2 = GetInput(context, node, 1);
 
       RuntimeShape axis_shape = GetTensorShape(axis);
@@ -254,9 +278,8 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
       // -input_zero_point * scale;
       op_data_ex->bias_aflt =
           AScalar(-op_data->input_zp) * op_data_ex->scale_aflt;
-
-      // KN_PRINTD(num_elements_in_axis);
     }
+    
 #endif
   }
 
@@ -266,7 +289,7 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
   if (input->type == kTfLiteFloat32) {
     TF_LITE_ENSURE_OK(context, PrepareSimple(context, node));
 
-    // OpData* op_data = static_cast<OpData*>(node->user_data);
+    // OpDataReduceEx* op_data = static_cast<OpDataReduceEx*>(node->user_data);
     // const TfLiteTensor* input = GetInput(context, node, 0);
     // const TfLiteTensor* output = GetOutput(context, node, 0);
     // const TfLiteTensor* axis = GetInput(context, node, 1);
@@ -331,7 +354,7 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
 
 #ifdef DMX1A_REDUCE_MAX_OPT
 
-int ReduceMaxQuantizedInt8(const OpData* data,
+int ReduceMaxQuantizedInt8(const OpDataReduceEx* data,
                            const int8_t* x,  // align up16 buffer, zero paddding
                            int8_t* pOut, int32_t* pScratchOuput, int n,
                            int depth) {
@@ -404,7 +427,7 @@ int ReduceMaxQuantizedInt8(const OpData* data,
 
 #endif
 #ifdef DMX1A_MEAN_OPT
-void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
+void ReduceMeanQuantizedInt8(OpDataReduceEx* data, const int8_t* input, int8_t* output,
                              int32_t* temp_buffer, int sign) {
   int32_t* pY = (int32_t*)output;
   AScalar Scale = data->scale_aflt;
@@ -430,7 +453,21 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
   replicate_ar(VR_scale, 0xf, Scale.fr);
   replicate_ar(VR_bias, 0xf, Bias.fr);
   replicate_ar(VR_invCount, 0xf, invScale.fr);
+  vr128 VR_outZp;
 
+  replicate_ar(VR_outZp, 0xf, AScalar(data->ReduceOp.output_zp, 0).fr);
+  //vr128 VR_xor_0x80;
+  // FIXME: output Zp should -128 / 0
+#if 0
+  vr128 VR_xor_0x80;
+
+  if (data->ReduceOp.output_zp == -128) {
+    replicate_ar(VR_xor_0x80, 0xf, 0x80808080);
+  }
+  else {
+    replicate_ar(VR_xor_0x80, 0xf, 0x00000000);
+  }
+#endif
   if (total_output >= 8)  // FIXME: AND DIM0 == 1, DIM3 = total_output
   {
     // per group, 8 elements
@@ -455,7 +492,12 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
       }
       mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
       // output sum * 2 fix-point if required
-
+      if (num_elements_in_axis & 1)
+      {
+        replicate_ar(VR_x, 0xc, 0); // HIPART zero
+        load32x2_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+        mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+      }
       // store32x4_vr_postI(VR_acc, pDst, INC1);
       // store_AccExtend_postI(pDst, INC1);
       store_32x4_vr_a(VR_acc, UR_Dst, pDst);
@@ -464,13 +506,6 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
     flush_32x4(UR_Dst, pDst);
   }
 
-  vr128 VR_xor_0x80;
-
-  if (data->ReduceOp.output_zp == -128) {
-    replicate_ar(VR_xor_0x80, 0xf, 0x80808080);
-  } else {
-    replicate_ar(VR_xor_0x80, 0xf, 0x00000000);
-  }
   int32_t* pSrc = temp_buffer;
   ulsr128 UR_Src = align_32x4_load(pSrc);
   for (int ii = 0; ii < groupOutput4; ii++) {
@@ -484,11 +519,14 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
     VR_out = vmuls(VR_acc, VR_invCount, 0);  // / num_element_in_axis
     VR_out = vmacs_adj(VR_bias, VR_out, VR_scale, 0, 0);  // acc
     //	VR_out = vexp_adji(VR_out, 8);
+     VR_out = vadds(VR_out, VR_outZp, 0);
     convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
 
     rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-
-    VR_q7_out = vbool(VR_q7_out, VR_xor_0x80, 0x6);
+   // VR_out = vadds(VR_out, VR_outZp, 0);
+    //convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
+    //rnd_sat_pack(VR_q7_out, VRQ1, VR_out, 1);
+    //vr128 VR_q7_out2 = vbool(VR_q7_out, VR_xor_0x80, 0x6);
 
     store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
   }
@@ -502,17 +540,312 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
       VR_out = vmuls(VR_acc, VR_invCount, 0);  // / num_element_in_axis
       VR_out = vmacs_adj(VR_bias, VR_out, VR_scale, 0, 0);  // acc
       //	VR_out = vexp_adji(VR_out, 8);
+      VR_out = vadds(VR_out, VR_outZp, 0);
       convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
-      VR_q7_out = vbool(VR_q7_out, VR_xor_0x80, 0x6);
+
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
       store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
     }
   }
 }
+
+// keep dim=true,  input [a,b,c,d] -> axis=2 -> [a,b,1,d],
+// d is multiple of 8 for quantized alignment
+
+void ReduceMeanQuantizedInt8Axis2KD(OpDataReduceEx* data, const int8_t* input, 
+  const RuntimeShape &input_shape,
+  int8_t* output,
+  const RuntimeShape &output_shape,
+  int32_t* temp_buffer, int sign) {
+  int32_t* pY = (int32_t*)output;
+  AScalar Scale = data->scale_aflt;
+  AScalar invScale = data->inv_count;
+  AScalar Bias = data->bias_aflt;
+  int num_elements_in_axis = data->num_elements_in_axis;
+  // int total_input = 12*8*256;
+  int group_output = data->input_last_dim; //data->ReduceOp.num_output_elements;
+  int groupOutputAU8 = (((group_output + 7) >> 3));
+  int groupOutput4 = group_output >> 2;
+
+  int input_group = input_shape.Dims(1);
+  int grp_size = data->input_last_dim * num_elements_in_axis;
+
+  int blockInput = num_elements_in_axis >> 1;
+  int nextGroupInput;
+
+
+  int exp_fxp =
+    30;  //(sign == 3 )? 15: ((sign == 1)? 16: 17); // 31-(14+2), 31-
+
+  vr128 VR_const_one;
+  vr128 VR_scale, VR_bias, VR_invCount;
+  ulsr128 UR_Y = align_8x4_store(pY);
+  replicate_ar(VR_const_one, 0xf, 0x01010101);
+
+  replicate_ar(VR_scale, 0xf, Scale.fr);
+  replicate_ar(VR_bias, 0xf, Bias.fr);
+  replicate_ar(VR_invCount, 0xf, invScale.fr);
+
+  //vr128 VR_xor_0x80;
+  vr128 VR_outZp;
+
+  replicate_ar(VR_outZp, 0xf, (AScalar(data->ReduceOp.output_zp, 0)).fr);
+  //vr128 VR_tmp = vexp_adji(VR_outZp, 0);
+  //convert_32F_to_16I_x4(VR_tmp, (unsigned int)15 - 8, 0);
+
+  KN_PRINTD(input_group);
+  KN_PRINTD(grp_size);
+  KN_PRINTD(grp_size);
+  nextGroupInput = group_output >> 3;
+  KN_PRINTD(nextGroupInput);
+
+  // zero point, output zero point
+  //vr128 VR_izp, VR_outScale;
+  //replicate_ar(VR_izp, 0xf, AScalar(-(data->ReduceOp.input_zp)* num_elements_in_axis).fr);
+  //replicate_ar(VR_izp, 0xf, AScalar(-(data->ReduceOp.input_zp) * num_elements_in_axis).fr);
+  //replicate_ar(VR_outScale, 0xf, data->output_multipler.fr); // multipler
+  for (int g = 0; g < input_group; g++)
+  {
+    int32_t* pDst = temp_buffer;
+    ulsr128 UR_Dst = align_32x4_store(pDst);
+    if (group_output >= 8)  // FIXME: AND DIM0 == 1, DIM3 = total_output
+    {
+      // per group, 8 elements
+
+
+      for (int ii = 0; ii < groupOutputAU8; ii++) {
+        vr128 VR_x;
+        vr128 VR_acc = vseta_vr(0, 0, 0);
+        mov_AccExtend_vr(VR_acc);
+        int32_t* pInput1 = (int32_t*)input + ii * 2 + ((g * grp_size)>>2); // >>2 for int32_t = 4 bytes 
+        load32x2_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+        load32x2_vr_postR(VR_x, pInput1, nextGroupInput, VRH);
+        WUR_MvmAux(0);
+
+        for (int jj = 0; jj < blockInput - 1; jj++)  // input 2,
+        {
+          vr128 VR_y = vexp_adji(VR_x, 0);
+          //KN_PRINTX_VR128(VR_y);
+          mac8bx8b(VR_acc, VR_y, VR_const_one, sign);
+
+          load32x2_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+          load32x2_vr_postR(VR_x, pInput1, nextGroupInput, VRH);
+        }
+       // KN_PRINTX_VR128(VR_x);
+        mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+
+        if (num_elements_in_axis & 1)
+        { 
+          replicate_ar(VR_x, 0xc, 0); // HIPART zero
+          load32x2_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+          mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+        }
+        // output sum * 2 fix-point if required
+
+        // store32x4_vr_postI(VR_acc, pDst, INC1);
+        // store_AccExtend_postI(pDst, INC1);
+        store_32x4_vr_a(VR_acc, UR_Dst, pDst);
+        store_32x4_vr_a(mov_vr_AccExtend(), UR_Dst, pDst);
+      }
+      flush_32x4(UR_Dst, pDst);
+    } // end of group_output >= 8
+
+
+  
+    int32_t* pSrc = temp_buffer;
+    ulsr128 UR_Src = align_32x4_load(pSrc);
+    for (int ii = 0; ii < groupOutput4; ii++) {
+      vr128 VR_acc, VR_out, VR_q7_out;
+      load_32x4_vr_a(VR_acc, UR_Src, pSrc);  // , INC1);
+
+      //KN_PRINTX_VR128(VR_acc);
+
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ1);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ2);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ3);
+      // out = acc - input_scale_zero_point * count
+      VR_out = vmuls(VR_acc, VR_invCount, 0);  // / num_element_in_axis
+      //VR_out = vadds(VR_acc, VR_izp, 0); // temp_sum + input_zero_point * elax
+
+      VR_out = vmacs_adj(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+      // + output ZP
+      VR_out = vadds(VR_out, VR_outZp, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
+      rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+
+      //VR_q7_out = vbool(VR_q7_out, VR_xor_0x80, 0x6);
+      //store_8x4_vr_a(VR_out, UR_Y, pY );
+      store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
+    }
+    flush_8x4(UR_Y, pY);
+    if (group_output & 3) {
+      for (int ii = 0; ii < (group_output & 3); ii++) {
+        vr128 VR_acc, VR_out, VR_q7_out;
+        load32x1_vr_postI(VR_acc, pSrc, INC1, VRQ0);
+        convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);
+
+        VR_out = vmuls(VR_acc, VR_invCount, 0);  // / num_element_in_axis
+        VR_out = vmacs_adj(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+        //	VR_out = vexp_adji(VR_out, 8);
+        VR_out = vadds(VR_out, VR_outZp, 0);
+        convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
+        rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+        
+        VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+        store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+      }
+    }
+  }// end of input_ group
+}
+
+// keep dim=true,  input [a,b,c,d] -> axis=2 -> [a,b,1,d],
+// d is multiple of 4 for quantized alignment
+void ReduceMeanQuantizedInt8Axis2KD_OutAlign4(OpDataReduceEx* data, const int8_t* input,
+  const RuntimeShape& input_shape,
+  int8_t* output,
+  const RuntimeShape& output_shape,
+  int32_t* temp_buffer, int sign) {
+  int32_t* pY = (int32_t*)output;
+  AScalar Scale = data->scale_aflt;
+  AScalar invScale = data->inv_count;
+  AScalar Bias = data->bias_aflt;
+  int num_elements_in_axis = data->num_elements_in_axis;
+  // int total_input = 12*8*256;
+  int group_output = data->input_last_dim; //data->ReduceOp.num_output_elements;
+  int groupOutputAU4 = (((group_output + 3) >> 2));
+  int groupOutput4 = group_output >> 2;
+
+  int input_group = input_shape.Dims(1);
+  int grp_size = data->input_last_dim * num_elements_in_axis;
+
+  int blockInput = num_elements_in_axis >> 1;
+  int nextGroupInput;
+
+
+  int exp_fxp =
+    30;  //(sign == 3 )? 15: ((sign == 1)? 16: 17); // 31-(14+2), 31-
+
+  vr128 VR_const_one;
+  vr128 VR_scale, VR_bias, VR_invCount;
+  ulsr128 UR_Y = align_8x4_store(pY);
+  replicate_ar(VR_const_one, 0xf, 0x01010101);
+
+  replicate_ar(VR_scale, 0xf, Scale.fr);
+  replicate_ar(VR_bias, 0xf, Bias.fr);
+  replicate_ar(VR_invCount, 0xf, invScale.fr);
+
+  //vr128 VR_xor_0x80;
+  vr128 VR_outZp;
+
+  replicate_ar(VR_outZp, 0xf, (AScalar(data->ReduceOp.output_zp, 0)).fr);
+  //vr128 VR_tmp = vexp_adji(VR_outZp, 0);
+  //convert_32F_to_16I_x4(VR_tmp, (unsigned int)15 - 8, 0);
+
+  KN_PRINTD(input_group);
+  KN_PRINTD(grp_size);
+  nextGroupInput = group_output >> 2;
+  KN_PRINTD(nextGroupInput);
+
+  // zero point, output zero point
+  //vr128 VR_izp, VR_outScale;
+  //replicate_ar(VR_izp, 0xf, AScalar(-(data->ReduceOp.input_zp)* num_elements_in_axis).fr);
+  //replicate_ar(VR_izp, 0xf, AScalar(-(data->ReduceOp.input_zp) * num_elements_in_axis).fr);
+  //replicate_ar(VR_outScale, 0xf, data->output_multipler.fr); // multipler
+  for (int g = 0; g < input_group; g++)
+  {
+    int32_t* pDst = temp_buffer;
+    ulsr128 UR_Dst = align_32x4_store(pDst);
+    if (group_output >= 4)  // FIXME: AND DIM0 == 1, DIM3 = total_output
+    {
+      // per group, 8 elements
+
+      for (int ii = 0; ii < groupOutputAU4; ii++) {
+        vr128 VR_x = vseta_vr(0, 0, 0);
+        vr128 VR_acc = vseta_vr(0, 0, 0);
+        mov_AccExtend_vr(VR_acc);
+        int32_t* pInput1 = (int32_t*)input + ii *1 + ((g * grp_size) >> 2); // >>2 for int32_t = 4 bytes 
+        load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRQ0);
+        load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRQ2);
+        WUR_MvmAux(0);
+
+        for (int jj = 0; jj < blockInput - 1; jj++)  // input 2,
+        {
+          vr128 VR_y = vexp_adji(VR_x, 0);
+          //KN_PRINTX_VR128(VR_y);
+          mac8bx8b(VR_acc, VR_y, VR_const_one, sign);
+          load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRQ0);
+          load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRQ2);
+        }
+        // KN_PRINTX_VR128(VR_x);
+        mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+
+        if (num_elements_in_axis & 1)
+        {
+          replicate_ar(VR_x, 0xc, 0); // HIPART zero
+          load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRQ0);
+          mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+        }
+        // output sum * 2 fix-point if required
+
+        // store32x4_vr_postI(VR_acc, pDst, INC1);
+        // store_AccExtend_postI(pDst, INC1);
+        store_32x4_vr_a(VR_acc, UR_Dst, pDst);
+       // store_32x4_vr_a(mov_vr_AccExtend(), UR_Dst, pDst);
+      }
+      flush_32x4(UR_Dst, pDst);
+    } // end of group_output >= 8
+
+
+
+    int32_t* pSrc = temp_buffer;
+    ulsr128 UR_Src = align_32x4_load(pSrc);
+    for (int ii = 0; ii < groupOutput4; ii++) {
+      vr128 VR_acc, VR_out, VR_q7_out;
+      load_32x4_vr_a(VR_acc, UR_Src, pSrc);  // , INC1);
+
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ1);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ2);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ3);
+      // out = acc - input_scale_zero_point * count
+      VR_out = vmuls(VR_acc, VR_invCount, 0);  // / num_element_in_axis
+      //VR_out = vadds(VR_acc, VR_izp, 0); // temp_sum + input_zero_point * elax
+
+      VR_out = vmacs_adj(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+      // + output ZP
+      VR_out = vadds(VR_out, VR_outZp, 0);
+      convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
+      rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+
+      //VR_q7_out = vbool(VR_q7_out, VR_xor_0x80, 0x6);
+      //store_8x4_vr_a(VR_out, UR_Y, pY );
+      store32x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
+    }
+    flush_8x4(UR_Y, pY);
+    if (group_output & 3) {
+      for (int ii = 0; ii < (group_output & 3); ii++) {
+        vr128 VR_acc, VR_out, VR_q7_out;
+        load32x1_vr_postI(VR_acc, pSrc, INC1, VRQ0);
+        convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);
+
+        VR_out = vmuls(VR_acc, VR_invCount, 0);  // / num_element_in_axis
+        VR_out = vmacs_adj(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+        //	VR_out = vexp_adji(VR_out, 8);
+        VR_out = vadds(VR_out, VR_outZp, 0);
+        convert_32F_to_16I_x4(VR_out, (unsigned int)15 - 8, 0);
+        rnd_sat_pack(VR_q7_out, VRQ0, VR_out, 1);
+
+        VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0);
+        store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+      }
+    }
+  }// end of input_ group
+}
 #endif
 #if defined(HMD1A_MEAN_OPT)
-void ReduceMeanorSumFloat(OpData* data, const TfLiteEvalTensor* inputTensor,
+void ReduceMeanorSumFloat(OpDataReduceEx* data, const TfLiteEvalTensor* inputTensor,
                           const float* input, float* output, int mean) {
   float* pY = (float*)output;
   // AScalar Scale = data->scale_aflt;
@@ -719,7 +1052,7 @@ void ReduceMeanorSumFloat(OpData* data, const TfLiteEvalTensor* inputTensor,
 }
 #endif
 #if defined(DMX1A_SUM_OPT)  //|| defined(HMD1A_SUM_OPT)
-void ReduceMeanorSumFloat(OpData* data, const TfLiteEvalTensor* inputTensor,
+void ReduceMeanorSumFloat(OpDataReduceEx* data, const TfLiteEvalTensor* inputTensor,
                           const float* input, float* output, int mean) {
   float* pY = (float*)output;
   // AScalar Scale = data->scale_aflt;
@@ -927,7 +1260,7 @@ void ReduceMeanorSumFloat(OpData* data, const TfLiteEvalTensor* inputTensor,
 
 #ifdef HMD1A_REDUCE_MAX_OPT
 
-int ReduceMaxQuantizedInt8(const OpData* data,
+int ReduceMaxQuantizedInt8(const OpDataReduceEx* data,
                            const int8_t* x,  // align up16 buffer, zero paddding
                            int8_t* pOut, int32_t* pScratchOuput, int n,
                            int depth) {
@@ -1002,7 +1335,7 @@ int ReduceMaxQuantizedInt8(const OpData* data,
 #endif
 #ifdef HMD1A_MEAN_OPT
 
-void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
+void ReduceMeanQuantizedInt8(OpDataReduceEx* data, const int8_t* input, int8_t* output,
                              int32_t* temp_buffer, int sign) {
   int32_t* pY = (int32_t*)output;
   AScalar Scale = data->scale_aflt;
@@ -1027,6 +1360,9 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
   replicate_ar(VR_scale, 0x3, Scale.fr);
   replicate_ar(VR_bias, 0x3, Bias.fr);
   replicate_ar(VR_invCount, 0x3, invScale.fr);
+  vr64 VR_outZp;
+
+  replicate_ar(VR_outZp, 0x3, AScalar(data->ReduceOp.output_zp, 0).fr);
 
   if (total_output >= 4)  // FIXME: AND DIM0 == 1, DIM3 = total_output
   {
@@ -1034,7 +1370,7 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
     nextGroupInput = total_output >> 2;
 
     for (int ii = 0; ii < groupOutputAU4; ii++) {
-      vr64 VR_x;
+      vr64 VR_x = vseta_vr(0, 0);;
       vr64 VR_acc = vseta_vr(0, 0);
       mov_AccExtend_vr(VR_acc);
       int32_t* pInput1 = (int32_t*)input + ii * 1;  // 32 bit pointer, 1*4
@@ -1051,18 +1387,17 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
       }
       mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
       // output sum * 2 fix-point if required
+      if (num_elements_in_axis & 1)
+      {
+        replicate_ar(VR_x, 0x2, 0); // HIPART zero
+        load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+        mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+      }
       store32x2_vr_postI(VR_acc, pDst, INC1);
       store_AccExtend_postI(pDst, INC1);
     }
   }
 
-  vr64 VR_xor_0x80;
-  KN_PRINT_Q31_SIZE(temp_buffer, total_output);
-  if (data->ReduceOp.output_zp == -128) {
-    replicate_ar(VR_xor_0x80, 0x3, 0x80808080);
-  } else {
-    replicate_ar(VR_xor_0x80, 0x3, 0x00000000);
-  }
   int32_t* pSrc = temp_buffer;
   ulsr32 UR_src = align_32x2_load(pSrc);
   for (int ii = 0; ii < groupOutput2; ii++) {
@@ -1074,9 +1409,10 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
 
     VR_out = vmuls(VR_acc, VR_invCount, 0);           // / num_element_in_axis
     VR_out = vmacs(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+    VR_out = vadds(VR_out, VR_outZp, 0);
     convert_32F_to_16I_x2(VR_out, (unsigned int)15 - 8, 0);
     rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
-    VR_q7_out = vbool(VR_q7_out, VR_xor_0x80, 0x6);
+
     store16x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
   }
 
@@ -1089,34 +1425,176 @@ void ReduceMeanQuantizedInt8(OpData* data, const int8_t* input, int8_t* output,
 
       VR_out = vmuls(VR_acc, VR_invCount, 0);           // / num_element_in_axis
       VR_out = vmacs(VR_bias, VR_out, VR_scale, 0, 0);  // acc
-      // VR_out = vexp_adji(VR_out, 8);
+      VR_out = vadds(VR_out, VR_outZp, 0);
       convert_32F_to_16I_x1(VR_out, (unsigned int)15 - 8, 0, VRQ0);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
-      VR_q7_out = vbool(VR_q7_out, VR_xor_0x80, 0x6);
+
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
       store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
     }
   }
 }
 
+void ReduceMeanQuantizedInt8Axis2KD(OpDataReduceEx* data, const int8_t* input,
+  const RuntimeShape& input_shape, 
+  int8_t* output,
+  const RuntimeShape& output_shape,
+  int32_t* temp_buffer, int sign) {
+  int32_t* pY = (int32_t*)output;
+  AScalar Scale = data->scale_aflt;
+  AScalar invScale = data->inv_count;
+  AScalar Bias = data->bias_aflt;
+  int num_elements_in_axis = data->num_elements_in_axis;
+  // int total_input = 12*8*256;
+  int group_output = data->input_last_dim;
+  int groupOutputAU4 = (((group_output + 3) >> 2));
+  int groupOutput2 = group_output >> 1;
+  int input_group = input_shape.Dims(1);
+  int grp_size = data->input_last_dim * num_elements_in_axis;
+
+  int blockInput = num_elements_in_axis >> 1;
+  int nextGroupInput;
+  int32_t* pDst = temp_buffer;
+
+  int exp_fxp =
+    30;  //(sign == 3 )? 15: ((sign == 1)? 16: 17); // 31-(14+2), 31-
+  nextGroupInput = group_output >> 2;
+
+  KN_PRINTD(nextGroupInput);
+  vr64 VR_const_one;
+  vr64 VR_scale, VR_bias, VR_invCount;
+  replicate_ar(VR_const_one, 0x3, 0x01010101);
+
+  replicate_ar(VR_scale, 0x3, Scale.fr);
+  replicate_ar(VR_bias, 0x3, Bias.fr);
+  replicate_ar(VR_invCount, 0x3, invScale.fr);
+  vr64 VR_outZp;
+
+  replicate_ar(VR_outZp, 0x3, (AScalar(data->ReduceOp.output_zp, 0)).fr);
+  for (int g = 0; g < input_group; g++)
+  {
+ // FIXME: AND DIM0 == 1, DIM3 = total_output
+    pDst = temp_buffer;
+    {
+      // per group, 8 elements
+
+      for (int ii = 0; ii < groupOutputAU4; ii++) {
+        vr64 VR_x;
+        vr64 VR_acc = vseta_vr(0, 0);
+        mov_AccExtend_vr(VR_acc);
+        int32_t* pInput1 = (int32_t*)input + ii * 1 + ((g * grp_size) >>2);  // 32 bit pointer, 1*4
+        load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+        load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRH);
+        WUR_MvmAux(0);
+
+        for (int jj = 0; jj < blockInput - 1; jj++)  // input 2,
+        {
+          vr64 VR_y = vexp_adji(VR_x, 0);
+          mac8bx8b(VR_acc, VR_y, VR_const_one, sign);
+          load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+          load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRH);
+        }
+        mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+        // output sum * 2 fix-point if required
+
+        if (num_elements_in_axis & 1)
+        {
+          replicate_ar(VR_x, 0x2, 0); // HIPART zero
+          load32x1_vr_postR(VR_x, pInput1, nextGroupInput, VRL);
+          mac8bx8b(VR_acc, VR_x, VR_const_one, sign);
+        }
+
+        store32x2_vr_postI(VR_acc, pDst, INC1);
+        store_AccExtend_postI(pDst, INC1);
+      }
+    }
+
+
+    int32_t* pSrc = temp_buffer;
+    ulsr32 UR_src = align_32x2_load(pSrc);
+    for (int ii = 0; ii < groupOutput2; ii++) {
+      vr64 VR_acc, VR_out, VR_q7_out;
+      // load32x2_vr_postI(VR_acc, pSrc, INC1);
+      load_32x2_vr_a(VR_acc, UR_src, pSrc);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);
+      convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ1);
+
+      VR_out = vmuls(VR_acc, VR_invCount, 0);           // / num_element_in_axis
+      VR_out = vmacs(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+      VR_out = vadds(VR_out, VR_outZp, 0);
+      convert_32F_to_16I_x2(VR_out, (unsigned int)15 - 8, 0);
+      rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
+
+      store16x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
+    }
+
+    if (group_output & 1) {
+      // for(int ii = 0; ii < (total_output&3); ii++)
+      {
+        vr64 VR_acc, VR_out, VR_q7_out;
+        load32x1_vr_postI(VR_acc, pSrc, INC1, VRQ0);
+        convert_32I_to_32F_x1(VR_acc, exp_fxp, VRQ0);
+
+        VR_out = vmuls(VR_acc, VR_invCount, 0);           // / num_element_in_axis
+        VR_out = vmacs(VR_bias, VR_out, VR_scale, 0, 0);  // acc
+        VR_out = vadds(VR_out, VR_outZp, 0);
+        convert_32F_to_16I_x1(VR_out, (unsigned int)15 - 8, 0, VRQ0);
+        rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
+
+        VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
+        store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+      }
+    }
+  }// end of input_ group
+}
 #endif
 TfLiteStatus EvalMean(TfLiteContext* context, TfLiteNode* node) {
-  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
 
-  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
-  OpData* op_data_ex = reinterpret_cast<OpData*>(node->user_data);
+  OpDataReduceEx* op_data_ex = reinterpret_cast<OpDataReduceEx*>(node->user_data);
   OpDataReduce* op_data =
       reinterpret_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
 #if defined(DMX1A_MEAN_OPT) || defined(HMD1A_MEAN_OPT)
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+
+  KN_PRINTD(op_data_ex->opt_constraint);
   if (op_data_ex->opt_constraint == 1) {
     int32_t* temp_buffer = static_cast<int32_t*>(
         context->GetScratchBuffer(context, op_data->temp_buffer_idx));
 
+   // KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input), ElementCount(*input->dims));
     ReduceMeanQuantizedInt8(
         op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<int8_t>(output), temp_buffer, 1);
-
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
   }
+  else if (op_data_ex->opt_constraint == 2)
+  {
+    int32_t* temp_buffer = static_cast<int32_t*>(
+      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+    ReduceMeanQuantizedInt8Axis2KD(
+      op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
+      tflite::micro::GetTensorShape(input),
+      tflite::micro::GetTensorData<int8_t>(output),
+      tflite::micro::GetTensorShape(output),
+      temp_buffer, 1);
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
+  }
+#if !defined(HMD1A_MEAN_OPT) // for dmx only align 4 output , hmd already aligned 4 output 
+  else if (op_data_ex->opt_constraint == 3)
+  {
+    int32_t* temp_buffer = static_cast<int32_t*>(
+      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+    ReduceMeanQuantizedInt8Axis2KD_OutAlign4(op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
+      tflite::micro::GetTensorShape(input),
+      tflite::micro::GetTensorData<int8_t>(output),
+      tflite::micro::GetTensorShape(output),
+      temp_buffer, 1);
+
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
+  }
+#endif
 #if defined(DMX1A_SUM_OPT) || defined(HMD1A_SUM_OPT) || defined(HMD1A_MEAN_OPT)
   else if (op_data_ex->opt_constraint_float) {
     //  int32_t* temp_buffer = static_cast<int32_t*>(
@@ -1136,9 +1614,10 @@ TfLiteStatus EvalMean(TfLiteContext* context, TfLiteNode* node) {
   {
 #ifndef REMOVE_REFOP_SUPPORT
 
-    return EvalMeanHelper(context, node, op_data);
+    TfLiteStatus status =  EvalMeanHelper(context, node, op_data);
 
-    // KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
+    KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
+    return status;
 #else
     return kTfLiteError;
 #endif
@@ -1150,7 +1629,7 @@ TfLiteStatus EvalSum(TfLiteContext* context, TfLiteNode* node) {
   // OpContext op_context(context, node);
   // ruy::profiler::ScopeLabel label("Sum");
   // static_cast , reinterpreter_cast will allocate new tensors
-  OpData* op_data_ex = static_cast<OpData*>(node->user_data);
+  OpDataReduceEx* op_data_ex = static_cast<OpDataReduceEx*>(node->user_data);
 
   OpDataReduce* op_data = static_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
@@ -1187,11 +1666,11 @@ TfLiteStatus EvalSum(TfLiteContext* context, TfLiteNode* node) {
 TfLiteStatus EvalMeanInt8(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
 
-  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+
 
   // ResolveAxis(tflite::micro::GetTensorData<int>(axis), num_axis, &op_params);
 
-  OpData* op_data_ex = static_cast<OpData*>(node->user_data);
+  OpDataReduceEx* op_data_ex = static_cast<OpDataReduceEx*>(node->user_data);
 
   OpDataReduce* op_data = static_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
   if (kTfLiteInt8 != input->type) {
@@ -1204,14 +1683,13 @@ TfLiteStatus EvalMeanInt8(TfLiteContext* context, TfLiteNode* node) {
   // Defer to specialized implementation for 4D Mean across axes 1 & 2.
 #if defined(DMX1A_MEAN_OPT) || defined(HMD1A_MEAN_OPT)
   if (op_data_ex->opt_constraint == 1) {
+    TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
     int32_t* temp_buffer = static_cast<int32_t*>(
         context->GetScratchBuffer(context, op_data->temp_buffer_idx));
 
     ReduceMeanQuantizedInt8(
         op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<int8_t>(output), temp_buffer, 1);
-    // KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
-    // ElementCount(*output->dims));
   }
 #endif
   else {
@@ -1233,7 +1711,7 @@ TfLiteStatus EvalMax(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_TYPES_EQ(context, input->type, output->type);
   TfLiteReducerParams* params =
       static_cast<TfLiteReducerParams*>(node->builtin_data);
-  OpData* op_data_ex = static_cast<OpData*>(node->user_data);
+  OpDataReduceEx* op_data_ex = static_cast<OpDataReduceEx*>(node->user_data);
 
   OpDataReduce* op_data = static_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
 

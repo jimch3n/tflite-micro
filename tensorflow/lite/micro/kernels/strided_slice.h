@@ -35,6 +35,27 @@ void* StridedSliceInit(TfLiteContext* context, const char* buffer,
 
 TfLiteStatus StridedSlicePrepare(TfLiteContext* context, TfLiteNode* node);
 
+#if defined(IA8201)
+// only for 8201
+struct StridedSliceOpData {
+  tflite::StridedSliceParams op_params;
+  int opt_constraint;
+  int src_offset;
+  // uint16_t* srcIdx;
+};
+//#include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#endif
+
+
+namespace {
+  #if defined(IA8201)
+  template <typename T>
+  static void SlicedCopyOptOffset(const T* src, T* dst, int nElement) {
+    block_copy_bytes((int8_t*)dst, (int8_t*)src, sizeof(T) * nElement);
+  }
+  #endif
+}
+
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_STRIDED_SLICE_H_

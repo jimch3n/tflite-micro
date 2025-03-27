@@ -36,6 +36,9 @@ limitations under the License.
 #include "tensorflow/lite/micro/tflite_bridge/flatbuffer_conversions_bridge.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
+#ifdef _MSC_VER
+#define TF_LITE_SHOW_MEMORY_USE
+#endif
 #ifdef USE_TFLM_COMPRESSION
 
 #include <algorithm>

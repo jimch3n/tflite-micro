@@ -510,9 +510,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\svdf_common.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\strided_slice_common.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\fft_auto_scale_common.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -618,26 +615,32 @@
     <ClCompile Include="$(TFLM_ROOT)\signal\src\window.cc">
       <Filter>Source Files\signal\src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\slice.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\slice.cc">
       <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\transpose.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\transpose.cc">
       <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\lite\micro\hexdump.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\hexdump.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc">
       <Filter>Source Files\compiler</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\compiler\mlir\lite\schema\schema_utils.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\compiler\mlir\lite\schema\schema_utils.cc">
       <Filter>Source Files\compiler</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\decompress.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\decompress_common.cc">
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\decompress_common.cc">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\strided_slice_common.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\dequantize_common.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

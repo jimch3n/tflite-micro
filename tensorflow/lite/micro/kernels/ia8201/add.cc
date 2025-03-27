@@ -43,7 +43,7 @@ namespace tflite {
 // constexpr int kAddInputTensor2 = 1;
 // constexpr int kAddOutputTensor = 0;
 
-struct OpData {
+struct OpDataAddEx {
   OpDataAdd AddOp;  // from reference
   AScalar input1_multiplier_fr32;
   AScalar input2_multiplier_fr32;
@@ -60,7 +60,7 @@ struct OpData {
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteAddParams* params,
                              const TfLiteTensor* input1,
                              const TfLiteTensor* input2, TfLiteTensor* output,
-                             OpData* data) {
+                             OpDataAddEx* data) {
   data->requires_broadcast = !HaveSameShapes(input1, input2);
 
   if (output->type == kTfLiteUInt8 || output->type == kTfLiteInt8) {
@@ -230,7 +230,169 @@ static void AddFloat(float* output, const float* input1, const float* input2,
   }
 }
 
-static TfLiteStatus AddQuantizedInt8Sat(const OpData* data_ex,
+static TfLiteStatus AddQuantizedInt8SatX4(const OpDataAddEx* data_ex,
+  const int8_t** ppInput,
+  const int8_t* input2, int8_t** ppOutput,
+  int n) {
+  const OpDataAdd* data = &data_ex->AddOp;
+
+  vr128 vr_input1, vr_input2;
+  int loopLim = n >> 2;
+  //
+  // ulsr128 ur_input1, ur_input2;
+  //int8_t* pOut = output;
+  //ulsr128 UR_out = align_8x4_store(pOut);
+  vr128 vr_offset1, vr_offset2;
+  vr128 vr_multiplier_input1, vr_multiplier_input2;
+  vr128 vr_multiplier_output;
+  vr128 vr_output_offset;
+  vr128 vr_shift_input1, vr_shift_input2;
+  vr128 vr_raw_sum, vr_output, vr_q7_out;
+  ulsr128  UR_input2;
+  const int8_t* in1, * in2, * in3, * in4;
+  in1 = ppInput[0];
+  in2 = ppInput[1];
+  in3 = ppInput[2];
+  in4 = ppInput[3];
+
+  const int8_t* out1, * out2, * out3, * out4;
+  out1 = ppOutput[0];
+  out2 = ppOutput[1];
+  out3 = ppOutput[2];
+  out4 = ppOutput[3];
+
+
+  CHECK_ALIGN_4(out1);
+
+  CHECK_ALIGN_4(out2);
+  CHECK_ALIGN_4(out3);
+  CHECK_ALIGN_4(out4);
+  replicate_ar(vr_offset1, 0xf, data_ex->input1_offset_fr32.fr);  // Afloat
+  replicate_ar(vr_offset2, 0xf, data_ex->input2_offset_fr32.fr);
+  replicate_ar(vr_output_offset, 0xf, data_ex->output_offset_fr32.fr);
+  replicate_ar(vr_multiplier_input1, 0xf, data_ex->input1_multiplier_fr32.fr);
+  replicate_ar(vr_multiplier_input2, 0xf, data_ex->input2_multiplier_fr32.fr);
+
+  replicate_ar(vr_multiplier_output, 0xf, data_ex->output_multiplier_fr32.fr);
+
+  ulsr128 UR_in1 = align_8x4_load(in1);
+  ulsr128 UR_in2 = align_8x4_load(in2);
+  ulsr128 UR_in3 = align_8x4_load(in3);
+  ulsr128 UR_in4 = align_8x4_load(in4);
+
+  UR_input2 = align_8x4_load(input2);
+
+  if (loopLim > 0) {
+    for (int ii = 0; ii < loopLim; ii++) {
+      // q7*1<<left
+
+      load_8x4_vr_a(vr_input1, UR_in1, in1);
+      load_8x4_vr_a(vr_input2, UR_input2, input2);
+
+      convert_16I_to_32F_x4(vr_input1, 0);
+      convert_16I_to_32F_x4(vr_input2, 0);
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+      vr_shift_input2 =
+        vexp_adj(vadds(vr_input2, vr_offset2, 0), 31 - 8 - data->left_shift);
+
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+      vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output =
+        vmacs_adj(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+      // convert to 8 bit rndsat-back
+      convert_32F_to_16I_x4(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output,  1);
+      store32x1_vr_postI(vr_q7_out, out1, INC1, VRQ0);
+      // second input/output
+      load_8x4_vr_a(vr_input1, UR_in2, in2);
+      convert_16I_to_32F_x4(vr_input1, 0);
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output =
+        vmacs_adj(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+      convert_32F_to_16I_x4(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output,  1);
+      store32x1_vr_postI(vr_q7_out, out2, INC1, VRQ0);
+      // third input/output
+      load_8x4_vr_a(vr_input1, UR_in3, in3);
+      convert_16I_to_32F_x4(vr_input1, 0);
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output =
+        vmacs_adj(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+      convert_32F_to_16I_x4(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output,  1);
+      store32x1_vr_postI(vr_q7_out, out3, INC1, VRQ0);  // output, INC1, VRQ0);
+
+
+      // fourth input
+      load_8x4_vr_a(vr_input1, UR_in4, in4);
+      convert_16I_to_32F_x4(vr_input1, 0);
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output =
+        vmacs_adj(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+      convert_32F_to_16I_x4(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output,  1);
+      store32x1_vr_postI(vr_q7_out, out4, INC1, VRQ0);  // output, INC1, VRQ0);
+
+    }
+    
+    //flush_8x4(UR_out, pOut);
+  }
+  // reminder
+#if 0
+  if (n & 3) {
+    load_8x4_vr_a(vr_input1, UR_input1, input1);
+    load_8x4_vr_a(vr_input2, UR_input2, input2);
+
+    convert_16I_to_32F_x4(vr_input1, 0);
+    convert_16I_to_32F_x4(vr_input2, 0);
+    vr_shift_input1 =
+      vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+    vr_shift_input2 =
+      vexp_adj(vadds(vr_input2, vr_offset2, 0), 31 - 8 - data->left_shift);
+
+    vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+    vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+
+    vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+    vr_output =
+      vmacs_adj(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+    // convert to 8 bit rndsat-back
+    convert_32F_to_16I_x4(vr_output, 0, 0);
+    // store 1 byt one
+    rnd_sat_pack(vr_q7_out, VRQ0, vr_output, 1);
+    vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0);
+    KN_PRINTX_VR128(vr_output);
+    for (int ii = 0; ii < (n & 3); ii++) {
+      store8x1_vr_postI(vr_output, pOut, INC1, VRQ0);
+      vr_output = vpermsi(vr_output, vr_output, 0, SHR_BY_1_ELEM);
+    }
+  }
+#endif
+  return kTfLiteOk;
+}
+static TfLiteStatus AddQuantizedInt8Sat(const OpDataAddEx* data_ex,
                                         const int8_t* input1,
                                         const int8_t* input2, int8_t* output,
                                         int n) {
@@ -482,7 +644,156 @@ static void AddFloat(float* output, const float* input1, const float* input2,
   }
 }
 
-static TfLiteStatus AddQuantizedInt8Sat(const OpData* data_ex,
+static TfLiteStatus AddQuantizedInt8SatX4(const OpDataAddEx* data_ex,
+  const int8_t** ppInput,
+  const int8_t* input2, int8_t** ppOutput,
+  int n) {
+  vr64 vr_input1, vr_input2;
+  const OpDataAdd* data = &data_ex->AddOp;
+  int loopLim = n >> 1;
+  //
+  // ulsr128 ur_input1, ur_input2;
+
+  vr64 vr_offset1, vr_offset2;
+  vr64 vr_multiplier_input1, vr_multiplier_input2;
+  vr64 vr_multiplier_output;
+  vr64 vr_output_offset;
+  vr64 vr_shift_input1, vr_shift_input2;
+  vr64 vr_raw_sum, vr_output, vr_output2, vr_q7_out;
+
+  const int8_t *in1, *in2, *in3, *in4;
+  in1 = ppInput[0];
+  in2 = ppInput[1];
+  in3 = ppInput[2];
+  in4 = ppInput[3];
+
+  const int8_t* out1, * out2, * out3, * out4;
+  out1 = ppOutput[0];
+  out2 = ppOutput[1];
+  out3 = ppOutput[2];
+  out4 = ppOutput[3];
+  replicate_ar(vr_offset1, 0x3, data_ex->input1_offset_fr32.fr);  // Afloat
+  replicate_ar(vr_offset2, 0x3, data_ex->input2_offset_fr32.fr);
+  replicate_ar(vr_output_offset, 0x3, data_ex->output_offset_fr32.fr);
+  replicate_ar(vr_multiplier_input1, 0x3, data_ex->input1_multiplier_fr32.fr);
+  replicate_ar(vr_multiplier_input2, 0x3, data_ex->input2_multiplier_fr32.fr);
+
+  replicate_ar(vr_multiplier_output, 0x3, data_ex->output_multiplier_fr32.fr);
+
+  if (loopLim > 0) {
+
+    for (int ii = 0; ii < loopLim ; ii++) {
+      // q7*1<<left
+      load8x2_vr_postI(vr_input1, in1, INC1);
+
+      load8x2_vr_postI(vr_input2, input2, INC1);
+
+      convert_16I_to_32F_x2(vr_input1, 0);
+      convert_16I_to_32F_x2(vr_input2, 0);
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+      vr_shift_input2 =
+        vexp_adj(vadds(vr_input2, vr_offset2, 0), 31 - 8 - data->left_shift);
+
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+      vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output =
+        vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+      // second input 1
+      load8x2_vr_postI(vr_input1, in2, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
+
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output2 =
+        vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+      convert_32F_to_16I_x2(vr_output, 0, 0);
+      convert_32F_to_16I_x2(vr_output2, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      store16x1_vr_postI(vr_q7_out, out1, INC1, VRQ0);
+
+
+      rnd_sat_pack(vr_q7_out, VRQ1, vr_output2, vr_output2, 1);
+      store16x1_vr_postI(vr_q7_out, out2, INC1, VRQ1);
+      // copy
+      // 
+      // third
+      load8x2_vr_postI(vr_input1, in3, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
+
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+      vr_output =
+        vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+// four
+      load8x2_vr_postI(vr_input1, in4, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
+      vr_shift_input1 =
+        vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+
+      vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+
+      vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+      vr_output2 =
+        vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+      convert_32F_to_16I_x2(vr_output, 0, 0);
+      convert_32F_to_16I_x2(vr_output2, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      store16x1_vr_postI(vr_q7_out, out3, INC1, VRQ0);
+
+
+      rnd_sat_pack(vr_q7_out, VRQ1, vr_output2, vr_output2, 1);
+      store16x1_vr_postI(vr_q7_out, out4, INC1, VRQ1);
+    }
+
+  }
+  // reminder
+#if 0
+  if (n & 1) {
+    load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
+    load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+
+    convert_16I_to_32F_x2(vr_input1, 0);
+    convert_16I_to_32F_x2(vr_input2, 0);
+
+    vr_shift_input1 =
+      vexp_adj(vadds(vr_input1, vr_offset1, 0), 31 - 8 - data->left_shift);
+    vr_shift_input2 =
+      vexp_adj(vadds(vr_input2, vr_offset2, 0), 31 - 8 - data->left_shift);
+
+    vr_shift_input1 = vmuls(vr_multiplier_input1, vr_shift_input1, 0);
+    vr_shift_input2 = vmuls(vr_multiplier_input2, vr_shift_input2, 0);
+
+    vr_raw_sum = vadds(vr_shift_input1, vr_shift_input2, 0);  // Q24
+
+    vr_output = vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
+
+    // convert to 8 bit rndsat-back
+    convert_32F_to_16I_x2(vr_output, 0, 0);
+    // store 1 byt one
+    rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+    vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+    store8x1_vr_postI(vr_output, output, INC1, VRQ0);
+  }
+#endif
+  return kTfLiteOk;
+}
+static TfLiteStatus AddQuantizedInt8Sat(const OpDataAddEx* data_ex,
                                         const int8_t* input1,
                                         const int8_t* input2, int8_t* output,
                                         int n) {
@@ -527,7 +838,9 @@ static TfLiteStatus AddQuantizedInt8Sat(const OpData* data_ex,
 
       vr_output =
           vmacs(vr_output_offset, vr_raw_sum, vr_multiplier_output, 0, 0);
-
+      load8x2_vr_postI(vr_input1, input1, INC1);
+      load8x2_vr_postI(vr_input2, input2, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
       // convert to 8 bit rndsat-back
       convert_32F_to_16I_x2(vr_output, 0, 0);
 
@@ -535,9 +848,7 @@ static TfLiteStatus AddQuantizedInt8Sat(const OpData* data_ex,
       vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
       store8x1_vr_postI(vr_output, output, INC1, VRQ0);
       store8x1_vr_postI(vr_output, output, INC1, VRQ1);
-      load8x2_vr_postI(vr_input1, input1, INC1);
-      load8x2_vr_postI(vr_input2, input2, INC1);
-      convert_16I_to_32F_x2(vr_input1, 0);
+
     }
     convert_16I_to_32F_x2(vr_input2, 0);
     // add offset each input
@@ -595,7 +906,7 @@ static TfLiteStatus AddQuantizedInt8Sat(const OpData* data_ex,
 #endif
 
 static TfLiteStatus EvalAddFloat(TfLiteContext* context, TfLiteNode* node,
-                                 TfLiteAddParams* params, const OpData* data_ex,
+                                 TfLiteAddParams* params, const OpDataAddEx* data_ex,
                                  const TfLiteEvalTensor* input1,
                                  const TfLiteEvalTensor* input2,
                                  TfLiteEvalTensor* output) {
@@ -708,7 +1019,7 @@ static TfLiteStatus EvalAddFloat(TfLiteContext* context, TfLiteNode* node,
 
 static TfLiteStatus EvalAddQuantized(TfLiteContext* context, TfLiteNode* node,
                                      TfLiteAddParams* params,
-                                     const OpData* data_ex,
+                                     const OpDataAddEx* data_ex,
                                      const TfLiteEvalTensor* input1,
                                      const TfLiteEvalTensor* input2,
                                      TfLiteEvalTensor* output) {
@@ -726,7 +1037,7 @@ static TfLiteStatus EvalAddQuantized(TfLiteContext* context, TfLiteNode* node,
     op_params.output_multiplier = data->output_multiplier;
     op_params.output_shift = data->output_shift;
     SetActivationParams(data->output_activation_min,
-                        data->output_activation_max, &op_params);
+      data->output_activation_max, &op_params);
 
 #define TF_LITE_ADD(type, opname, dtype)                         \
   type::opname(op_params, tflite::micro::GetTensorShape(input1), \
@@ -738,15 +1049,16 @@ static TfLiteStatus EvalAddQuantized(TfLiteContext* context, TfLiteNode* node,
 #if defined(DMX1A_ADD_OPT) || defined(HMD1A_ADD_OPT)
     if ((data_ex->opt_constraint == 1) && output->type == kTfLiteInt8) {
       return AddQuantizedInt8Sat(
-          data_ex, tflite::micro::GetTensorData<int8_t>(input1),
-          tflite::micro::GetTensorData<int8_t>(input2),
-          tflite::micro::GetTensorData<int8_t>(output),
-          MatchingElementsSize(tflite::micro::GetTensorShape(input1),
-                               tflite::micro::GetTensorShape(input2),
-                               tflite::micro::GetTensorShape(output)));
+        data_ex, tflite::micro::GetTensorData<int8_t>(input1),
+        tflite::micro::GetTensorData<int8_t>(input2),
+        tflite::micro::GetTensorData<int8_t>(output),
+        MatchingElementsSize(tflite::micro::GetTensorShape(input1),
+          tflite::micro::GetTensorShape(input2),
+          tflite::micro::GetTensorShape(output)));
       KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
-                       ElementCount(*output->dims));
-    } else if ((data_ex->opt_constraint == 2) && output->type == kTfLiteInt8) {
+        ElementCount(*output->dims));
+    }
+    else if ((data_ex->opt_constraint == 2) && output->type == kTfLiteInt8) {
       // dim input1 [a,b,c,d], input2 = [d]
       // for loop all a*b*c for each d
       const int8_t* input1_data = tflite::micro::GetTensorData<int8_t>(input1);
@@ -754,33 +1066,77 @@ static TfLiteStatus EvalAddQuantized(TfLiteContext* context, TfLiteNode* node,
       int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
 
       int internal_loop_count =
-          tflite::micro::GetTensorShape(input2).FlatSize();
+        tflite::micro::GetTensorShape(input2).FlatSize();
       int external_loop_count =
-          tflite::micro::GetTensorShape(input1).FlatSize();
+        tflite::micro::GetTensorShape(input1).FlatSize();
       /*
               tflite::micro::GetTensorData<int8_t>(output),
               MatchingElementsSize(tflite::micro::GetTensorShape(input1),
                       tflite::micro::GetTensorShape(input2),
                       tflite::micro::GetTensorShape(output));
                       */
-      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input1),
-                       ElementCount(*input1->dims));
-      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input2),
-                       ElementCount(*input2->dims));
+      KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input1),
+        ElementCount(*input1->dims), 1024);
+      KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input2),
+        ElementCount(*input2->dims), 1024);
+      int ii = 0;
 
-      for (int ii = 0; ii < external_loop_count;
-           ii += internal_loop_count)  // dim 2 , dim3
+      //loopLim =>> 2;
+      if ((internal_loop_count & 3) == 0)
       {
+        int loopLim = external_loop_count / internal_loop_count;
+        for (ii = 0; ii < loopLim >> 2;
+          ii++)  // dim 2 , dim3
+        {
+          const int8_t* pInput4[4];
+          pInput4[0] = input1_data;
+          pInput4[1] = pInput4[0] + internal_loop_count;
+          pInput4[2] = pInput4[1] + internal_loop_count;
+          pInput4[3] = pInput4[2] + internal_loop_count;
+
+          int8_t* pOutput4[4];
+          pOutput4[0] = output_data;
+          pOutput4[1] = pOutput4[0] + internal_loop_count;
+          pOutput4[2] = pOutput4[1] + internal_loop_count;
+          pOutput4[3] = pOutput4[2] + internal_loop_count;
+
+          AddQuantizedInt8SatX4(data_ex, pInput4, input2_data, pOutput4,
+            internal_loop_count);
+
+          input1_data = pInput4[3] + internal_loop_count;
+          output_data = pOutput4[3] + internal_loop_count;
+        }
+        //ii = ii * 
+        for (ii = 0; ii < (loopLim & 3);
+          ii++)  // dim 2 , dim3
+        {
+
+          AddQuantizedInt8Sat(data_ex, input1_data, input2_data, output_data,
+            internal_loop_count);
+          input1_data += internal_loop_count;
+          output_data += internal_loop_count;
+
+        }
+
+      }else {
+      // if internal unaligned 4
+      for (int ii = 0; ii < (external_loop_count);
+        ii += internal_loop_count)  // dim 2 , dim3
+      {
+
         AddQuantizedInt8Sat(data_ex, input1_data, input2_data, output_data,
-                            internal_loop_count);
+          internal_loop_count);
         input1_data += internal_loop_count;
         output_data += internal_loop_count;
-      }
-      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
-                       ElementCount(*output->dims));
-    }
 
-    else
+      }
+
+    }
+      KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(output),
+        ElementCount(*output->dims), 1024);
+
+  }
+  else
 #endif
     {
 #ifndef REMOVE_REFOP_SUPPORT
@@ -845,7 +1201,7 @@ static TfLiteStatus EvalAddQuantized(TfLiteContext* context, TfLiteNode* node,
 
 void* AddInit(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataAddEx));
 }
 
 TfLiteStatus AddPrepare(TfLiteContext* context, TfLiteNode* node) {
@@ -863,7 +1219,7 @@ TfLiteStatus AddPrepare(TfLiteContext* context, TfLiteNode* node) {
       micro_context->AllocateTempOutputTensor(node, kAddOutputTensor);
   TF_LITE_ENSURE(context, output != nullptr);
 
-  OpData* data_ex = static_cast<OpData*>(node->user_data);
+  OpDataAddEx* data_ex = static_cast<OpDataAddEx*>(node->user_data);
   OpDataAdd* data = static_cast<OpDataAdd*>(&data_ex->AddOp);
 
   auto* params = reinterpret_cast<TfLiteAddParams*>(node->builtin_data);
@@ -969,7 +1325,7 @@ TfLiteStatus EvalAdd(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kAddOutputTensor);
   TfLiteStatus status = kTfLiteOk;
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpData* data_ex = static_cast<const OpData*>(node->user_data);
+  const OpDataAddEx* data_ex = static_cast<const OpDataAddEx*>(node->user_data);
 
   const OpDataAdd* data = static_cast<const OpDataAdd*>(&data_ex->AddOp);
 
@@ -1020,32 +1376,112 @@ TfLiteStatus EvalAddInt8(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kAddOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpData* data = static_cast<const OpData*>(node->user_data);
+  const OpDataAddEx* data_ex = static_cast<const OpDataAddEx*>(node->user_data);
 
   if (output->type != kTfLiteInt8) {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(output->type), output->type);
     return kTfLiteError;
   }
+
 #if defined(DMX1A_ADD_OPT) || defined(HMD1A_ADD_OPT)
-  if (data->opt_constraint) {
+  if ((data_ex->opt_constraint == 1) && output->type == kTfLiteInt8) {
     return AddQuantizedInt8Sat(
-        data, tflite::micro::GetTensorData<int8_t>(input1),
-        tflite::micro::GetTensorData<int8_t>(input2),
-        tflite::micro::GetTensorData<int8_t>(output),
-        MatchingElementsSize(tflite::micro::GetTensorShape(input1),
-                             tflite::micro::GetTensorShape(input2),
-                             tflite::micro::GetTensorShape(output)));
-  } else
+      data_ex, tflite::micro::GetTensorData<int8_t>(input1),
+      tflite::micro::GetTensorData<int8_t>(input2),
+      tflite::micro::GetTensorData<int8_t>(output),
+      MatchingElementsSize(tflite::micro::GetTensorShape(input1),
+        tflite::micro::GetTensorShape(input2),
+        tflite::micro::GetTensorShape(output)));
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
+      ElementCount(*output->dims));
+  }
+  else if ((data_ex->opt_constraint == 2) && output->type == kTfLiteInt8) {
+    // dim input1 [a,b,c,d], input2 = [d]
+    // for loop all a*b*c for each d
+    const int8_t* input1_data = tflite::micro::GetTensorData<int8_t>(input1);
+    const int8_t* input2_data = tflite::micro::GetTensorData<int8_t>(input2);
+    int8_t* output_data = tflite::micro::GetTensorData<int8_t>(output);
+
+    int internal_loop_count =
+      tflite::micro::GetTensorShape(input2).FlatSize();
+    int external_loop_count =
+      tflite::micro::GetTensorShape(input1).FlatSize();
+    /*
+            tflite::micro::GetTensorData<int8_t>(output),
+            MatchingElementsSize(tflite::micro::GetTensorShape(input1),
+                    tflite::micro::GetTensorShape(input2),
+                    tflite::micro::GetTensorShape(output));
+                    */
+    KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input1),
+      ElementCount(*input1->dims), 1024);
+    KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input2),
+      ElementCount(*input2->dims), 1024);
+    int ii = 0;
+    int loopLim = external_loop_count / internal_loop_count;
+    //loopLim =>> 2;
+    if ((internal_loop_count & 3) == 0)
+    {
+      for (ii = 0; ii < loopLim >> 2;
+        ii++)  // dim 2 , dim3
+      {
+        const int8_t* pInput4[4];
+        pInput4[0] = input1_data;
+        pInput4[1] = pInput4[0] + internal_loop_count;
+        pInput4[2] = pInput4[1] + internal_loop_count;
+        pInput4[3] = pInput4[2] + internal_loop_count;
+
+        int8_t* pOutput4[4];
+        pOutput4[0] = output_data;
+        pOutput4[1] = pOutput4[0] + internal_loop_count;
+        pOutput4[2] = pOutput4[1] + internal_loop_count;
+        pOutput4[3] = pOutput4[2] + internal_loop_count;
+
+        AddQuantizedInt8SatX4(data_ex, pInput4, input2_data, pOutput4,
+          internal_loop_count);
+
+        input1_data = pInput4[3] + internal_loop_count;
+        output_data = pOutput4[3] + internal_loop_count;
+      }
+      //ii = ii * 
+      for (ii = 0; ii < (loopLim & 3);
+        ii++)  // dim 2 , dim3
+      {
+
+        AddQuantizedInt8Sat(data_ex, input1_data, input2_data, output_data,
+          internal_loop_count);
+        input1_data += internal_loop_count;
+        output_data += internal_loop_count;
+
+      }
+    }
+    else {
+      // internal loop unaligned 4
+      for (ii = 0; ii < (external_loop_count );
+        ii+= internal_loop_count)  // dim 2 , dim3
+      {
+
+        AddQuantizedInt8Sat(data_ex, input1_data, input2_data, output_data,
+          internal_loop_count);
+        input1_data += internal_loop_count;
+        output_data += internal_loop_count;
+
+      }
+
+    }
+    KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(output),
+      ElementCount(*output->dims), 1024);
+  }else
 #endif
   {
     TfLiteStatus status = kTfLiteOk;
     auto* params = reinterpret_cast<TfLiteAddParams*>(node->builtin_data);
     status =
-        EvalAddQuantized(context, node, params, data, input1, input2, output);
+        EvalAddQuantized(context, node, params, data_ex, input1, input2, output);
 
     return status;
   }
+  return kTfLiteOk;
 }
 TfLiteStatus EvalAddFloat32(TfLiteContext* context, TfLiteNode* node) {
   auto* params = reinterpret_cast<TfLiteAddParams*>(node->builtin_data);
@@ -1058,7 +1494,7 @@ TfLiteStatus EvalAddFloat32(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kAddOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  const OpData* data = static_cast<const OpData*>(node->user_data);
+  const OpDataAddEx* data = static_cast<const OpDataAddEx*>(node->user_data);
   if (output->type != kTfLiteFloat32) {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(output->type), output->type);

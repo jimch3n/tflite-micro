@@ -39,7 +39,7 @@ namespace tflite {
 constexpr int kPoolingInputTensor = 0;
 constexpr int kPoolingOutputTensor = 0;
 
-struct OpData {
+struct OpDataPoolEx {
   TfLitePaddingValues padding;
   // Index to buffer for optimizations if applicable.
   int buffer_idx;
@@ -56,7 +56,7 @@ struct OpData {
 TfLiteStatus CalculateOpData(TfLiteContext *context,
                              const TfLitePoolParams *params,
                              const TfLiteTensor *input, TfLiteTensor *output,
-                             OpData *data) {
+                             OpDataPoolEx *data) {
   // input: batch, height, width, channel
   int height = SizeOfDimension(input, 1);
   int width = SizeOfDimension(input, 2);
@@ -85,7 +85,7 @@ TfLiteStatus CalculateOpData(TfLiteContext *context,
 static TfLiteStatus AverageEvalFloat(const TfLiteContext *context,
                                      const TfLiteNode *node,
                                      const TfLitePoolParams *params,
-                                     const OpData &data,
+                                     const OpDataPoolEx &data,
                                      const TfLiteEvalTensor *input,
                                      TfLiteEvalTensor *output) {
 #ifndef REMOVE_REFOP_SUPPORT
@@ -153,7 +153,7 @@ static VAR_ALIGN_16 const unsigned short bytearray_dmx[] = {
 
 };
 
-int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
+int AvgPoolQuantizedKernelInt8(const OpDataPoolEx &data, const int32_t *x,
                                int8_t *pOut, int32_t *pScratchOuput, int n,
                                int depth, int filter_count, int sign) {
 #ifdef KN_DEBUG
@@ -312,7 +312,7 @@ int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
 // align
 
 int MaxPoolKernelQuantizedUInt8(
-    const OpData &data,
+    const OpDataPoolEx &data,
     const int8_t *x,  // align up16 buffer, zero paddding
     int8_t *pOut, int32_t *pScratchOuput, int n, int depth) {
   // int n4 = (n)>>2; // align-up 4 padding 16 byte zero
@@ -387,11 +387,96 @@ int MaxPoolKernelQuantizedUInt8(
 
   return 0;
 }
+//asssume n == depth, saturation 127 ~ -128, n align 4
+ int MaxPoolKernelQuantizedInt8Opt2(
+  const OpDataPoolEx& data,
+  const int8_t* x,  // align up16 buffer, zero paddding
+  int8_t* pOut, int32_t* pScratchOuput, int n, int n4, int depth) {
+  // int n4 = (n)>>2; // align-up 4 padding 16 byte zero
+  vr128 VR_data, VR_max, VR_out;
+  // vr128 VR_mask;
+  int m2 = (depth + 3) >> 2;
+  const int8_t* pData = x;
+  int8_t* pDataGroup = (int8_t*)pData;
+  //int32_t* pDst = pScratchOuput;
+  int8_t* pY = pOut;
+  // int idx;
+  mir30 mir_idx;
+  // int n4 = (n / depth);  // >> 2;
+  const int cvt_32f = 7;
+  int depthInc = (depth + 3) >> 2;
+#ifdef KN_DEBUG
+  CHECK_ALIGN_4(pData);
+
+#endif
+  if (m2 > 0)
+  {
+    ulsr128 UR_Y = align_8x4_store(pY);
+
+    for (int jj = 0; jj < m2; jj++) {
+      pData = pDataGroup;
+
+      load32x1_vr_postR(VR_data, pData, depthInc, VRQ0);
+      VR_out = shift8_into32_arith(VR_data, 24, 0, VRQ0);
+
+      convert_16I_to_32F_x4(VR_out, cvt_32f);
+      vmaxmin_init(VR_max, VR_out, mir_idx);
+
+      for (int ii = 0; ii < n4 - 1; ii++) {
+        load32x1_vr_postR(VR_data, pData, depthInc, VRQ0);
+        VR_out = shift8_into32_arith(VR_data, 24, 0, VRQ0);
+        convert_16I_to_32F_x4(VR_out, cvt_32f);
+        vmax_idx(VR_max, VR_out, mir_idx);
+      }
+
+      convert_32F_to_16I_x4(VR_max, 15 - 8, 1);  // rounding
+      //VR_max = shift32_arith(VR_max, (unsigned)-16, 0);
+
+      //store32x4_vr_postI(VR_max, pDst, INC1);
+      store_8x4_vr_a(VR_max, UR_Y, pY);
+
+
+      pDataGroup += 4;  // byte ?
+    }
+    flush_8x4(UR_Y, pY);
+  }
+#if 0
+  int m4 = depth >> 2;
+  pDst = pScratchOuput;
+  if (m4 > 0) {
+    ulsr128 UR_Y = align_8x4_store(pY);  // unaligned 4 store
+    load32x4_vr_postI(VR_max, pDst, INC1);
+    for (int jj = 0; jj < m4 - 1; jj++) {
+
+      SATURATE_INT32_VR128(VR_max, VR_max, data.activation_min,
+        data.activation_max);
+
+      VR_out = shift32_arith(VR_max, 24, 0);
+      load32x4_vr_postI(VR_max, pDst, INC1);
+      store_8x4_vr_a(VR_out, UR_Y, pY);
+    }
+    SATURATE_INT32_VR128(VR_max, VR_max, data.activation_min,
+      data.activation_max);
+    VR_out = shift32_arith(VR_max, 24, 0);
+    store_8x4_vr_a(VR_out, UR_Y, pY);
+    flush_8x4(UR_Y, pY);
+  }
+
+  for (int jj = 0; jj < (depth & 3); jj++) {
+    load32x1_vr_postI(VR_max, pDst, INC1, VRQ0);
+    SATURATE_INT32_VR_IDX(VR_max, VR_max, data.activation_min,
+      data.activation_max, VRQ0);
+    VR_out = shift32_arith(VR_max, 24, 0);
+    store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+  }
+#endif
+  return 0;
+}
 
 int MaxPoolKernelQuantizedInt8(
-    const OpData &data,
+    const OpDataPoolEx &data,
     const int8_t *x,  // align up16 buffer, zero paddding
-    int8_t *pOut, int32_t *pScratchOuput, int n, int depth) {
+    int8_t *pOut, int32_t *pScratchOuput, int n, int n4, int depth) {
   // int n4 = (n)>>2; // align-up 4 padding 16 byte zero
   vr128 VR_data, VR_max, VR_out;
   // vr128 VR_mask;
@@ -402,17 +487,18 @@ int MaxPoolKernelQuantizedInt8(
   int8_t *pY = pOut;
   // int idx;
   mir30 mir_idx;
-  int n4 = (n / depth);  // >> 2;
+ // int n4 = (n / depth);  // >> 2;
   int cvt_32f = 7;
   int depthInc = (depth + 3) >> 2;
 #ifdef KN_DEBUG
   CHECK_ALIGN_4(pData);
+  
 #endif
 
   for (int jj = 0; jj < m2; jj++) {
     pData = pDataGroup;
+    
     load32x1_vr_postR(VR_data, pData, depthInc, VRQ0);
-
     VR_out = shift8_into32_arith(VR_data, 24, 0, VRQ0);
 
     convert_16I_to_32F_x4(VR_out, cvt_32f);
@@ -420,9 +506,7 @@ int MaxPoolKernelQuantizedInt8(
 
     for (int ii = 0; ii < n4 - 1; ii++) {
       load32x1_vr_postR(VR_data, pData, depthInc, VRQ0);
-
       VR_out = shift8_into32_arith(VR_data, 24, 0, VRQ0);
-
       convert_16I_to_32F_x4(VR_out, cvt_32f);
       vmax_idx(VR_max, VR_out, mir_idx);
     }
@@ -438,14 +522,20 @@ int MaxPoolKernelQuantizedInt8(
   pDst = pScratchOuput;
   if (m4 > 0) {
     ulsr128 UR_Y = align_8x4_store(pY);  // unaligned 4 store
-    for (int jj = 0; jj < m4; jj++) {
-      load32x4_vr_postI(VR_max, pDst, INC1);
+    load32x4_vr_postI(VR_max, pDst, INC1);
+    for (int jj = 0; jj < m4-1; jj++) {
+
       SATURATE_INT32_VR128(VR_max, VR_max, data.activation_min,
                            data.activation_max);
+ 
       VR_out = shift32_arith(VR_max, 24, 0);
-
+      load32x4_vr_postI(VR_max, pDst, INC1);
       store_8x4_vr_a(VR_out, UR_Y, pY);
     }
+    SATURATE_INT32_VR128(VR_max, VR_max, data.activation_min,
+      data.activation_max);
+    VR_out = shift32_arith(VR_max, 24, 0);
+    store_8x4_vr_a(VR_out, UR_Y, pY);
     flush_8x4(UR_Y, pY);
   }
 
@@ -459,7 +549,7 @@ int MaxPoolKernelQuantizedInt8(
   return 0;
 }
 
-void AvgPoolQuantized(const OpData &data, const int8_t *input_data,
+void AvgPoolQuantized(const OpDataPoolEx &data, const int8_t *input_data,
                       int8_t *output_data, int signs)
 
 {
@@ -550,7 +640,7 @@ void AvgPoolQuantized(const OpData &data, const int8_t *input_data,
   }
 }
 
-void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
+void MaxPoolQuantizedInt8(const OpDataPoolEx &data, const int8_t *input_data,
                           int8_t *output_data, int sign = 1)
 
 {
@@ -583,7 +673,22 @@ void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
   KN_PRINTD(inFCM);
   KN_PRINTX(pIm2ColBuf);
   KN_PRINTX(pOutputBuf);
+  int N4 = inFCN / inFCM;
 
+
+  int (*MaxPoolKernel)(const OpDataPoolEx & data,
+    const int8_t * x,  // align up16 buffer, zero paddding
+    int8_t * pOut, int32_t * pScratchOuput, int n, int n4, int depth) ;
+  
+  if (data.opt_constraint == 1)
+  {
+    MaxPoolKernel = MaxPoolKernelQuantizedInt8;
+  }
+  else {
+    TFLITE_CHECK_EQ(inFCN, inFCM);
+
+    MaxPoolKernel = MaxPoolKernelQuantizedInt8Opt2;
+  }
   for (int i_out_y = 0; i_out_y < conv2d.out_y; ++i_out_y) {
     for (int i_out_x = 0; i_out_x < conv2d.out_x; ++i_out_x) {
       // HACK padding with input negative offset, and inputhe mac8bx8b will
@@ -630,9 +735,9 @@ void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
 
       {
         if (sign) {
-          MaxPoolKernelQuantizedInt8(data, (int8_t *)pIm2ColBuf,
+          MaxPoolKernel(data, (int8_t *)pIm2ColBuf,
                                      (int8_t *)&outBuf[outBufIdx * inFCM],
-                                     pOutputBuf, inFCN, inFCM);
+                                     pOutputBuf, inFCN, N4,  inFCM);
         } else {
           MaxPoolKernelQuantizedUInt8(data, (int8_t *)pIm2ColBuf,
                                       (int8_t *)&outBuf[outBufIdx * inFCM],
@@ -659,7 +764,7 @@ static VAR_ALIGN_16 const unsigned int bytearray_hmd[] = {
 
 };
 
-int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
+int AvgPoolQuantizedKernelInt8(const OpDataPoolEx &data, const int32_t *x,
                                int8_t *pOut, int32_t *pScratchOuput, int n,
                                int depth, int filter_count, int sign) {
 #ifdef KN_DEBUG
@@ -811,7 +916,7 @@ int AvgPoolQuantizedKernelInt8(const OpData &data, const int32_t *x,
 // align
 
 int MaxPoolKernelQuantizedUInt8(
-    const OpData &data,
+    const OpDataPoolEx &data,
     const int8_t *x,  // align up16 buffer, zero paddding
     int8_t *pOut, int32_t *pScratchOuput, int n, int depth) {
   // int n4 = (n)>>2; // align-up 4 padding 16 byte zero
@@ -886,10 +991,84 @@ int MaxPoolKernelQuantizedUInt8(
   return 0;
 }
 
-int MaxPoolKernelQuantizedInt8(
-    const OpData &data,
+static int MaxPoolKernelQuantizedInt8Opt2(
+  const OpDataPoolEx& data,
+  const int8_t* x,  // align up16 buffer, zero paddding
+  int8_t* pOut, int32_t* pScratchOuput, int n, int n4, int depth) {
+  // int n4 = (n)>>2; // align-up 4 padding 16 byte zero
+  vr64 VR_data, VR_max, VR_out;
+  // vr128 VR_mask;
+  int m2 = (depth + 1) >> 1;
+  const int8_t* pData = x;
+  int8_t* pDataGroup = (int8_t*)pData;
+
+  int8_t* pY = pOut;
+  // int idx;
+  mir18 mir_idx;
+  // int n4 = (n / depth);  // >> 2;
+  int cvt_32f = 7;
+  int depthInc = (depth + 1) >> 1;
+#ifdef KN_DEBUG
+  CHECK_ALIGN_4(pData);
+#endif
+  if (m2 > 0)
+  {
+    for (int jj = 0; jj < m2; jj++) {
+      pData = pDataGroup;
+      load16x1_vr_postR(VR_data, pData, depthInc, VRQ0);
+
+      VR_out = shift8_into32_arith(VR_data, 24, 0, VRQ0, 1);
+
+      convert_16I_to_32F_x2(VR_out, cvt_32f);
+      vmaxmin_init(VR_max, VR_out, mir_idx);
+
+      for (int ii = 0; ii < n4 - 1; ii++) {
+        load16x1_vr_postR(VR_data, pData, depthInc, VRQ0);
+
+        VR_out = shift8_into32_arith(VR_data, 24, 0, VRQ0, 1);
+
+        convert_16I_to_32F_x2(VR_out, cvt_32f);
+        vmax_idx(VR_max, VR_out, mir_idx);
+      }
+
+      convert_32F_to_16I_x2(VR_max, 15-8, 1);  // rounding
+      //VR_max = shift32_arith(VR_max, (unsigned)-16, 0);
+      store8x1_vr_postI(VR_max, pY, INC1, VRL);
+      store8x1_vr_postI(VR_max, pY, INC1, VRH);
+      pDataGroup += 2;  // byte ?
+    }
+  }
+#if 0
+  int loopLim = depth >> 1;
+  pDst = pScratchOuput;
+  if (loopLim > 0) {
+    for (int ii = 0; ii < loopLim; ii++) {
+      load32x2_vr_postI(VR_max, pDst, INC1);
+      SATURATE_INT32_VR64(VR_max, VR_max, data.activation_min,
+        data.activation_max);
+      VR_out = shift32_arith(VR_max, 24, 0);
+
+      store8x1_vr_postI(VR_out, pY, INC1, VRL);
+      store8x1_vr_postI(VR_out, pY, INC1, VRH);
+    }
+  }
+
+  if (depth & 1) {
+    load32x1_vr_postI(VR_max, pDst, INC1, VRQ0);
+    SATURATE_INT32_VR_IDX(VR_max, VR_max, data.activation_min,
+      data.activation_max, VRQ0);
+    VR_out = shift32_arith(VR_max, 24, 0);
+
+    store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
+  }
+#endif
+  return 0;
+}
+
+static int MaxPoolKernelQuantizedInt8(
+    const OpDataPoolEx &data,
     const int8_t *x,  // align up16 buffer, zero paddding
-    int8_t *pOut, int32_t *pScratchOuput, int n, int depth) {
+    int8_t *pOut, int32_t *pScratchOuput, int n, int n4, int depth) {
   // int n4 = (n)>>2; // align-up 4 padding 16 byte zero
   vr64 VR_data, VR_max, VR_out;
   // vr128 VR_mask;
@@ -900,7 +1079,7 @@ int MaxPoolKernelQuantizedInt8(
   int8_t *pY = pOut;
   // int idx;
   mir18 mir_idx;
-  int n4 = (n / depth);  // >> 2;
+ // int n4 = (n / depth);  // >> 2;
   int cvt_32f = 7;
   int depthInc = (depth + 1) >> 1;
 #ifdef KN_DEBUG
@@ -957,7 +1136,7 @@ int MaxPoolKernelQuantizedInt8(
   return 0;
 }
 
-void AvgPoolQuantized(const OpData &data, const int8_t *input_data,
+void AvgPoolQuantized(const OpDataPoolEx &data, const int8_t *input_data,
                       int8_t *output_data, int signs)
 
 {
@@ -1041,7 +1220,7 @@ void AvgPoolQuantized(const OpData &data, const int8_t *input_data,
   }
 }
 
-void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
+void MaxPoolQuantizedInt8(const OpDataPoolEx &data, const int8_t *input_data,
                           int8_t *output_data, int sign = 1)
 
 {
@@ -1073,7 +1252,20 @@ void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
   KN_PRINTD(inFCM);
   KN_PRINTX(pIm2ColBuf);
   KN_PRINTX(pOutputBuf);
+  int N4 = inFCN / inFCM;
+  int (*MaxPoolKernel)(const OpDataPoolEx & data,
+    const int8_t * x,  // align up16 buffer, zero paddding
+    int8_t * pOut, int32_t * pScratchOuput, int n, int n4, int depth);
 
+  if (data.opt_constraint == 1)
+  {
+    MaxPoolKernel = MaxPoolKernelQuantizedInt8;
+  }
+  else {
+    TFLITE_CHECK_EQ(inFCN, inFCM);
+
+    MaxPoolKernel = MaxPoolKernelQuantizedInt8Opt2;
+  }
   for (int i_out_y = 0; i_out_y < conv2d.out_y; ++i_out_y) {
     for (int i_out_x = 0; i_out_x < conv2d.out_x; ++i_out_x) {
       // HACK padding with input negative offset, and inputhe mac8bx8b will
@@ -1111,9 +1303,9 @@ void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
 
       {
         if (sign) {
-          MaxPoolKernelQuantizedInt8(data, (int8_t *)pIm2ColBuf,
+          MaxPoolKernel(data, (int8_t *)pIm2ColBuf,
                                      (int8_t *)&outBuf[outBufIdx * inFCM],
-                                     pOutputBuf, inFCN, inFCM);
+                                     pOutputBuf, inFCN, N4, inFCM);
         } else {
           MaxPoolKernelQuantizedUInt8(data, (int8_t *)pIm2ColBuf,
                                       (int8_t *)&outBuf[outBufIdx * inFCM],
@@ -1134,7 +1326,7 @@ void MaxPoolQuantizedInt8(const OpData &data, const int8_t *input_data,
 static TfLiteStatus AverageEvalQuantized(TfLiteContext *context,
                                          const TfLiteNode *node,
                                          const TfLitePoolParams *params,
-                                         const OpData &data,
+                                         const OpDataPoolEx &data,
                                          const TfLiteEvalTensor *input,
                                          TfLiteEvalTensor *output) {
   TFLITE_DCHECK(input->type == kTfLiteInt16 || input->type == kTfLiteInt8);
@@ -1208,7 +1400,7 @@ static TfLiteStatus AverageEvalQuantized(TfLiteContext *context,
 }
 
 static TfLiteStatus MaxEvalFloat(TfLiteContext *context, TfLiteNode *node,
-                                 TfLitePoolParams *params, const OpData &data,
+                                 TfLitePoolParams *params, const OpDataPoolEx &data,
                                  const TfLiteEvalTensor *input,
                                  TfLiteEvalTensor *output) {
   float activation_min, activation_max;
@@ -1238,7 +1430,7 @@ static TfLiteStatus MaxEvalFloat(TfLiteContext *context, TfLiteNode *node,
 static TfLiteStatus MaxEvalQuantized(TfLiteContext *context,
                                      const TfLiteNode *node,
                                      const TfLitePoolParams *params,
-                                     const OpData &data,
+                                     const OpDataPoolEx &data,
                                      const TfLiteEvalTensor *input,
                                      TfLiteEvalTensor *output) {
   RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
@@ -1256,7 +1448,7 @@ static TfLiteStatus MaxEvalQuantized(TfLiteContext *context,
   op_params.quantized_activation_max = data.activation_max;
   // check uint8
 #if defined(DMX1A_POOL_OPT) || defined(HMD1A_POOL_OPT)
-  if (data.opt_constraint == 1) {
+  if (data.opt_constraint > 0) {
     int8_t *p_aligned_scratch = nullptr;
 
     if (data.buffer_idx > -1) {
@@ -1302,14 +1494,14 @@ static TfLiteStatus MaxEvalQuantized(TfLiteContext *context,
 
 void *Init(TfLiteContext *context, const char *buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataPoolEx));
 }
 
 TfLiteStatus MaxPrepare(TfLiteContext *context, TfLiteNode *node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  OpData *data = static_cast<OpData *>(node->user_data);
+  OpDataPoolEx *data = static_cast<OpDataPoolEx *>(node->user_data);
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
   MicroContext *micro_context = GetMicroContext(context);
@@ -1354,6 +1546,11 @@ TfLiteStatus MaxPrepare(TfLiteContext *context, TfLiteNode *node) {
   if (input->type == kTfLiteInt8) {
     if (conv2d.out_ch == conv2d.in_ch) {  // && (conv2d.out_ch&3)==0) {
       data->opt_constraint = 1;
+      if (data->activation_max == 127 &&
+        data->activation_min == -128 && (conv2d.in_ch&3)==0)
+      {
+        data->opt_constraint = 2;
+      }
     }
 
     KN_PRINTD(data->opt_constraint);
@@ -1396,7 +1593,7 @@ TfLiteStatus AveragePrepare(TfLiteContext *context, TfLiteNode *node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  OpData *data = static_cast<OpData *>(node->user_data);
+  OpDataPoolEx *data = static_cast<OpDataPoolEx *>(node->user_data);
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
   MicroContext *micro_context = GetMicroContext(context);
@@ -1482,7 +1679,7 @@ TfLiteStatus AveragePrepare(TfLiteContext *context, TfLiteNode *node) {
 TfLiteStatus AverageEval(TfLiteContext *context, TfLiteNode *node) {
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
-  const OpData &data = *(static_cast<const OpData *>(node->user_data));
+  const OpDataPoolEx &data = *(static_cast<const OpDataPoolEx *>(node->user_data));
 
   const TfLiteEvalTensor *input =
       tflite::micro::GetEvalInput(context, node, kPoolingInputTensor);
@@ -1509,7 +1706,7 @@ TfLiteStatus AverageEval(TfLiteContext *context, TfLiteNode *node) {
 TfLiteStatus AverageEvalInt8(TfLiteContext *context, TfLiteNode *node) {
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
-  const OpData &data = *(static_cast<const OpData *>(node->user_data));
+  const OpDataPoolEx &data = *(static_cast<const OpDataPoolEx *>(node->user_data));
 
   const TfLiteEvalTensor *input =
       tflite::micro::GetEvalInput(context, node, kPoolingInputTensor);
@@ -1530,7 +1727,7 @@ TfLiteStatus AverageEvalInt8(TfLiteContext *context, TfLiteNode *node) {
 TfLiteStatus MaxEval(TfLiteContext *context, TfLiteNode *node) {
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
-  const OpData &data = *(static_cast<const OpData *>(node->user_data));
+  const OpDataPoolEx &data = *(static_cast<const OpDataPoolEx *>(node->user_data));
 
   TfLiteStatus status = kTfLiteOk;
   const TfLiteEvalTensor *input =
@@ -1562,7 +1759,7 @@ TfLiteStatus MaxEval(TfLiteContext *context, TfLiteNode *node) {
 TfLiteStatus EvalMaxInt8(TfLiteContext *context, TfLiteNode *node) {
   auto *params = reinterpret_cast<TfLitePoolParams *>(node->builtin_data);
 
-  const OpData &data = *(static_cast<const OpData *>(node->user_data));
+  const OpDataPoolEx &data = *(static_cast<const OpDataPoolEx *>(node->user_data));
 
   const TfLiteEvalTensor *input =
       tflite::micro::GetEvalInput(context, node, kPoolingInputTensor);

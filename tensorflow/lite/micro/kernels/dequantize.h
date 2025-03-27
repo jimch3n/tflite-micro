@@ -30,7 +30,19 @@ struct DequantizeOpData {
   int output_shift;
   int32_t output_zero_point;
 };
+#if defined (IA8201)
+struct DequantizeOpDataEx {
+  tflite::DequantizationParams quantization_params;
+  // The scaling factor from input to output (aka the 'real multiplier') can
+  // be represented as a fixed point multiplier plus a left shift.
+  int32_t output_multiplier;
+  int output_shift;
+  int32_t output_zero_point;
 
+  AScalar scale;
+  AScalar zero_point;
+};
+#endif
 TfLiteStatus DequantizePrepare(TfLiteContext* context, TfLiteNode* node);
 
 }  // namespace tflite

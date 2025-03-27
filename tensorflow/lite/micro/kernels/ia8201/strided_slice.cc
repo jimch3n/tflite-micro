@@ -18,7 +18,7 @@ limitations under the License.
 #if 1  // ndef REMOVE_REFOP_SUPPORT
 #include "tensorflow/lite/kernels/internal/reference/strided_slice.h"
 #endif
-#include <cmath>
+#include <cstdint>
 #include <cstring>
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -28,28 +28,27 @@ limitations under the License.
 #include "tensorflow/lite/kernels/op_macros.h"
 
 #include "tensorflow/lite/micro/kernels/kernel_util.h"
+
+#include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_utils.h"
 #include "tensorflow/lite/micro/kernels/ia8201/mvm_helper.h"
+#include "tensorflow/lite/micro/kernels/strided_slice.h"
 namespace tflite {
 namespace {
-// namespace micro {
-// namespace strided_slice {
-
-constexpr int kInputTensor = 0;
-constexpr int kBeginTensor = 1;
-constexpr int kEndTensor = 2;
-constexpr int kStridesTensor = 3;
-constexpr int kOutputTensor = 0;
 
 struct StridedSliceContext {
   StridedSliceContext(TfLiteContext* context, TfLiteNode* node) {
     params = reinterpret_cast<TfLiteStridedSliceParams*>(node->builtin_data);
     micro_context = GetMicroContext(context);
-    input = micro_context->AllocateTempInputTensor(node, kInputTensor);
-    begin = micro_context->AllocateTempInputTensor(node, kBeginTensor);
-    end = micro_context->AllocateTempInputTensor(node, kEndTensor);
-    strides = micro_context->AllocateTempInputTensor(node, kStridesTensor);
-    output = micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+    input =
+        micro_context->AllocateTempInputTensor(node, kStridedSliceInputTensor);
+    begin =
+        micro_context->AllocateTempInputTensor(node, kStridedSliceBeginTensor);
+    end = micro_context->AllocateTempInputTensor(node, kStridedSliceEndTensor);
+    strides = micro_context->AllocateTempInputTensor(
+        node, kStridedSliceStridesTensor);
+    output = micro_context->AllocateTempOutputTensor(node,
+                                                     kStridedSliceOutputTensor);
     dims = NumDimensions(input);
   }
   ~StridedSliceContext() {
@@ -68,182 +67,267 @@ struct StridedSliceContext {
   TfLiteTensor* output;
   int dims;
 };
-struct StridedSliceOpData {
-  tflite::StridedSliceParams op_params;
-  int opt_constraint;
-  int src_offset;
-  // uint16_t* srcIdx;
-};
-// This Op only supports 1-4D cases and since we use the reference 4D
-// implementation, the 1-3D tensors are mapped to 4D.
-const int kMaxDim = 4;
-// input 1x10x40 -> output -> 1x7x40
-template <typename T>
-static void SlicedCopyOptOffset(const T* src, T* dst, int nElement) {
-  block_copy_bytes((int8_t*)dst, (int8_t*)src, sizeof(T) * nElement);
-}
-tflite::StridedSliceParams BuildStridedSliceParams(
-    StridedSliceContext* op_context, tflite::StridedSliceParams& op_params) {
-  op_params.start_indices_count = op_context->dims;
-  op_params.stop_indices_count = op_context->dims;
-  op_params.strides_count = op_context->dims;
 
-  for (int i = 0; i < op_context->dims; ++i) {
-    op_params.start_indices[i] = GetTensorData<int32_t>(op_context->begin)[i];
-    op_params.stop_indices[i] = GetTensorData<int32_t>(op_context->end)[i];
-    op_params.strides[i] = GetTensorData<int32_t>(op_context->strides)[i];
+
+int32_t ia8201_strided_slice_int8(int8_t* __restrict__ p_out,
+  const   int8_t* __restrict__ p_inp,
+  int32_t start_0, int32_t stop_0,
+  int32_t start_1, int32_t stop_1,
+  int32_t start_2, int32_t stop_2,
+  int32_t start_3, int32_t stop_3,
+  int32_t start_4, int32_t stop_4,
+  int32_t stride_0, int32_t stride_1,
+  int32_t stride_2, int32_t stride_3, int32_t stride_4,
+  int32_t dims_1, int32_t dims_2,
+  int32_t dims_3, int32_t dims_4)
+{
+  /* NULL pointer checks */
+  ARG_CHK_PTR(p_out, -1);
+  ARG_CHK_PTR(p_inp, -1);
+
+  /* Pointer alignment checks */
+  ARG_CHK_ALIGN(p_out, sizeof(int8_t), -1);
+  ARG_CHK_ALIGN(p_inp, sizeof(int8_t), -1);
+
+  /* Invalid input checks */
+  ARG_CHK_COND(((dims_1 <= 0) || (dims_2 <= 0) || (dims_3 <= 0) || (dims_4 <= 0)), -1);
+  ARG_CHK_COND(((stride_0 == 0) || (stride_1 == 0) || (stride_2 == 0) || (stride_3 == 0) || (stride_4 == 0)), -1);
+  ARG_CHK_COND(((stride_0 != 1) || (start_0 != 0) || (stop_0 != 1)), -1); /* TFLM reference Op only supports upto 4D cases*/
+  /* Below conditions are derived from TFLM ref implementation */
+  if (stride_1 > 0)
+  {
+    ARG_CHK_COND(((start_1 < 0) || (start_1 > dims_1) || (stop_1 < 0) || (stop_1 > dims_1)), -1);
+  }
+  else
+  {
+    ARG_CHK_COND(((start_1 < -1) || (start_1 > (dims_1 - 1)) || (stop_1 < -1) || (stop_1 > (dims_1 - 1))), -1);
+  }
+  if (stride_2 > 0)
+  {
+    ARG_CHK_COND(((start_2 < 0) || (start_2 > dims_2) || (stop_2 < 0) || (stop_2 > dims_2)), -1);
+  }
+  else
+  {
+    ARG_CHK_COND(((start_2 < -1) || (start_2 > (dims_2 - 1)) || (stop_2 < -1) || (stop_2 > (dims_2 - 1))), -1);
+  }
+  if (stride_3 > 0)
+  {
+    ARG_CHK_COND(((start_3 < 0) || (start_3 > dims_3) || (stop_3 < 0) || (stop_3 > dims_3)), -1);
+  }
+  else
+  {
+    ARG_CHK_COND(((start_3 < -1) || (start_3 > (dims_3 - 1)) || (stop_3 < -1) || (stop_3 > (dims_3 - 1))), -1);
+  }
+  if (stride_4 > 0)
+  {
+    ARG_CHK_COND(((start_4 < 0) || (start_4 > dims_4) || (stop_4 < 0) || (stop_4 > dims_4)), -1);
+  }
+  else
+  {
+    ARG_CHK_COND(((start_4 < -1) || (start_4 > (dims_4 - 1)) || (stop_4 < -1) || (stop_4 > (dims_4 - 1))), -1);
   }
 
-  op_params.begin_mask = op_context->params->begin_mask;
-  op_params.ellipsis_mask = 0;
-  op_params.end_mask = op_context->params->end_mask;
-  op_params.new_axis_mask = 0;
-  op_params.shrink_axis_mask = op_context->params->shrink_axis_mask;
-  return op_params;
+  int i0, i1, i2, i3, i4;
+  int a1 = dims_1 * dims_2 * dims_3 * dims_4;
+  int a2 = dims_2 * dims_3 * dims_4;
+  int a3 = dims_3 * dims_4;
+  int a4 = dims_4;
+
+  if ((stride_0 == 1) && (stride_1 == 1) && (stride_2 == 1) && (stride_3 == 1) && (stride_4 == 1))
+  {
+    int start_0_a1 = start_0 * a1;
+    int start_1_a2 = start_1 * a2;
+    int start_2_a3 = start_2 * a3;
+    int start_3_a4 = start_3 * a4;
+
+    int stride_0_a1 = a1;
+    int stride_1_a2 = a2;
+    int stride_2_a3 = a3;
+    int stride_3_a4 = a4;
+
+    int stop_2_start_2_a3 = (stop_2 - start_2) * a3;
+    int stop_3_start_3_a4 = (stop_3 - start_3) * a4;
+    int stop_4_start_4 = (stop_4 - start_4);
+
+    int8_t* p_inp0 = (int8_t*)p_inp + (start_0_a1);
+
+    for (i0 = start_0; i0 < stop_0; i0++)
+    {
+      int8_t* p_inp1 = p_inp0 + (start_1_a2);
+      for (i1 = start_1; i1 < stop_1; i1++)
+      {
+        int8_t* p_inp2 = p_inp1 + (start_2_a3);
+        if ((start_3 == 0) && (start_4 == 0) && (stop_3 == dims_3) && (stop_4 == dims_4))
+        {
+          //xa_nn_memcpy((void*)p_out, (void*)p_inp2, stop_2_start_2_a3);
+          block_copy_bytes(p_out, p_inp2, stop_2_start_2_a3);
+          p_out += stop_2_start_2_a3;
+        }
+        else
+        {
+          for (i2 = start_2; i2 < stop_2; i2++)
+          {
+            int8_t* p_inp3 = p_inp2 + (start_3_a4);
+            if ((start_4 == 0) && (stop_4 == dims_4))
+            {
+              block_copy_bytes((int8_t*)p_out, (int8_t*)p_inp3, stop_3_start_3_a4);
+              p_out += stop_3_start_3_a4;
+            }
+            else
+            {
+              for (i3 = start_3; i3 < stop_3; i3++)
+              {
+                int8_t* p_inp4 = p_inp3 + start_4;
+                block_copy_bytes((int8_t*)p_out, (int8_t*)p_inp4, stop_4_start_4);
+                p_out += stop_4_start_4;
+                p_inp3 += stride_3_a4;
+              } // for i3
+            }
+            p_inp2 += stride_2_a3;
+          } // for i2
+        }
+        p_inp1 += stride_1_a2;
+      } //for i1
+      p_inp0 += stride_0_a1;
+    } //for i0
+  }
+  else
+  {
+    /* ceil((stop - start) / stride) */
+    int i0_cnt = ((stop_0 - start_0 + (stride_0 - (stride_0 > 0 ? 1 : -1))) / stride_0);
+    int i1_cnt = ((stop_1 - start_1 + (stride_1 - (stride_1 > 0 ? 1 : -1))) / stride_1);
+    int i2_cnt = ((stop_2 - start_2 + (stride_2 - (stride_2 > 0 ? 1 : -1))) / stride_2);
+    int i3_cnt = ((stop_3 - start_3 + (stride_3 - (stride_3 > 0 ? 1 : -1))) / stride_3);
+    int i4_cnt = ((stop_4 - start_4 + (stride_4 - (stride_4 > 0 ? 1 : -1))) / stride_4);
+
+    i0_cnt = i0_cnt < 0 ? 0 : i0_cnt;
+    i1_cnt = i1_cnt < 0 ? 0 : i1_cnt;
+    i2_cnt = i2_cnt < 0 ? 0 : i2_cnt;
+    i3_cnt = i3_cnt < 0 ? 0 : i3_cnt;
+    i4_cnt = i4_cnt < 0 ? 0 : i4_cnt;
+
+    int start_0_a1 = start_0 * a1;
+    int start_1_a2 = start_1 * a2;
+    int start_2_a3 = start_2 * a3;
+    int start_3_a4 = start_3 * a4;
+
+    int stride_0_a1 = stride_0 * a1;
+    int stride_1_a2 = stride_1 * a2;
+    int stride_2_a3 = stride_2 * a3;
+    int stride_3_a4 = stride_3 * a4;
+
+    int stop_2_start_2_a3 = (stop_2 - start_2) * a3;
+    int stop_3_start_3_a4 = (stop_3 - start_3) * a4;
+    int stop_4_start_4 = (stop_4 - start_4);
+
+    int8_t* p_inp0 = (int8_t*)p_inp + (start_0_a1);
+    for (i0 = 0; i0 < i0_cnt; i0++)
+    {
+      int8_t* p_inp1 = p_inp0 + (start_1_a2);
+      for (i1 = 0; i1 < i1_cnt; i1++)
+      {
+        int8_t* p_inp2 = p_inp1 + (start_2_a3);
+        if ((stride_2 == 1) && (stride_3 == 1) && (stride_4 == 1) && (start_3 == 0) && (start_4 == 0) && (stop_3 == dims_3) && (stop_4 == dims_4))
+        {
+          block_copy_bytes((int8_t*)p_out, (int8_t*)p_inp2, stop_2_start_2_a3);
+          p_out += stop_2_start_2_a3;
+        }
+        else
+        {
+          for (i2 = 0; i2 < i2_cnt; i2++)
+          {
+            int8_t* p_inp3 = p_inp2 + (start_3_a4);
+            if ((stride_3 == 1) && (stride_4 == 1) && (start_4 == 0) && (stop_4 == dims_4))
+            {
+              block_copy_bytes((int8_t*)p_out, (int8_t*)p_inp3, stop_3_start_3_a4);
+              p_out += stop_3_start_3_a4;
+            }
+            else
+            {
+              for (i3 = 0; i3 < i3_cnt; i3++)
+              {
+                int8_t* p_inp4 = p_inp3 + start_4;
+                if (stride_4 == 1)
+                {
+                  block_copy_bytes((int8_t*)p_out, (int8_t*)p_inp4, stop_4_start_4);
+                  p_out += stop_4_start_4;
+                }
+                else
+                {
+                  int8_t d1;
+                  for (i4 = 0; i4 < i4_cnt; i4++)
+                  {
+                    d1 = *p_inp4;
+                    *p_out++ = d1;
+                    p_inp4 += (stride_4 * sizeof(int8_t));
+                  } //for i4
+                }
+                p_inp3 += stride_3_a4;
+              } // for i3
+            }
+            p_inp2 += stride_2_a3;
+          } // for i2
+        }
+        p_inp1 += stride_1_a2;
+      } //for i1
+      p_inp0 += stride_0_a1;
+    } //for i0
+  }
+  return 0;
 }
 
-// Processes the indexing tensors (begin, end and strides) to resize the
-// output tensor. This function is callable from both Prepare() and Eval() as
-// long as the caller ensures the indexing tensors are present.
-TfLiteStatus CheckOutputSize(TfLiteContext* context,
-                             StridedSliceContext* op_context) {
+
+#if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
+void StridedSlice_int8(const tflite::StridedSliceParams& op_params,
+  const RuntimeShape& unextended_input_shape,
+  const int8_t* input_data,
+  const RuntimeShape& unextended_output_shape,
+  int8_t* output_data) {
   using ::tflite::strided_slice::StartForAxis;
   using ::tflite::strided_slice::StopForAxis;
-  TfLiteIntArray* output_shape = op_context->output->dims;
-  int shape_size = 0;
-  // from external
-  tflite::StridedSliceParams op_params;  // auto op_params = ;
-  BuildStridedSliceParams(op_context, op_params);
-  auto input_shape = GetTensorShape(op_context->input);
-  for (int idx = 0; idx < op_context->dims; ++idx) {
-    int32_t stride = GetTensorData<int32_t>(op_context->strides)[idx];
-    TF_LITE_ENSURE_MSG(context, stride != 0, "stride value has to be non-zero");
-    int32_t begin = StartForAxis(op_params, input_shape, idx);
-    int32_t end = StopForAxis(op_params, input_shape, idx, begin);
 
-    // When shrinking an axis, the end position does not matter (and can be
-    // incorrect when negative indexing is used, see Issue #19260). Always use
-    // begin + 1 to generate a length 1 slice, since begin has
-    // already been adjusted for negative indices by StartForAxis.
-    const bool shrink_axis = op_context->params->shrink_axis_mask & (1 << idx);
-    if (shrink_axis) {
-      end = begin + 1;
-    }
+  //ruy::profiler::ScopeLabel label("StridedSlice");
 
-    // This is valid for both positive and negative strides
-    int32_t dim_shape = std::ceil((end - begin) / static_cast<float>(stride));
-    dim_shape = dim_shape < 0 ? 0 : dim_shape;
-    if (!shrink_axis) {
-      TF_LITE_ENSURE_EQ(context, output_shape->data[shape_size], dim_shape);
-      shape_size++;
-    }
-  }
-  TF_LITE_ENSURE_EQ(context, output_shape->size, shape_size);
-  return kTfLiteOk;
+  // Note that the output_shape is not used herein.
+  tflite::StridedSliceParams params_copy = op_params;
+
+  TFLITE_DCHECK_LE(unextended_input_shape.DimensionsCount(), 5);
+  TFLITE_DCHECK_LE(unextended_output_shape.DimensionsCount(), 5);
+  const RuntimeShape input_shape =
+    RuntimeShape::ExtendedShape(5, unextended_input_shape);
+  const RuntimeShape output_shape =
+    RuntimeShape::ExtendedShape(5, unextended_output_shape);
+
+  // Reverse and pad to 5 dimensions because that is what the runtime code
+  // requires (ie. all shapes must be 5D and are given backwards).
+  ::tflite::strided_slice::StridedSlicePadIndices(&params_copy, 5);
+
+  const int start_0 = StartForAxis(params_copy, input_shape, 0);
+  const int stop_0 = StopForAxis(params_copy, input_shape, 0, start_0);
+  const int start_1 = StartForAxis(params_copy, input_shape, 1);
+  const int stop_1 = StopForAxis(params_copy, input_shape, 1, start_1);
+  const int start_2 = StartForAxis(params_copy, input_shape, 2);
+  const int stop_2 = StopForAxis(params_copy, input_shape, 2, start_2);
+  const int start_3 = StartForAxis(params_copy, input_shape, 3);
+  const int stop_3 = StopForAxis(params_copy, input_shape, 3, start_3);
+  const int start_4 = StartForAxis(params_copy, input_shape, 4);
+  const int stop_4 = StopForAxis(params_copy, input_shape, 4, start_4);
+
+  ia8201_strided_slice_int8(output_data, input_data, static_cast<int>(start_0),
+    static_cast<int>(stop_0), static_cast<int>(start_1),
+    static_cast<int>(stop_1), static_cast<int>(start_2),
+    static_cast<int>(stop_2), static_cast<int>(start_3),
+    static_cast<int>(stop_3), static_cast<int>(start_4),
+    static_cast<int>(stop_4), params_copy.strides[0],
+    params_copy.strides[1], params_copy.strides[2],
+    params_copy.strides[3], params_copy.strides[4],
+    input_shape.Dims(1), input_shape.Dims(2),
+    input_shape.Dims(3), input_shape.Dims(4));
 }
+#endif  // defined(HIFI3) || defined(HIFI4) || defined(HIFI5)
 
-void* Init(TfLiteContext* context, const char* buffer, size_t length) {
-  TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(StridedSliceOpData));
-}
 
-TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
-  TFLITE_DCHECK(node->user_data != nullptr);
-  StridedSliceOpData* op_data =
-      static_cast<StridedSliceOpData*>(node->user_data);
-  // StridedSliceParams* op_params2 =
-  //     static_cast<StridedSliceParams*>(node->user_data);
-
-  // pOpStridedSliceData->op_params = op_params;
-  TF_LITE_ENSURE_EQ(context, NumInputs(node), 4);
-  TF_LITE_ENSURE_EQ(context, NumOutputs(node), 1);
-  StridedSliceContext op_context(context, node);
-  TF_LITE_ENSURE_MSG(context, op_context.dims <= kMaxDim,
-                     "input dim should not exceed 4");
-  // auto params =
-  tflite::StridedSliceParams params;
-  BuildStridedSliceParams(&op_context, params);
-  memcpy(&op_data->op_params, &params, sizeof(StridedSliceParams));
-  // allocate persist op data to store opt_context
-
-  // pOpStridedSliceData->op_params = op_params;
-#if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
-
-  // check special case begin 0, x, 0,
-  //                    end  0, 0, 0
-  //                    strides 1, 1, 1
-  // CROP case from source at 2 dim.
-
-  // able to satisfied optimization condition
-  auto input_shape = GetTensorShape(op_context.input);
-  auto output_shape = GetTensorShape(op_context.output);
-  // int output_size = ElementCount(*op_context.output->dims);
-
-  op_data->opt_constraint = 0;
-  // op_data->srcIdx = NULL;
-
-  int all_strides_one = 1;
-  for (int ii = 0; ii < params.strides_count; ii++) {
-    if (1 != params.strides[ii]) {
-      all_strides_one = 0;
-      break;
-    }
-  }
-  // linear copy: FIXME to a generic copy and fast
-  if (all_strides_one) {
-    // type 1: dim = 3,
-    // begin: 0, x, 0 , x < 0
-    // end: 0, 0, 0
-    if (params.start_indices_count == 3 && params.stop_indices_count == 3 &&
-        (params.stop_indices[0] == 0 && params.stop_indices[1] == 0 &&
-         params.stop_indices[2] == 0 && params.start_indices[0] == 0 &&
-         params.start_indices[1] < 0 && params.start_indices[2] == 0)) {
-      op_data->opt_constraint = 1;
-      op_data->src_offset =
-          (input_shape.Dims(1) + params.start_indices[1]) * input_shape.Dims(2);
-
-    }
-    // type 2: dim = 3,
-    // begin: 0, x, 0
-    // end:   0, y, 0
-    else if (params.start_indices_count == 3 &&
-             params.stop_indices_count == 3 &&
-             (params.stop_indices[0] == 0 && params.stop_indices[2] == 0 &&
-              params.start_indices[0] == 0 && params.start_indices[2] == 0)) {
-      op_data->opt_constraint = 2;
-      op_data->src_offset = (params.start_indices[1]) * input_shape.Dims(2);
-    }
-// type 3: dim = 4,
-// begin: 0, x, 0, 0
-// end:   0, y, 0, y
-#if 0
-      else if (params.start_indices_count == 4 && params.stop_indices_count == 4 &&
-              (params.stop_indices[0] == 0  && params.stop_indices[2] == 0 &&
-               params.start_indices[0] == 0 && params.start_indices[2] == 0 && params.start_indices[3] == 0))
-      {
-          op_data->opt_constraint =3;
-          op_data->src_offset = ( params.start_indices[1]) * input_shape.Dims(3);
-      }
-#endif
-  }
-  KN_PRINTD(op_data->opt_constraint);
-  // TODO: type 3 begin 0,0,0,0
-  //         end 0 1, 0, 1
-  //         stride 1, 1, 1, 1
-  // else
-  //#endif
-  //{
-  //    op_data->srcIdx = (uint16_t*)context->AllocatePersistentBuffer(context,
-  //        sizeof(uint16_t) * output_size);
-  // }
-#endif
-#if 0
-  
-#endif
-  return CheckOutputSize(context, &op_context);
-}
-
-TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus StridedSliceEval(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const StridedSliceOpData* op_data =
       (static_cast<const StridedSliceOpData*>(node->user_data));
@@ -252,9 +336,9 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   //    *(static_cast<const StridedSliceParams*>(node->user_data));
 
   const TfLiteEvalTensor* input =
-      tflite::micro::GetEvalInput(context, node, kInputTensor);
+      tflite::micro::GetEvalInput(context, node, kStridedSliceInputTensor);
   TfLiteEvalTensor* output =
-      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+      tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
   switch (output->type) {
     case kTfLiteFloat32:
 
@@ -299,9 +383,10 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       break;
 #endif
     case kTfLiteInt8:
-      KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(input),
-                       ElementCount(*input->dims));
-#if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
+      KN_PRINTD(op_data->opt_constraint);
+      KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input),
+                       ElementCount(*input->dims),1024);
+#if 0 //defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
 
       if (op_data->opt_constraint > 0) {
         const int8_t* Src =
@@ -319,11 +404,20 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 #endif
 
       {
+        // new opt without constriant
+#if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
+        StridedSlice_int8(
+          op_params, tflite::micro::GetTensorShape(input),
+          tflite::micro::GetTensorData<int8_t>(input),
+          tflite::micro::GetTensorShape(output),
+          tflite::micro::GetTensorData<int8_t>(output));
+#else
         reference_ops::StridedSlice(
             op_params, tflite::micro::GetTensorShape(input),
             tflite::micro::GetTensorData<int8_t>(input),
             tflite::micro::GetTensorShape(output),
             tflite::micro::GetTensorData<int8_t>(output));
+#endif
       }
       KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output),
                        ElementCount(*output->dims));
@@ -331,7 +425,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       // REMOVE SAVE CODE SIZE
     case kTfLiteFloat16:
 
-#if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
+#if 0 //defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
       KN_PRINTD(op_data->opt_constraint);
       if (op_data->opt_constraint > 0) {
         const int16_t* Src =
@@ -387,7 +481,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 // multiple evaluation ffunction to register correct one to saving code size.
 // since template cost around 3k for each type
 
-TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus StridedSliceEvalFloat32(TfLiteContext* context, TfLiteNode* node) {
   const StridedSliceOpData* op_data =
       (static_cast<const StridedSliceOpData*>(node->user_data));
 
@@ -395,9 +489,9 @@ TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
   //    *(static_cast<const StridedSliceParams*>(node->user_data));
 
   const TfLiteEvalTensor* input =
-      tflite::micro::GetEvalInput(context, node, kInputTensor);
+      tflite::micro::GetEvalInput(context, node, kStridedSliceInputTensor);
   TfLiteEvalTensor* output =
-      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+      tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
 
   if (output->type != kTfLiteFloat32) {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
@@ -437,15 +531,15 @@ TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 #if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
-TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus StridedSliceEvalInt8(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const StridedSliceParams& op_params =
       *(static_cast<const StridedSliceParams*>(node->user_data));
 
   const TfLiteEvalTensor* input =
-      tflite::micro::GetEvalInput(context, node, kInputTensor);
+      tflite::micro::GetEvalInput(context, node, kStridedSliceInputTensor);
   TfLiteEvalTensor* output =
-      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+      tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
   if (output->type != kTfLiteInt8) {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(input->type), input->type);
@@ -458,15 +552,15 @@ TfLiteStatus EvalInt8(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 
-TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus StridedSliceEvalInt16(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   const StridedSliceParams& op_params =
       *(static_cast<const StridedSliceParams*>(node->user_data));
 
   const TfLiteEvalTensor* input =
-      tflite::micro::GetEvalInput(context, node, kInputTensor);
+      tflite::micro::GetEvalInput(context, node, kStridedSliceInputTensor);
   TfLiteEvalTensor* output =
-      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+      tflite::micro::GetEvalOutput(context, node, kStridedSliceOutputTensor);
   if (output->type != kTfLiteInt16) {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(input->type), input->type);
@@ -483,27 +577,27 @@ TfLiteStatus EvalInt16(TfLiteContext* context, TfLiteNode* node) {
 }  // namespace
 
 TFLMRegistration Register_STRIDED_SLICE() {
-  return tflite::micro::RegisterOp(Init,
-                                   /*prepare=*/Prepare,
-                                   /*invoke=*/Eval);
+  return tflite::micro::RegisterOp(StridedSliceInit,
+                                   /*prepare=*/StridedSlicePrepare,
+                                   /*invoke=*/StridedSliceEval);
 }
 
 TFLMRegistration Register_STRIDED_SLICE_FLOAT32() {
-  return tflite::micro::RegisterOp(Init,
-                                   /*prepare=*/Prepare,
-                                   /*invoke=*/EvalFloat32);
+  return tflite::micro::RegisterOp(StridedSliceInit,
+                                   /*prepare=*/StridedSlicePrepare,
+                                   /*invoke=*/StridedSliceEvalFloat32);
 }
 #if defined(DMX1A_STRIDED_SLICE_OPT) || defined(HMD1A_STRIDED_SLICE_OPT)
 TFLMRegistration Register_STRIDED_SLICE_INT8() {
-  return tflite::micro::RegisterOp(Init,
-                                   /*prepare=*/Prepare,
-                                   /*invoke=*/EvalInt8);
+  return tflite::micro::RegisterOp(StridedSliceInit,
+                                   /*prepare=*/StridedSlicePrepare,
+                                   /*invoke=*/StridedSliceEvalInt8);
 }
 
 TFLMRegistration Register_STRIDED_SLICE_INT16() {
-  return tflite::micro::RegisterOp(Init,
-                                   /*prepare=*/Prepare,
-                                   /*invoke=*/EvalInt16);
+  return tflite::micro::RegisterOp(StridedSliceInit,
+                                   /*prepare=*/StridedSlicePrepare,
+                                   /*invoke=*/StridedSliceEvalInt16);
 }
 #endif
 //}  // namespace micro

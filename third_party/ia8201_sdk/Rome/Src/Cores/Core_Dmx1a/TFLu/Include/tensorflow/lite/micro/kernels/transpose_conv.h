@@ -23,6 +23,19 @@ limitations under the License.
 
 namespace tflite {
 
+// For the TfLite transpose_conv implementation, input tensor 0 corresponds to
+// the OutputShapeTensor. However, since TFLM does not support dynamic tensors,
+// the TFLM implementation ignores input tensor 0 and the only inputs we care
+// about are kFilterTensor, kInputTensor and kBiasTensor.
+constexpr int kTransposeConvFilterTensor = 1;
+constexpr int kTransposeConvInputTensor = 2;
+constexpr int kTransposeConvBiasTensor = 3;
+constexpr int kTransposeConvOutputTensor = 0;
+
+// Conv is quantized along dimension 0:
+// https://www.tensorflow.org/lite/performance/quantization_spec
+constexpr int kTransposeConvQuantizedDimension = 0;
+
 // This is the most generic TFLMRegistration. The actual supported types
 // may still be target dependent. The only requirement is that every
 // implementation (reference or optimized) must define this function.

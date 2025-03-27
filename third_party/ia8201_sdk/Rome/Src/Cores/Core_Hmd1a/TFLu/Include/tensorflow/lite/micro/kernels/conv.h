@@ -1,4 +1,4 @@
-/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2024 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,6 +49,14 @@ struct OpDataConv {
   // A buffer used to store unpacked filter values. This is used if the source
   // tensor is of n-bit precision that cannot be easily processed by kernels.
   int filter_buffer_index;
+
+#ifdef USE_TFLM_COMPRESSION
+
+  // scratch buffers for compressed tensors
+  int weights_scratch_index;
+  int bias_scratch_index;
+
+#endif  // USE_TFLM_COMPRESSION
 };
 
 extern const int kConvInputTensor;
@@ -83,21 +91,16 @@ TfLiteStatus ConvPrepare(TfLiteContext* context, TfLiteNode* node);
 // implementation (reference or optimized) must define this function.
 TFLMRegistration Register_CONV_2D();
 
-#if defined(XTENSA)
+#if defined(XTENSA) || defined(IA8201) || defined(IA700)
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8 activations and int8 weights and always calls the reference
 // implementation.
 TFLMRegistration Register_CONV_2D_INT8REF();
-#else
-#if defined(IA700) || defined(IA8201)
-// Returns a TfLiteRegistration struct for kernel variant that only supports
-// int8 inputs and outputs.
-TFLMRegistration Register_CONV_2D_INT8REF();
+
 #else
 inline TFLMRegistration Register_CONV_2D_INT8REF() {
   return Register_CONV_2D();
 }
-#endif
 #endif  // defined(XTENSA)
 
 #if defined(CMSIS_NN)
@@ -121,17 +124,8 @@ TFLMRegistration Register_CONV_2D_INT8();
 TFLMRegistration Register_CONV_2D_INT16();
 
 #else
-#if defined(IA700) || defined(IA8201)
-// Returns a TfLiteRegistration struct for kernel variant that only supports
-// int8 inputs and outputs.
-TFLMRegistration Register_CONV_2D_INT8REF();
-inline TFLMRegistration Register_CONV_2D_INT8() {
-  return Register_CONV_2D_INT8REF();
-}
-#else
 inline TFLMRegistration Register_CONV_2D_INT8() { return Register_CONV_2D(); }
 
-#endif
 inline TFLMRegistration Register_CONV_2D_INT16() { return Register_CONV_2D(); }
 #endif  // defined(CMSIS_NN) || defined(XTENSA)
 

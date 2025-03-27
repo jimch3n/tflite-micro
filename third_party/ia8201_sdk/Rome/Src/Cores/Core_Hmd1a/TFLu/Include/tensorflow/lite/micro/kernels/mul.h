@@ -67,7 +67,7 @@ TFLMRegistration Register_MUL();
 TFLMRegistration Register_MUL_INT8();
 #else
 // Fallback registration
-inline TFLMRegistration Register_MUL_INT8() { return Register_MUL(); }
+//inline TFLMRegistration Register_MUL_INT8() { return Register_MUL(); }
 #endif
 }  // namespace tflite
 

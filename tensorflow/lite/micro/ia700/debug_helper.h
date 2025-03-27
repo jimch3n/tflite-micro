@@ -209,6 +209,17 @@ limitations under the License.
     }                                                                \
     putchar('\n');                                                   \
   } while (0)
+#define KN_PRINTD_SIZE(BUF, SIZE)                                 \
+  do {                                                               \
+    int32_t *pBuf = (int32_t *)BUF;                                  \
+    printf("%s: %p size:%d %s:%d\n", #BUF, pBuf, SIZE, __FUNCTION__, \
+           __LINE__);                                                \
+    for (int ii = 0; ii < (int)SIZE; ii++) {                         \
+      printf("[%3d]: %08d %c", ii, pBuf[ii],                         \
+             ((ii + 1) & 7) == 0 ? '\n' : ' ');                      \
+    }                                                                \
+    putchar('\n');                                                   \
+  } while (0)
 #define KN_PRINT_Q63_SIZE(BUF, SIZE)                                 \
   do {                                                               \
     int64_t *pBuf = (int64_t *)BUF;                                  \
@@ -362,6 +373,7 @@ limitations under the License.
 #define KN_PRINT_Q15_SIZE(BUF, SIZE)
 #define KN_PRINT_CRC(BUF, SIZE)
 #define KN_PRINT_Q31_SIZE(BUF, SIZE)
+#define KN_PRINTD_SIZE(BUF, SIZE)   
 #define KN_PRINT_Q63_SIZE(BUF, SIZE)
 #define KN_PRINTAFLT(FTL)
 #define KN_TLFM_PRINT_VR128(VR_IN) (static_cast<void>(0))
