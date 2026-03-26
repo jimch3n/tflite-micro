@@ -111,6 +111,7 @@ TFLMRegistration Register_MAXIMUM();
 TFLMRegistration Register_MEAN();
 #if defined(IA8201)  || defined(IA700)
 TFLMRegistration Register_MEAN_INT8();
+TFLMRegistration Register_MEAN_FLOAT32();
 #endif
 TFLMRegistration Register_MINIMUM();
 TFLMRegistration Register_MIRROR_PAD();

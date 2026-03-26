@@ -65,6 +65,21 @@ typedef enum { VRL = 0, VRH } REG_HALF_t;
 #include "tensorflow/lite/micro/ia700/platform.h"
 
 
+// common xtensa nn check
+// input 1x10x40 -> output -> 1x7x40
+#define ARG_CHK_PTR(_ptr, _err)                                \
+do {                                                                    \
+  if((_ptr) == NULL) return (_err);                                     \
+} while(0)
+#define ARG_CHK_ALIGN(_ptr, _align, _err)                      \
+do {                                                                    \
+  if(((unsigned int)(_ptr) & ((_align) - 1)) != 0) return (_err);       \
+} while(0)
+#define ARG_CHK_COND(_cond, _err)                              \
+do {                                                                    \
+  if((_cond)) return (_err);                                            \
+} while(0)
+
 #define load8x2_vr_postI_unalign(VRX, ADDR, POSTI) \
   load8x1_vr_postI(VRX, ADDR, POSTI, VRQ0);        \
   load8x1_vr_postI(VRX, ADDR, POSTI, VRQ1);
@@ -285,6 +300,12 @@ int ConvIm2ColIndex(const ds_conv2d_layer_t& conv2d, int i_out_x, int i_out_y,
 int ConvIm2ColIndex(const ds_conv2d_layer_t& conv2d, int i_out_x, int i_out_y,
                     im2col_ex_idx* im2col_tab);
 
+
+// inline fill bytes into 32_bit integer
+static inline uint32_t Bytex4(uint8_t input) {
+  return (input << 24) | (input << 16) |
+    (input << 8) | input;
+}
 static inline void im2col_padding(int8_t* dst, const int8_t* src, int32_t im_x,
                                   int filter_width, int32_t len_x,
                                   int32_t len_y, int32_t in_channel,

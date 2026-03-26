@@ -29,6 +29,7 @@ extern const int kActivationsOutputTensor;
 
 struct ReluOpData {
   ReluParams params;
+
 };
 
 struct Relu6OpData {

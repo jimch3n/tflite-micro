@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="HemiLite_RemoveRefOps|Win32">
+      <Configuration>HemiLite_RemoveRefOps</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="HemiLite|Win32">
+      <Configuration>HemiLite</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\fake_micro_context.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\flatbuffer_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\add_n.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\arg_min_max.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\assign_variable.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\batch_to_space_nd.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\broadcast_args.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\broadcast_to.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\call_once.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\cast.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ceil.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\comparisons.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\cumsum.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\depth_to_space.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\detection_postprocess.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\div.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\elu.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\exp.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\expand_dims.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\fill.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor_div.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor_mod.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\gather.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\gather_nd.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\hard_swish.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\hard_swish_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\add.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\concatenation.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\conv.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\depthwise_conv.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\depthwise_conv_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\dequantize.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\elementwise.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\fully_connected.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\l2norm.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\logistic.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\mul.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\mvm_helper.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\pooling.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\quantize.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\reduce.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\reshape.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\softmax.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\softmax_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\squared_difference.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\strided_slice.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\sub.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\svdf.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\tanh.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\lstm_eval.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\lstm_eval_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\unidirectional_sequence_lstm.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\if.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\kernel_runner.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\kernel_util.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\l2_pool_2d.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\leaky_relu.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\leaky_relu_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logical.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logical_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logistic_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\log_softmax.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\maximum_minimum.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\micro_tensor_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mirror_pad.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mul_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\neg.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\pack.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\pad.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\pooling_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\prelu.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\prelu_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\quantize_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\read_variable.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\resize_bilinear.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\resize_nearest_neighbor.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\round.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\select.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\shape.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_batch_nd.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_depth.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split_v.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\squeeze.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose_conv.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\unpack.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\var_handle.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\while.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\zeros_like.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_helpers.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_allocation_info.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_allocator.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_context.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_log.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_op_resolver.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_profiler.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_resource_variable.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\mock_micro_graph.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\recording_micro_allocator.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\test_helpers.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\test_helper_custom_ops.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\delay.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\dummy_ops.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\energy.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\fft_auto_scale_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\fft_auto_scale_kernel.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_log.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_spectral_subtraction.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_square_root.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\filter_bank_square_root_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\framer.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\irfft.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\overlap_add.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\pcan.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\rfft.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\stacker.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\micro\kernels\window.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\circular_buffer.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\energy.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\fft_auto_scale.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank_log.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank_spectral_subtraction.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\filter_bank_square_root.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\kiss_fft_wrappers\kiss_fft_float.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\kiss_fft_wrappers\kiss_fft_int16.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\kiss_fft_wrappers\kiss_fft_int32.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\log.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\irfft_float.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\irfft_int16.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\irfft_int32.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\max_abs.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\msb_32.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\msb_64.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\overlap_add.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\pcan_argc_fixed.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\rfft_float.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\rfft_int16.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\rfft_int32.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\square_root_32.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\square_root_64.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\signal\src\window.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\flatbuffer_conversions.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\api\tensor_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\core\c\common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\portable_tensor_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\quantization_util.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\reference\comparisons.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\reference\portable_tensor_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\tensor_ctypes.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\internal\tensor_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\kernels\kernel_util.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\non_persistent_arena_buffer_allocator.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\persistent_arena_buffer_allocator.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\recording_single_arena_buffer_allocator.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\arena_allocator\single_arena_buffer_allocator.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia700\debug_log.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia700\micro_time.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia700\platform.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\ia700\system_setup.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\conv_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\embedding_lookup.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ethosu.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\add_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\fully_connected_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\reduce_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\reshape_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\sub_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\svdf_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_planner\greedy_memory_planner.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_planner\linear_memory_planner.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\memory_planner\non_persistent_buffer_planner_shim.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\tflite_bridge\flatbuffer_conversions_bridge.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\tflite_bridge\micro_error_reporter.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\batch_matmul.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_context.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\micro_interpreter_graph.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\compiler\mlir\lite\core\api\error_reporter.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\compiler\mlir\lite\schema\schema_utils.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\hexdump.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\decompress.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\decompress_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\slice.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\strided_slice_common.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\transpose.cc" />
+    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia700\dequantize_common.cc" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{ED554AFB-FDF9-4E3D-8176-FB789E58C362}</ProjectGuid>
+    <RootNamespace>TFLuLib_Shapiro</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite_RemoveRefOps|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='HemiLite|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="tflm-micro-hemilite.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite_RemoveRefOps|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="tflm-micro-hemilite.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SDK_ROOT)\Dist\TFLu\Libs\</OutDir>
+    <IntDir>$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>TFLuLib</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite_RemoveRefOps|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SDK_ROOT)\Dist\TFLu\Libs\</OutDir>
+    <IntDir>$(ProjectName)\$(Configuration)\</IntDir>
+    <TargetName>TFLuLib_tiny</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite|Win32'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <ObjectFileName>$(IntDir)\$(Configuration)\%(RelativeDir)/</ObjectFileName>
+      <ProgramDataBaseFileName>$(OutDir)\$(Configuration)\$(TargetName).pdb</ProgramDataBaseFileName>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='HemiLite_RemoveRefOps|Win32'">
+    <ClCompile>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;DEBUG;REMOVE_REFOP_SUPPORT;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <ObjectFileName>$(IntDir)\%(RelativeDir)/</ObjectFileName>
+    </ClCompile>
+    <Link>
+      <SubSystem>
+      </SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -50,7 +50,7 @@ typedef enum {
   // hybrid
   CONV_OPT_FLT_X_INT8_PW = 8,
 } conv_opt_type;
-struct OpData {
+struct OpDataConvEx {
   struct OpDataConv ConvOp;
   // Index to buffer for optimizations if applicable.
   int buffer_idx;
@@ -69,7 +69,7 @@ struct OpData {
 
   int opt_constraint_float;
   ds_conv2d_layer_t conv2d;
-
+  AScalar *bias_aflt;
   uint32_t sizeScratchIm2Col;
   uint32_t sizeScratchOutput;
 };
@@ -80,7 +80,7 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
 
   // OpDataConv* data = static_cast<OpDataConv*>(node->user_data);
 
-  OpData *data_ex = static_cast<OpData *>(node->user_data);
+  OpDataConvEx *data_ex = static_cast<OpDataConvEx *>(node->user_data);
   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
 
   const auto &params =
@@ -133,9 +133,10 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
                       affine_quantization->zero_point->size);
   }
 
-  TF_LITE_ENSURE_STATUS(CalculateOpDataConv(
-      context, node, params, input_width, input_height, filter_width,
-      filter_height, output_width, output_height, input->type, data));
+  TF_LITE_ENSURE_STATUS(
+      CalculateOpDataConv(context, node, params, input_width, input_height,
+                          filter_width, filter_height, output_width,
+                          output_height, input->type, data));  // FIXED AS
   ds_conv2d_layer_t &conv2d = data_ex->conv2d;
 
   // assign conv2d
@@ -228,8 +229,13 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
           tflite::micro::GetEvalInput(context, node, kConvBiasTensor);
       const int32_t *bias_input =
           tflite::micro::GetTensorData<int32_t>(biasEval);
-      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_input,
+      size_t bias_size = ElementCount(*biasEval->dims);
+      AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
+          context, sizeof(AScalar) * bias_size);
+
+      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_aflt,
                                  output_matVec, 17);
+      data_ex->bias_aflt = bias_aflt;
       tflite::ConvertQ31ToAfloat(data->output_zero_point, data_ex->outputOffset,
                                  17);
 
@@ -382,8 +388,13 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
           tflite::micro::GetEvalInput(context, node, kConvBiasTensor);
       const float *bias = tflite::micro::GetTensorData<float>(biasEval);
       if (bias) {
-        tflite::ConvertIEEEFloatToAfloat(bias, (AScalar *)bias,
-                                         ElementCount(*biasEval->dims));
+              size_t bias_size = ElementCount(*biasEval->dims);
+      AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
+          context, sizeof(AScalar) * bias_size);
+
+        tflite::ConvertIEEEFloatToAfloat(bias, (AScalar *)bias_aflt,
+                                         bias_size);
+      data_ex->bias_aflt = bias_aflt;
       }
     }  // constraint
 #endif
@@ -394,9 +405,242 @@ TfLiteStatus ConvPrepareOpt(TfLiteContext *context, TfLiteNode *node) {
   micro_context->DeallocateTempTfLiteTensor(output);
   return kTfLiteOk;
 }  // namespace
+
+
+TfLiteStatus ConvPrepareInt8Opt2(TfLiteContext *context, TfLiteNode *node) {
+  TFLITE_DCHECK(node->user_data != nullptr);
+  TFLITE_DCHECK(node->builtin_data != nullptr);
+
+  // OpDataConv* data = static_cast<OpDataConv*>(node->user_data);
+
+  OpDataConvEx *data_ex = static_cast<OpDataConvEx *>(node->user_data);
+  OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
+
+  const auto &params =
+      *(static_cast<const TfLiteConvParams *>(node->builtin_data));
+
+  MicroContext *micro_context = GetMicroContext(context);
+
+  TfLiteTensor *output =
+      micro_context->AllocateTempOutputTensor(node, kConvOutputTensor);
+  TF_LITE_ENSURE(context, output != nullptr);
+  TfLiteTensor *input =
+      micro_context->AllocateTempInputTensor(node, kConvInputTensor);
+  TF_LITE_ENSURE(context, input != nullptr);
+  TfLiteTensor *filter =
+      micro_context->AllocateTempInputTensor(node, kConvWeightsTensor);
+  TF_LITE_ENSURE(context, filter != nullptr);
+
+  const int input_width = input->dims->data[2];
+  const int input_height = input->dims->data[1];
+  const int filter_width = filter->dims->data[2];
+  const int filter_height = filter->dims->data[1];
+  const int output_width = output->dims->data[2];
+  const int output_height = output->dims->data[1];
+  if (input->type != kTfLiteInt8)
+  {
+    MicroPrintf("unsupport type: %d\n", input->type);
+    return kTfLiteError;
+  }
+  // Dynamically allocate per-channel quantization parameters.
+  const int num_channels = filter->dims->data[kConvQuantizedDimension];
+  data->per_channel_output_multiplier =
+      static_cast<int32_t *>(context->AllocatePersistentBuffer(
+          context, num_channels * sizeof(int32_t)));
+  data->per_channel_output_shift =
+      static_cast<int32_t *>(context->AllocatePersistentBuffer(
+          context, num_channels * sizeof(int32_t)));
+
+  // All per-channel quantized tensors need valid zero point and scale arrays.
+  if (input->type == kTfLiteInt8 || input->type == kTfLiteInt16) {
+    TF_LITE_ENSURE_EQ(context, filter->quantization.type,
+                      kTfLiteAffineQuantization);
+
+    const auto *affine_quantization =
+        static_cast<TfLiteAffineQuantization *>(filter->quantization.params);
+    TFLITE_DCHECK(affine_quantization != nullptr);
+    TFLITE_DCHECK(affine_quantization->scale != nullptr);
+    TFLITE_DCHECK(affine_quantization->zero_point != nullptr);
+
+    TF_LITE_ENSURE(context,
+                   affine_quantization->scale->size == 1 ||
+                       affine_quantization->scale->size ==
+                           filter->dims->data[kConvQuantizedDimension]);
+    TF_LITE_ENSURE_EQ(context, affine_quantization->scale->size,
+                      affine_quantization->zero_point->size);
+  }
+
+  TF_LITE_ENSURE_STATUS(
+      CalculateOpDataConv(context, node, params, input_width, input_height,
+                          filter_width, filter_height, output_width,
+                          output_height, input->type, data));  // FIXED AS
+  ds_conv2d_layer_t &conv2d = data_ex->conv2d;
+
+  // assign conv2d
+
+  RuntimeShape input_shape = GetTensorShape(input);
+  RuntimeShape output_shape = GetTensorShape(output);
+  RuntimeShape filter_shape = GetTensorShape(filter);
+
+  conv2d.in_y = input_shape.Dims(1);
+  conv2d.in_x = input_shape.Dims(2);
+  conv2d.in_ch = input_shape.Dims(3);
+
+  conv2d.ker_y = filter_shape.Dims(1);
+  conv2d.ker_x = filter_shape.Dims(2);
+
+  conv2d.out_y = output_shape.Dims(1);
+  conv2d.out_x = output_shape.Dims(2);
+  conv2d.out_ch = output_shape.Dims(3);
+
+  conv2d.dilation_y = params.dilation_height_factor;
+  conv2d.dilation_x = params.dilation_width_factor;
+
+  conv2d.stride_y = params.stride_height;
+  conv2d.stride_x = params.stride_width;
+  conv2d.padding_y = data->padding.height;
+  conv2d.padding_x = data->padding.width;
+  conv2d.input_offset = -data->input_zero_point;
+  //    conv2d.filter_offset = -data->filter_zero_point;
+  KN_PRINTD(conv2d.dilation_y);
+  KN_PRINTD(conv2d.dilation_x);
+  if (input->type == kTfLiteInt8) {
+    // Initialize cmsis-nn convolution parameters
+    data_ex->opt_constraint = CONV_OPT_NONE;
+#if defined(HEMILITE_CONV_OPT)
+    int32_t *p_mapped_filter = nullptr;
+
+    const TfLiteEvalTensor *filterEval =
+        tflite::micro::GetEvalInput(context, node, kConvWeightsTensor);
+    const int8_t *filter_input =
+        tflite::micro::GetTensorData<int8_t>(filterEval);
+
+    uint8_t offsetInput = conv2d.input_offset & 0xff;
+    // uint32_t offsetVR=offsetInput;
+    data_ex->input_offset_int8 = (offsetInput << 24) | (offsetInput << 16) |
+                                 (offsetInput << 8) | offsetInput;
+    offsetInput = (data->input_zero_point & 0xff);
+    data_ex->input_offset_int8_neg = (offsetInput << 24) | (offsetInput << 16) |
+                                     (offsetInput << 8) | offsetInput;
+#ifdef ENABLE_DILATION_OPT
+    bool dilation_xy1 = true;  // enable DIALTION
+#else
+    bool dilation_xy1 = (1 == params.dilation_width_factor &&
+                         1 == params.dilation_height_factor);
+#endif
+    KN_PRINTD(dilation_xy1);
+    KN_PRINTD(conv2d.input_offset);
+
+    if ((conv2d.input_offset >= -128 && conv2d.input_offset <= 128) &&
+        dilation_xy1) {
+      data_ex->opt_constraint = CONV_OPT_TYPE1;
+      if ((conv2d.in_ch & 3) == 0) {
+        // aliged 4 byte copy
+        data_ex->opt_constraint = CONV_OPT_TYPE2;  // TODO
+      }else{
+
+        MicroPrintf("conv Error opt type: %d unaligned input channel\n",conv2d.in_ch  );
+        return kTfLiteError;
+      }
+    }
+    if (0 != data_ex->opt_constraint) {
+      const int input_depth = conv2d.in_ch;  // input_shape.Dims(3);
+      const int output_depth = conv2d.out_ch;
+      int32_t output_matVec = output_depth;
+      const int8_t *pfilter_val = &filter_input[0];
+      const int32_t map_coeff_size = tflite::ConvMap8bitCoeffs(
+          NULL, conv2d.ker_y, conv2d.ker_x, NULL, output_depth, input_depth);
+
+      if (!tflite::is_coeffs_mapped(context)) {
+        // const int32_t map_coeff_size = tflite::dmx1a::ConvMap8bitCoeffs(NULL,
+        // conv2d.ker_y, conv2d.ker_x, NULL,  output_depth ,input_depth );
+        p_mapped_filter = (int32_t *)context->AllocatePersistentBuffer(
+            context, map_coeff_size * sizeof(int8_t));
+        if (p_mapped_filter) {
+          tflite::ConvMap8bitCoeffs((int8_t *)p_mapped_filter, conv2d.ker_y,
+                                    conv2d.ker_x, (int8_t *)pfilter_val,
+                                    output_depth, input_depth);
+        }
+      } else {
+        p_mapped_filter = (int32_t *)pfilter_val;
+      }
+
+      data_ex->mapped_filter = p_mapped_filter;
+      const TfLiteEvalTensor *biasEval =
+          tflite::micro::GetEvalInput(context, node, kConvBiasTensor);
+      const int32_t *bias_input =
+          tflite::micro::GetTensorData<int32_t>(biasEval);
+      size_t bias_size = ElementCount(*biasEval->dims);
+      AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
+          context, sizeof(AScalar) * bias_size);
+
+      tflite::ConvertQ31ToAfloat(bias_input, (AScalar *)bias_aflt,
+                                 output_matVec, 17);
+      data_ex->bias_aflt = bias_aflt;
+      tflite::ConvertQ31ToAfloat(data->output_zero_point, data_ex->outputOffset,
+                                 17);
+
+      // data->outputMultiplerPerCh = (AScalar
+      // *)context->AllocatePersistentBuffer(context,
+      // output_matVec*sizeof(AScalar));
+      tflite::ConvertQ31ToAfloat(data->per_channel_output_multiplier,
+                                 (AScalar *)data->per_channel_output_multiplier,
+                                 output_matVec, data->per_channel_output_shift,
+                                 0);
+
+      int buf_size_im2col =
+          ((((conv2d.in_ch * conv2d.ker_x * conv2d.ker_y) + 15) >> 4)
+           << 4);  // get scratch buffer size for optimization
+
+      int32_t buf_size_output =
+          (((conv2d.out_ch + 7) >> 3) << 3) *
+          sizeof(int32_t);  // output store 8 multiple align
+
+      int buf_size_scratch = buf_size_im2col + buf_size_output;
+      data_ex->sizeScratchIm2Col = buf_size_im2col;
+      data_ex->sizeScratchOutput = buf_size_output;
+
+      if (buf_size_scratch > 0) {
+        TF_LITE_ENSURE_STATUS(context->RequestScratchBufferInArena(
+            context, buf_size_scratch, &data_ex->buffer_idx));
+
+      } else {
+        data_ex->buffer_idx = -1;
+      }
+      // prepare ConvInput Offset
+      KN_PRINTD(conv2d.input_offset);
+      if (conv2d.input_offset != 128 && conv2d.input_offset != 0) {
+        int inFCM = conv2d.out_ch;
+        int inFCN = conv2d.ker_x * conv2d.ker_y * conv2d.in_ch;
+        int inFCMA8 = (((inFCM + 7) >> 3) << 3);
+        KN_PRINTD(inFCM);
+        KN_PRINTD(inFCN);
+        int32_t *inputOffsetWithW =
+            (int32_t *)context->AllocatePersistentBuffer(
+                context, inFCMA8 * sizeof(int32_t));
+        data_ex->inputOffsetWithW = inputOffsetWithW;
+
+        MVMInputOffsetPrepare(data_ex->mapped_filter, inputOffsetWithW, inFCM,
+                              inFCN, data_ex->input_offset_int8);
+
+        KN_PRINT_Q31_SIZE(data_ex->inputOffsetWithW, inFCMA8);
+      } else {
+        data_ex->inputOffsetWithW = nullptr;
+      }
+    }  // constraint
+
+#endif
+  }
+
+  micro_context->DeallocateTempTfLiteTensor(filter);
+  micro_context->DeallocateTempTfLiteTensor(input);
+  micro_context->DeallocateTempTfLiteTensor(output);
+  return kTfLiteOk;
+}  // namespace
+
 void *InitConv(TfLiteContext *context, const char *buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataConvEx));
 }
 #if defined(HEMILITE_CONV_OPT)
 
@@ -779,7 +1023,7 @@ int ConvQuantizedInt8PerChInputOffset(
 
 #if defined(HEMILITE_CONV_OPT)
 
-void ConvFloat(const OpData &data_ex, const float *input_data,
+void ConvFloat(const OpDataConvEx &data_ex, const float *input_data,
                const float *filter_data, const float *bias_data,
                float *output_data, const AScalar &act_min,
                const AScalar &act_max)
@@ -859,7 +1103,7 @@ void ConvFloat(const OpData &data_ex, const float *input_data,
   }
 }
 
-void ConvPerChannelPaddingInputOffset(const OpData &data_ex,
+void ConvPerChannelPaddingInputOffset(const OpDataConvEx &data_ex,
                                       const int8_t *input_data,
                                       const int8_t *filter_data,
                                       const int32_t *bias_data,
@@ -939,7 +1183,7 @@ void ConvPerChannelPaddingInputOffset(const OpData &data_ex,
   }
 }
 void ConvPerChannelPadding(
-    const OpData &data_ex, const int8_t *input_data, const int8_t *filter_data,
+    const OpDataConvEx &data_ex, const int8_t *input_data, const int8_t *filter_data,
     const int32_t *bias_data,
     int8_t *output_data,  // uint32_t inputOffset_int8,uint32_t
                           // inputOffset_int8_neg,
@@ -1014,7 +1258,7 @@ void ConvPerChannelPadding(
 
 TfLiteStatus EvalConvFloat(TfLiteContext *context, TfLiteNode *node,
                            const TfLiteConvParams &params,
-                           const OpData &data_ex,
+                           const OpDataConvEx &data_ex,
 
                            const TfLiteEvalTensor *input,
                            const TfLiteEvalTensor *filter,
@@ -1060,7 +1304,7 @@ TfLiteStatus EvalConvFloat(TfLiteContext *context, TfLiteNode *node,
     while (batch) {
       ConvFloat(data_ex, (const float *)pInputLocal,
                 //  (const float *)data_ex.mapped_filter,
-                pFilter, tflite::micro::GetTensorData<float>(bias),
+                pFilter, (const float *)data_ex.bias_aflt,
                 pOutputLocal, afloat_activation_min, afloat_activation_max);
 
       // KN_PRINTD(batch);
@@ -1099,7 +1343,7 @@ TfLiteStatus EvalConvFloat(TfLiteContext *context, TfLiteNode *node,
 }
 TfLiteStatus EvalConvQuantizedPerChannel(
     TfLiteContext *context, TfLiteNode *node, const TfLiteConvParams &params,
-    const OpData &data_ex,
+    const OpDataConvEx &data_ex,
 
     const TfLiteEvalTensor *input, const TfLiteEvalTensor *filter,
     const TfLiteEvalTensor *bias, TfLiteEvalTensor *output,
@@ -1123,7 +1367,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
     const int batches = MatchingDim(tflite::micro::GetTensorShape(input), 0,
                                     tflite::micro::GetTensorShape(output), 0);
     int8_t *p_aligned_scratch = nullptr;
-
+    AScalar *bias_aflt = data_ex.bias_aflt;
     if (data_ex.buffer_idx > -1) {
       p_aligned_scratch =
           (int8_t *)context->GetScratchBuffer(context, data_ex.buffer_idx);
@@ -1149,7 +1393,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
         // KN_PRINT_Q7_SIZE(p_aligned_input,input_conv_depth );
         ConvPerChannelPadding(data_ex, (const int8_t *)pInputLocal,
                               (const int8_t *)data_ex.mapped_filter,
-                              tflite::micro::GetTensorData<int32_t>(bias),
+                              (const int32_t *)bias_aflt,
                               pOutputLocal, sign_in_offset);
       } else
 
@@ -1160,7 +1404,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
         ConvPerChannelPaddingInputOffset(
             data_ex, (const int8_t *)pInputLocal,
             (const int8_t *)data_ex.mapped_filter,
-            tflite::micro::GetTensorData<int32_t>(bias), pOutputLocal,
+            (const int32_t *)bias_aflt, pOutputLocal,
             data_ex.inputOffsetWithW, data_ex.input_offset_int8_neg,
             sign_in_offset);
       }
@@ -1625,7 +1869,7 @@ int ConvFloatKernel16(float *y, const float *x, const TfLiteFloat16 *A,
 
 #if defined(HEMILITE_CONV_OPT)
 
-void ConvFloatInt8(const OpData &data_ex, const float *input_data,
+void ConvFloatInt8(const OpDataConvEx &data_ex, const float *input_data,
                    const int8_t *filter_data, const float *bias_data,
                    float *output_data, const AScalar &act_min,
                    const AScalar &act_max)
@@ -1718,7 +1962,7 @@ void ConvFloatInt8(const OpData &data_ex, const float *input_data,
   }
 }
 
-void ConvFloat16(const OpData &data_ex, const float *input_data,
+void ConvFloat16(const OpDataConvEx &data_ex, const float *input_data,
                  const TfLiteFloat16 *filter_data, const float *bias_data,
                  float *output_data, const AScalar &act_min,
                  const AScalar &act_max)
@@ -1803,7 +2047,7 @@ void ConvFloat16(const OpData &data_ex, const float *input_data,
 #endif
 TfLiteStatus EvalConvFloatInt8(
     TfLiteContext *context, TfLiteNode *node, const TfLiteConvParams &params,
-    const OpData &data_ex, const TfLiteEvalTensor *input,
+    const OpDataConvEx &data_ex, const TfLiteEvalTensor *input,
     const TfLiteEvalTensor *filter, const TfLiteEvalTensor *bias,
     TfLiteEvalTensor *output, TfLiteEvalTensor *im2col) {
   KN_PRINTD(data_ex.opt_constraint_float);
@@ -1840,7 +2084,7 @@ TfLiteStatus EvalConvFloatInt8(
     while (batch) {
       ConvFloatInt8(data_ex, (const float *)pInputLocal,
                     //  (const float *)data_ex.mapped_filter,
-                    pFilter, tflite::micro::GetTensorData<float>(bias),
+                    pFilter, (const float *)data_ex.bias_aflt,
                     pOutputLocal, afloat_activation_min, afloat_activation_max);
 
       // KN_PRINTD(batch);
@@ -1866,7 +2110,7 @@ TfLiteStatus EvalConvFloatInt8(
 
 TfLiteStatus EvalConvFloat16Internal(TfLiteContext *context, TfLiteNode *node,
                                      const TfLiteConvParams &params,
-                                     const OpData &data_ex,
+                                     const OpDataConvEx &data_ex,
 
                                      const TfLiteEvalTensor *input,
                                      const TfLiteEvalTensor *filter,
@@ -1914,7 +2158,7 @@ TfLiteStatus EvalConvFloat16Internal(TfLiteContext *context, TfLiteNode *node,
     while (batch) {
       ConvFloat16(data_ex, (const float *)pInputLocal,
                   //  (const float *)data_ex.mapped_filter,
-                  pFilter, tflite::micro::GetTensorData<float>(bias),
+                  pFilter, (const float *)data_ex.bias_aflt,
                   pOutputLocal, afloat_activation_min, afloat_activation_max);
 
       // KN_PRINTD(batch);
@@ -1954,8 +2198,8 @@ TfLiteStatus EvalConv(TfLiteContext *context, TfLiteNode *node) {
       tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  // const OpData& data = *(static_cast<const OpData*>(node->user_data));
-  const auto &data_ex = *(static_cast<const OpData *>(node->user_data));
+  // const OpDataConvEx& data = *(static_cast<const OpDataConvEx*>(node->user_data));
+  const auto &data_ex = *(static_cast<const OpDataConvEx *>(node->user_data));
 
   // TFLITE_DCHECK(node->user_data != nullptr);
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
@@ -2056,8 +2300,8 @@ TfLiteStatus EvalConvInt8(TfLiteContext *context, TfLiteNode *node) {
       tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  // const OpData& data = *(static_cast<const OpData*>(node->user_data));
-  const auto &data_ex = *(static_cast<const OpData *>(node->user_data));
+  // const OpDataConvEx& data = *(static_cast<const OpDataConvEx*>(node->user_data));
+  const auto &data_ex = *(static_cast<const OpDataConvEx *>(node->user_data));
   //  const OpDataConv &data = data_ex.ConvOp;
   // TFLITE_DCHECK(node->user_data != nullptr);
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
@@ -2071,6 +2315,170 @@ TfLiteStatus EvalConvInt8(TfLiteContext *context, TfLiteNode *node) {
   EvalConvQuantizedPerChannel(context, node, params, data_ex, input, filter,
                               bias, output, nullptr);
 
+  return kTfLiteOk;
+}
+// opt_constraint = 2 , no input offset
+TfLiteStatus EvalConvInt8Opt2(TfLiteContext *context, TfLiteNode *node) {
+ // const auto &params =
+ //     *(reinterpret_cast<TfLiteConvParams *>(node->builtin_data));
+
+  const TfLiteEvalTensor *input =
+      tflite::micro::GetEvalInput(context, node, kConvInputTensor);
+  const TfLiteEvalTensor *filter =
+      tflite::micro::GetEvalInput(context, node, kConvWeightsTensor);
+//  const TfLiteEvalTensor *bias =
+ //     (NumInputs(node) == 3)
+ //         ? tflite::micro::GetEvalInput(context, node, kConvBiasTensor)
+ //         : nullptr;
+  TfLiteEvalTensor *output =
+      tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  // const OpDataConvEx& data = *(static_cast<const OpDataConvEx*>(node->user_data));
+  const auto &data_ex = *(static_cast<const OpDataConvEx *>(node->user_data));
+  //  const OpDataConv &data = data_ex.ConvOp;
+  // TFLITE_DCHECK(node->user_data != nullptr);
+  TF_LITE_ENSURE_EQ(context, input->type, output->type);
+  // enable 16x8
+  TF_LITE_ENSURE_MSG(
+      context,
+      input->type == filter->type ||
+          (input->type == kTfLiteInt16 && filter->type == kTfLiteInt8),
+      "Hybrid models are not supported on TFLite Micro.");
+
+ // EvalConvQuantizedPerChannel(context, node, params, data_ex, input, filter,
+ //                             bias, output, nullptr);
+const OpDataConv &data = data_ex.ConvOp;
+#if 0
+  ConvParams op_params;
+  op_params.input_offset = -data.input_zero_point;
+  op_params.output_offset = data.output_zero_point;
+  op_params.stride_height = params.stride_height;
+  op_params.stride_width = params.stride_width;
+  op_params.dilation_height_factor = params.dilation_height_factor;
+  op_params.dilation_width_factor = params.dilation_width_factor;
+  op_params.padding_values.height = data.padding.height;
+  op_params.padding_values.width = data.padding.width;
+  op_params.quantized_activation_min = data.output_activation_min;
+  op_params.quantized_activation_max = data.output_activation_max;
+  KN_PRINTD(data_ex.opt_constraint);
+#endif
+  if (data_ex.opt_constraint == 0 || nullptr != data_ex.inputOffsetWithW) {
+    MicroPrintf("unsupport constraint: %d , opt len: %x\n", data_ex.opt_constraint,
+    data_ex.inputOffsetWithW);
+    return kTfLiteError;
+  }
+    int32_t input_offset = -data.input_zero_point;
+    const int batches = MatchingDim(tflite::micro::GetTensorShape(input), 0,
+                                    tflite::micro::GetTensorShape(output), 0);
+    int8_t *p_aligned_scratch = nullptr;
+    AScalar *bias_aflt = data_ex.bias_aflt;
+    if (data_ex.buffer_idx > -1) {
+      p_aligned_scratch =
+          (int8_t *)context->GetScratchBuffer(context, data_ex.buffer_idx);
+    }
+    ds_conv2d_layer_t conv2d = data_ex.conv2d;
+    conv2d.pIm2Col = (int32_t *)p_aligned_scratch;
+    conv2d.pOutput =
+        (int32_t *)((int8_t *)p_aligned_scratch + data_ex.sizeScratchIm2Col);
+
+    int sign_in_offset = (input_offset == 128) ? 1 : 3;
+
+    int batch = batches;
+    const int8_t *pInputLocal =
+        (const int8_t *)tflite::micro::GetTensorData<int8_t>(input);
+    int8_t *pOutputLocal = tflite::micro::GetTensorData<int8_t>(output);
+    int input_conv_depth = conv2d.in_ch * conv2d.in_x * conv2d.in_y;
+    int output_conv_depth = conv2d.out_ch * conv2d.out_x * conv2d.out_y;
+
+            //ConvPerChannelPadding(data_ex, (const int8_t *)pInputLocal,
+        //                      (const int8_t *)data_ex.mapped_filter,
+        //                      (const int32_t *)bias_aflt,
+        //                      pOutputLocal, sign_in_offset);
+
+   // const OpDataConvEx &data_ex, 
+    const int8_t *input_data = pInputLocal; 
+    const int8_t *filter_data =    (const int8_t *)data_ex.mapped_filter;
+    const int32_t *bias_data =  (const int32_t *)bias_aflt;
+    int8_t *output_data =   pOutputLocal;// uint32_t inputOffset_int8,uint32_t
+                          // inputOffset_int8_neg,
+    int sign = sign_in_offset;
+        const AScalar *per_channel_output_multiplier =
+        (const AScalar *)(data_ex.ConvOp.per_channel_output_multiplier);
+    int inFCM = conv2d.out_ch;
+    int inFCN = conv2d.ker_x * conv2d.ker_y * conv2d.in_ch;
+
+    int inFCNA4 = (((inFCN + 3) >> 2) << 2);
+    int inFCN16Size = ((inFCNA4) + 15) / 16;
+
+    int8_t *pBuffer = (int8_t *)conv2d.pIm2Col;
+    int32_t *pOutput = (int32_t *)conv2d.pOutput;
+    int8_t *outBuf = output_data;
+    int32_t outBufIdx = 0;
+    int32_t dim_kernel_x = conv2d.ker_x;
+    int32_t dim_im_in_x = conv2d.in_x;
+    int32_t ch_im_in = conv2d.in_ch;
+    uint32_t input_offset2 = (conv2d.input_offset == 128) ? 0x80808080 : 0;  //
+
+    while (batch) {
+      
+        //ds_conv2d_layer_t conv2d = data_ex.conv2d;
+    for (int i_out_y = 0; i_out_y < conv2d.out_y; ++i_out_y) {
+      
+          for (int i_out_x = 0; i_out_x < conv2d.out_x; ++i_out_x) {
+            // HACK padding with input negative offset, and inputhe mac8bx8b will
+            // compensate to zero
+            int offset_im_src, offset_im_dst;
+            int len_cpy_x, len_cpy_y;
+            int dilation_y, dilation_x;
+            dilation_y = conv2d.dilation_y;
+            dilation_x = conv2d.dilation_x;
+            im2col_idx im2col_tab_2;
+            int padding =
+                tflite::ConvIm2ColIndex(conv2d, i_out_x, i_out_y, &im2col_tab_2);
+            len_cpy_y = im2col_tab_2.cpy_len_y;
+            len_cpy_x = im2col_tab_2.cpy_len_x;
+            offset_im_dst = im2col_tab_2.im_dst_offset;
+            offset_im_src = im2col_tab_2.im_src_offset;
+            if (!padding) {
+              tflite::block_fill_words((int32_t *)pBuffer, 0, inFCN16Size * 4);
+            }
+      /*
+            if (data_ex.opt_constraint == CONV_OPT_TYPE1) {
+              tflite::im2col_padding_offset(
+                  pBuffer + offset_im_dst, (const int8_t *)input_data + offset_im_src,
+                  dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+                  input_offset, dilation_y, dilation_x);
+            } else if (data_ex.opt_constraint == CONV_OPT_TYPE2) 
+            */{
+              tflite::im2col_padding_offset_align4(
+                  pBuffer + offset_im_dst, (const int8_t *)input_data + offset_im_src,
+                  dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+                  input_offset2, dilation_y, dilation_x);
+            }
+            // TODO:unrollx4
+
+            {
+              ConvQuantizedInt8PerChInputOffset(
+                  (int32_t *)pBuffer, (const int32_t *)filter_data,
+                  (const AScalar *)bias_data, (int8_t *)&outBuf[outBufIdx * inFCM],
+                  inFCM, inFCN, data_ex.outputOffset, NULL,
+                  (const AScalar *)per_channel_output_multiplier, pOutput, sign);
+
+              outBufIdx += 1;
+            }
+            // i_out_x_prev = i_out_x;
+          }
+          // i_out_y_prev = i_out_y;
+        }
+
+      
+      pInputLocal += input_conv_depth;
+      pOutputLocal += output_conv_depth;
+      batch--;
+    }
+
+  
   return kTfLiteOk;
 }
 
@@ -2090,8 +2498,8 @@ TfLiteStatus EvalConvFloat32(TfLiteContext *context, TfLiteNode *node) {
       tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
   TfLiteStatus status = kTfLiteOk;
   TFLITE_DCHECK(node->user_data != nullptr);
-  // const OpData& data = *(static_cast<const OpData*>(node->user_data));
-  const auto &data_ex = *(static_cast<const OpData *>(node->user_data));
+  // const OpDataConvEx& data = *(static_cast<const OpDataConvEx*>(node->user_data));
+  const auto &data_ex = *(static_cast<const OpDataConvEx *>(node->user_data));
   //  const OpDataConv &data = data_ex.ConvOp;
   // TFLITE_DCHECK(node->user_data != nullptr);
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
@@ -2142,8 +2550,8 @@ TfLiteStatus EvalConvFloat16(TfLiteContext *context, TfLiteNode *node) {
       tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  // const OpData& data = *(static_cast<const OpData*>(node->user_data));
-  const auto &data_ex = *(static_cast<const OpData *>(node->user_data));
+  // const OpDataConvEx& data = *(static_cast<const OpDataConvEx*>(node->user_data));
+  const auto &data_ex = *(static_cast<const OpDataConvEx *>(node->user_data));
   //  const OpDataConv &data = data_ex.ConvOp;
   // TFLITE_DCHECK(node->user_data != nullptr);
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
@@ -2173,8 +2581,8 @@ TfLiteStatus EvalConvFloatInt8(TfLiteContext *context, TfLiteNode *node) {
       tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  // const OpData& data = *(static_cast<const OpData*>(node->user_data));
-  const auto &data_ex = *(static_cast<const OpData *>(node->user_data));
+  // const OpDataConvEx& data = *(static_cast<const OpDataConvEx*>(node->user_data));
+  const auto &data_ex = *(static_cast<const OpDataConvEx *>(node->user_data));
   //  const OpDataConv &data = data_ex.ConvOp;
   // TFLITE_DCHECK(node->user_data != nullptr);
   TF_LITE_ENSURE_EQ(context, input->type, output->type);
@@ -2201,7 +2609,11 @@ TFLMRegistration Register_CONV_2D_INT8REF() {
                                    /*prepare=*/ConvPrepareOpt,
                                    /*invoke=*/EvalConvInt8);
 }
-
+TFLMRegistration Register_CONV_2D_INT8OPT2() {
+  return tflite::micro::RegisterOp(InitConv,
+                                   /*prepare=*/ConvPrepareInt8Opt2,
+                                   /*invoke=*/EvalConvInt8Opt2);
+}
 TFLMRegistration Register_CONV_2D_FLOAT32() {
   return tflite::micro::RegisterOp(InitConv,
                                    /*prepare=*/ConvPrepareOpt,
@@ -2209,14 +2621,13 @@ TFLMRegistration Register_CONV_2D_FLOAT32() {
 }
 
 TFLMRegistration Register_CONV_2D_FLOAT16() {
-  return tflite::micro::RegisterOp(InitConv,
+  return tflite::micro::RegisterOp(tflite::InitConv,
                                    /*prepare=*/ConvPrepareOpt,
                                    /*invoke=*/EvalConvFloat16);
 }
 
 TFLMRegistration Register_CONV_2D_FLOATINT8() {
-  return tflite::micro::RegisterOp(InitConv,
-
+  return tflite::micro::RegisterOp(tflite::InitConv,
                                    /*prepare=*/ConvPrepareOpt,
                                    /*invoke=*/EvalConvFloatInt8);
 }

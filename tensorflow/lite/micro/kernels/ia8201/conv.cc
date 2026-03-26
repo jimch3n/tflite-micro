@@ -13,6 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
+
+// profiler test
+#include "tensorflow/lite/micro/micro_profiler.h"
 #define ENABLE_DILATION_OPT  // enable dialtion optimization
 #include "tensorflow/lite/micro/ia8201/config.h"
 #ifndef REMOVE_REFOP_SUPPORT
@@ -721,13 +724,13 @@ int ConvApplyOffsetPerCh(
   }
   return 0;
 }
-int ConvQuantizedInt8PerChInputOffset(
+static int ConvQuantizedInt8PerChInputOffset(
     int32_t *x, const int32_t *A, const AScalar *bias, int8_t *output, int m,
     int n, const AScalar &outOffsetFr32,
     //  uint32_t input_offset,             // minus - zero_point
     int32_t *inputOffsetWithW,
     const AScalar *pOutMultiplerFr32,  // array output channel
-    int32_t *pScratch, int signs) {
+    int32_t *pScratch, int signs, tflite::MicroProfiler *profiler=nullptr) {
   int32_t *pDst = pScratch;
   const int32_t *pA = A;
   const int32_t *pX;
@@ -757,7 +760,11 @@ int ConvQuantizedInt8PerChInputOffset(
   //  xtbool2 signSpecInput = int_to_xt_bool2(3);
 
   int32_t *inputOffsetW = inputOffsetWithW;
-
+  if (profiler)
+  {
+    profiler->AccumuateMacCount(loopLimRow * (loopLimCol * 8 +
+      nBlockAligned2 - (loopLimCol << 3)));
+  }
   for (int i = 0; i < loopLimRow; i++) {
     // const int32_t *pA1 = pA;
 
@@ -1115,11 +1122,11 @@ int ConvApplyOffsetPerCh(
   }
   return 0;
 }
-int ConvQuantizedInt8PerChInputOffset(
+static int ConvQuantizedInt8PerChInputOffset(
     int32_t *x, const int32_t *A, const AScalar *bias, int8_t *output, int m,
     int n, const AScalar &outOffsetFr32, int32_t *inputOffsetWithW,
     const AScalar *pOutMultiplerFr32,  // array output channel
-    int32_t *pScratch, int signs) {
+    int32_t *pScratch, int signs, tflite::MicroProfiler *profiler = nullptr) {
   int32_t *pDst = pScratch;
   const int32_t *pA = A;
   const int32_t *pX;
@@ -1154,6 +1161,11 @@ int ConvQuantizedInt8PerChInputOffset(
   if (((unsigned int)x & 1) != 0) {
     return -1;
   }
+
+  if(profiler)
+  {
+    profiler->AccumuateMacCount(loopLimRow*looLimCol*8);
+  }
   for (int i = 0; i < loopLimRow; i++) {
     if (inputOffsetW) {
       load32x2_vr_postI(VR_y, inputOffsetW, INC1);
@@ -1185,7 +1197,7 @@ int ConvQuantizedInt8PerChInputOffset(
       mac8bx8b(VR_y, VR_A, VR_x, signSpec);
       load_32x2_vr_a(VR_A, UR_A, pA);
     }
-
+    
     for (int32_t j = (loopLimCol << 2); j < nBlockAligned2; j++) {
       load16x1_vr_postI(VR_x, pX, INC1, VRQ0);
       WUR_MvmAux(1);
@@ -1296,7 +1308,8 @@ void ConvPerChannelPaddingInputOffset(const OpData &data_ex,
                                       const int32_t *bias_data,
                                       int8_t *output_data,
                                       int32_t *inputOffsetWithW,  //_int8,
-                                      uint32_t inputOffset_int8_neg, int sign)
+                                      uint32_t inputOffset_int8_neg, int sign,
+                                    tflite::MicroProfiler *profiler)
 
 {
   ds_conv2d_layer_t conv2d = data_ex.conv2d;
@@ -1360,8 +1373,10 @@ void ConvPerChannelPaddingInputOffset(const OpData &data_ex,
             (int32_t *)pBuffer, (const int32_t *)filter_data,
             (const AScalar *)bias_data, (int8_t *)&outBuf[outBufIdx * inFCM],
             inFCM, inFCN, data_ex.outputOffset, inputOffsetWithW,
-            (const AScalar *)per_channel_output_multiplier, pOutput, sign);
+            (const AScalar *)per_channel_output_multiplier, pOutput, sign,
+          profiler);
         TFLITE_DCHECK(status == 0);
+     
         outBufIdx += 1;
       }
       // i_out_x_prev = i_out_x;
@@ -1374,7 +1389,8 @@ void ConvPerChannelPadding(
     const int32_t *bias_data,
     int8_t *output_data,  // uint32_t inputOffset_int8,uint32_t
                           // inputOffset_int8_neg,
-    int sign)
+    int sign,
+  tflite::MicroProfiler *profiler)
 
 {
   ds_conv2d_layer_t conv2d = data_ex.conv2d;
@@ -1432,7 +1448,7 @@ void ConvPerChannelPadding(
             (int32_t *)pBuffer, (const int32_t *)filter_data,
             (const AScalar *)bias_data, (int8_t *)&outBuf[outBufIdx * inFCM],
             inFCM, inFCN, data_ex.outputOffset, NULL,
-            (const AScalar *)per_channel_output_multiplier, pOutput, sign);
+            (const AScalar *)per_channel_output_multiplier, pOutput, sign, profiler);
 
         outBufIdx += 1;
       }
@@ -1535,6 +1551,10 @@ TfLiteStatus EvalConvQuantizedPerChannel(
     const TfLiteEvalTensor *input, const TfLiteEvalTensor *filter,
     const TfLiteEvalTensor *bias, TfLiteEvalTensor *output,
     TfLiteEvalTensor *im2col) {
+  // profiler here
+
+  tflite::MicroProfiler *profiler = (tflite::MicroProfiler *)context->profiler;
+  
   const OpDataConv &data = data_ex.ConvOp;
   ConvParams op_params;
   op_params.input_offset = -data.input_zero_point;
@@ -1551,7 +1571,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
   
   KN_PRINT_Q7_SIZE_ATMOST(tflite::micro::GetTensorData<int8_t>(input),
     ElementCount(*input->dims), 1024);
-
+  
 #if defined(DMX1A_CONV_OPT) || defined(HMD1A_CONV_OPT)
   if (data_ex.opt_constraint) {
     int32_t input_offset = -data.input_zero_point;
@@ -1585,7 +1605,9 @@ TfLiteStatus EvalConvQuantizedPerChannel(
         ConvPerChannelPadding(data_ex, (const int8_t *)pInputLocal,
                               (const int8_t *)data_ex.mapped_filter,
                               (const int32_t *)bias_aflt,
-                              pOutputLocal, sign_in_offset);
+                              pOutputLocal, sign_in_offset, profiler);
+
+
       } else
 
       {
@@ -1597,7 +1619,7 @@ TfLiteStatus EvalConvQuantizedPerChannel(
             (const int8_t *)data_ex.mapped_filter,
             (const int32_t *)bias_aflt, pOutputLocal,
             data_ex.inputOffsetWithW, data_ex.input_offset_int8_neg,
-            sign_in_offset);
+            sign_in_offset, profiler);
       }
 
       pInputLocal += input_conv_depth;
@@ -2905,6 +2927,8 @@ TfLiteStatus EvalConv(TfLiteContext *context, TfLiteNode *node) {
   TfLiteEvalTensor *output =
       tflite::micro::GetEvalOutput(context, node, kConvOutputTensor);
 
+  //tflite::MicroProfiler* profiler = (tflite::MicroProfiler*)context->profiler;
+
   TFLITE_DCHECK(node->user_data != nullptr);
   // const OpData& data = *(static_cast<const OpData*>(node->user_data));
   const auto &data_ex = *(static_cast<const OpData *>(node->user_data));
@@ -2995,6 +3019,7 @@ TfLiteStatus EvalConv(TfLiteContext *context, TfLiteNode *node) {
 TfLiteStatus EvalConvInt8(TfLiteContext *context, TfLiteNode *node) {
   const auto &params =
       *(reinterpret_cast<TfLiteConvParams *>(node->builtin_data));
+
 
   const TfLiteEvalTensor *input =
       tflite::micro::GetEvalInput(context, node, kConvInputTensor);

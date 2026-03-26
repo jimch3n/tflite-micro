@@ -74,6 +74,16 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
           continue;
           //  printf("Mapped[%d] = %d\n",idx, opNumber);
         }
+        else if (*pMappedOps == 's') {// skip subgraph sX prefix
+     
+#ifdef KN_DEBUG
+          MicroPrintf("skip subgraph[%d] ", opNumber);
+          //   MicroPrintf("Missing registration for opcode_index %d\n", index);
+#endif
+          opNumber = 0;
+          dec = 0;
+          continue;
+        }
         opNumber += (*pMappedOps - '0') * decimals[dec];
 #ifdef KN_DEBUG
         //MicroPrintf("parsing = %c dec table: %d", *pMappedOps, decimals[dec]);

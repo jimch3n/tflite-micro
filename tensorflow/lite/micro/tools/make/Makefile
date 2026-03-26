@@ -241,8 +241,8 @@ BUILD_TYPE := default
 ifeq ($(BUILD_TYPE), debug)
 	# Specifying BUILD_TYPE=debug adds debug symbols to the binary (and makes it
 	# larger) and should be used to run a binary with gdb.
-	CXXFLAGS += -g
-	CCFLAGS  += -g
+	CXXFLAGS += -g3 -ggdb
+	CCFLAGS  += -g3 -ggdb
 	BT=dbg
 else ifeq ($(BUILD_TYPE), release)
 	# The 'release' build results in the smallest binary (by virtue of removing
@@ -259,7 +259,7 @@ else ifeq ($(BUILD_TYPE), release)
 	CXXFLAGS += -DNDEBUG -DTF_LITE_STRIP_ERROR_STRINGS
 	CCFLAGS  += -DNDEBUG -DTF_LITE_STRIP_ERROR_STRINGS
 	BT=rel
-else ifeq ($(BUILD_TYPE), remove_ref_ops)
+else ifeq ($(BUILD_TYPE), tiny)
 	# The 'release' build results in the smallest binary (by virtue of removing
 	# strings from log messages, DCHECKs ...).
 	#
@@ -273,7 +273,7 @@ else ifeq ($(BUILD_TYPE), remove_ref_ops)
 	# BUILD_TYPE=release_with_logs.
 	CXXFLAGS += -DNDEBUG -DTF_LITE_STRIP_ERROR_STRINGS -DREMOVE_REFOP_SUPPORT
 	CCFLAGS  += -DNDEBUG -DTF_LITE_STRIP_ERROR_STRINGS -DREMOVE_REFOP_SUPPORT
-	BT=rro
+	BT=tiny
 else ifeq ($(BUILD_TYPE), release_with_logs)
 	# The latency with BUILD_TYPE=release_with_logs will be close to the 'release'
 	# build and there will still be error logs. This build type may be preferable
@@ -302,7 +302,7 @@ MICROLITE_LIB_NAME := libtensorflow-microlite.a
 ENABLE_COMPRESSION := no
 ifneq ($(USE_TFLM_COMPRESSION),)
   # currently only Linux (x86), Xtensa targets supported
-  ifeq ($(TARGET), $(filter $(TARGET), linux xtensa))
+  ifeq ($(TARGET), $(filter $(TARGET), linux xtensa ia700))
     CXXFLAGS += -DUSE_TFLM_COMPRESSION
     CCFLAGS += -DUSE_TFLM_COMPRESSION
     ENABLE_COMPRESSION := yes
@@ -691,7 +691,8 @@ TARGET_SPECIFIC_MAKE_TEST:=0
 ifeq ($(findstring $(TARGET),$(TARGETS_WITHOUT_MAKEFILES)),)
   include $(MAKEFILE_DIR)/targets/$(TARGET)_makefile.inc
 endif
-
+### include layer debugger
+#include $(MAKEFILE_DIR)/../Makefile.inc
 # Validate valid options.
 ifeq (,$(filter $(OPTIMIZE_KERNELS_FOR),KERNELS_OPTIMIZED_FOR_SPEED KERNELS_OPTIMIZED_FOR_SIZE))
     $(error Incorrect OPTIMIZE_KERNELS_FOR: $(OPTIMIZE_KERNELS_FOR))
@@ -907,7 +908,7 @@ ifeq ($(TARGET), ia8201)
   ifeq ($(BUILD_TYPE), release)
 	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib.a
   endif
-  ifeq ($(BUILD_TYPE), remove_ref_ops)
+  ifeq ($(BUILD_TYPE), tiny)
 	cp -f $(MICROLITE_LIB_PATH) $(SDK_TFLU_LIB_PATH)/$(LIB_PREFIX)TFLuLib_tiny.a
   endif
   
@@ -923,7 +924,7 @@ ifeq ($(TARGET), ia700)
  ifeq ($(BUILD_TYPE), release)
 	cp -f $(MICROLITE_LIB_PATH) $(SDK_ROOT)/Dist/TFLu/Libs/$(LIB_PREFIX)TFLuLib.a
  endif
- ifeq ($(BUILD_TYPE), remove_ref_ops)
+ ifeq ($(BUILD_TYPE), tiny)
 	cp -f $(MICROLITE_LIB_PATH) $(SDK_ROOT)/Dist/TFLu/Libs/$(LIB_PREFIX)TFLuLib_tiny.a
  endif
 endif

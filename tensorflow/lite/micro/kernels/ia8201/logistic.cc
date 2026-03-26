@@ -816,12 +816,82 @@ TfLiteStatus IA8201_LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 
-//}  // namespace activations
+
+TfLiteStatus LogisticEvalFloat32(TfLiteContext* context, TfLiteNode* node) {
+  const TfLiteEvalTensor* input =
+      tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kLogisticOutputTensor);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  //OpData* data = static_cast<OpData*>(node->user_data);
+
+  if (input->type != kTfLiteFloat32)
+  {
+    MicroPrintf("unsupport type: %d\n",input->type);
+    return kTfLiteError;
+  }
+  const int flat_size = MatchingFlatSize(tflite::micro::GetTensorShape(input),
+                                        tflite::micro::GetTensorShape(output));
+  SigmoidV_Full((float*)tflite::micro::GetTensorData<float>(output),
+                tflite::micro::GetTensorData<float>(input), flat_size);
+
+
+  return kTfLiteOk;
+}
+
+TfLiteStatus LogisticEvalInt8(TfLiteContext* context, TfLiteNode* node) {
+  const TfLiteEvalTensor* input =
+      tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kLogisticOutputTensor);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  OpData* data = static_cast<OpData*>(node->user_data);
+
+  if (input->type != kTfLiteInt8)
+  {
+    MicroPrintf("unsupport type: %d\n",input->type);
+    return kTfLiteError;
+  }
+ // const int flat_size = MatchingFlatSize(tflite::micro::GetTensorShape(input),
+ //                                       tflite::micro::GetTensorShape(output));
+#if !(defined(DMX1A_LOGISTIC_OPT) || defined(HMD1A_LOGISTIC_OPT))
+        reference_integer_ops::Logistic(
+            data->input_zero_point, data->input_range_radius,
+            data->input_multiplier, data->input_left_shift,
+            NumElements(input->dims),
+            tflite::micro::GetTensorData<int8_t>(input),
+            tflite::micro::GetTensorData<int8_t>(output));
+        // KN_PRINT_Q7_SIZE( tflite::micro::GetTensorData<int8_t>(output),
+        // ElementCount(*input->dims) );
+#else
+        LogisticQuantizedInt8(data,
+                              tflite::micro::GetTensorData<int8_t>(output),
+                              tflite::micro::GetTensorData<int8_t>(input),
+                              NumElements(input->dims));
+
+#endif
+
+
+  return kTfLiteOk;
+}
 
 TFLMRegistration Register_LOGISTIC() {
   return tflite::micro::RegisterOp(LogisticInit,
                                    /*prepare=*/IA8201_LogisticPrepare,
                                    /*invoke=*/IA8201_LogisticEval);
+}
+
+TFLMRegistration Register_LOGISTIC_FLOAT32() {
+  return tflite::micro::RegisterOp(LogisticInit,
+                                   /*prepare=*/IA8201_LogisticPrepare,
+                                   /*invoke=*/LogisticEvalFloat32);
+}
+TFLMRegistration Register_LOGISTIC_INT8() {
+  return tflite::micro::RegisterOp(LogisticInit,
+                                   /*prepare=*/IA8201_LogisticPrepare,
+                                   /*invoke=*/LogisticEvalInt8);
 }
 //}  // namespace micro
 //}  // namespace ops

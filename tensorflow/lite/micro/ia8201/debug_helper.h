@@ -412,6 +412,8 @@ limitations under the License.
 #define KN_PRINTS(STR)
 #define KN_PRINT_FLOAT_INT8(IN, SIZE, SCALE)
 #endif
+#ifndef __XTENSA__
+
 #define CHECK_ALIGN_2(ADDR)                                                   \
   do {                                                                        \
     if (((unsigned)ADDR & 0x1) != 0) {                                        \
@@ -438,5 +440,34 @@ limitations under the License.
       printf("not align 8: %s %p %s: %d\n", #ADDR, ADDR, __FILE__, __LINE__); \
     }                                                                         \
   } while (0);
+#else
+// not xtensa check align 
+#define CHECK_ALIGN_2(ADDR)                                                   \
+  do {                                                                        \
+    if (((unsigned)ADDR & 0x1) != 0) {                                        \
+      MicroPrintf("not align 2: %s %p %s: %d\n", #ADDR, ADDR, __FILE__, __LINE__); \
+    }                                                                         \
+  } while (0);
+#define CHECK_ALIGN_16(ADDR)                                                   \
+  do {                                                                         \
+    if (((unsigned)ADDR & 0x7) != 0) {                                         \
+      MicroPrintf("not align 16: %s %p %s: %d\n", #ADDR, ADDR, __FILE__, __LINE__); \
+    }                                                                          \
+  } while (0);
+
+#define CHECK_ALIGN_4(ADDR)                                                   \
+  do {                                                                        \
+    if (((unsigned)ADDR & 0x3) != 0) {                                        \
+      MicroPrintf("not align 4: %s %p %s: %d\n", #ADDR, ADDR, __FILE__, __LINE__); \
+    }                                                                         \
+  } while (0);
+
+#define CHECK_ALIGN_8(ADDR)                                                   \
+  do {                                                                        \
+    if (((unsigned)ADDR & 0x7) != 0) {                                        \
+      MicroPrintf("not align 8: %s %p %s: %d\n", #ADDR, ADDR, __FILE__, __LINE__); \
+    }                                                                         \
+  } while (0);
+#endif
 
 #endif

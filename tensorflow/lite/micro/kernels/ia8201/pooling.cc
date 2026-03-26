@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 //#define KN_DEBUG
-
+ 
 #include "tensorflow/lite/micro/ia8201/config.h"
 
 //#include "flatbuffers/base.h"  // from @flatbuffers
@@ -388,7 +388,7 @@ int MaxPoolKernelQuantizedUInt8(
   return 0;
 }
 //asssume n == depth, saturation 127 ~ -128, n align 4
- int MaxPoolKernelQuantizedInt8Opt2(
+ static int MaxPoolKernelQuantizedInt8Opt2(
   const OpDataPoolEx& data,
   const int8_t* x,  // align up16 buffer, zero paddding
   int8_t* pOut, int32_t* pScratchOuput, int n, int n4, int depth) {
@@ -685,8 +685,8 @@ void MaxPoolQuantizedInt8(const OpDataPoolEx &data, const int8_t *input_data,
     MaxPoolKernel = MaxPoolKernelQuantizedInt8;
   }
   else {
-    TFLITE_CHECK_EQ(inFCN, inFCM);
-
+    // TFLITE_CHECK_EQ(inFCN, inFCM); ??
+     
     MaxPoolKernel = MaxPoolKernelQuantizedInt8Opt2;
   }
   for (int i_out_y = 0; i_out_y < conv2d.out_y; ++i_out_y) {

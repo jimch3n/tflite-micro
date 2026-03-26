@@ -44,7 +44,7 @@ limitations under the License.
 #define DMX1A_SQRT_OPT
 #define DMX1A_RSQRT_OPT
 #define DMX1A_SQUARE_OPT
-
+#define DMX1A_LOG_OPT   // log
 // unidirectional_lstm_sequence
 #define DMX1A_LSTM_OPT
 
@@ -53,6 +53,9 @@ limitations under the License.
 //#define SIG_FB_SQRT_OPT  //afloat
 #define DMX1A_TRANSPOSE_OPT // only for float32
 #define DMX1A_SLICE_OPT // SLICE only for float32, begins, size
+
+#define DMX1A_MINMAX_OPT //minimum maximum
+#define DMX1A_RELU_OPT   //activation relu int8
 #elif defined(HMD1A)
 
 #define HMD1A_CONV_OPT     // convolution
@@ -73,6 +76,7 @@ limitations under the License.
 #define HMD1A_SVDF_OPT      // svdf
 #define HMD1A_TANH_OPT  // tanh
 
+#define HMD1A_SLICE_OPT // slice
 #define HMD1A_STRIDED_SLICE_OPT //strided_slice
 #define HMD1A_CONCATENATION_OPT // concatenation
 
@@ -80,6 +84,8 @@ limitations under the License.
 #define HMD1A_SQRT_OPT
 #define HMD1A_RSQRT_OPT
 #define HMD1A_SQUARE_OPT
+
+#define HMD1A_LOG_OPT   // log
 #define HMD1A_SUB_OPT
 #define HMD1A_SQUARED_DIFF_OPT //squared_difference float only
 // unidirectional_lstm_sequence

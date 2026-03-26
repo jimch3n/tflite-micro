@@ -1,0 +1,23 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+// File: AScalarArray.h
+//
+// Copyright (c) 2018 Knowles Electronics, LLC. All rights reserved.
+// THIS FILE IS SUBJECT TO THE TERMS OF YOUR SDK LICENSE WITH KNOWLES.
+// SEE ALSO License.txt
+//
+////////////////////////////////////////////////////////////////////////////////
+
+#if defined(AVL_GENERIC)
+
+ #include "Generic/AScalarArray.h"
+
+#elif defined(AVL_HEMI)
+
+ #include "Hemi/AScalarArray.h"
+
+#elif defined(AVL_DELTAMAX)
+
+ #include "DeltaMax/AScalarArray.h"
+
+#endif

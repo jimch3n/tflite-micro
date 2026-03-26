@@ -64,7 +64,13 @@ class MicroProfiler : public MicroProfilerInterface {
   // Output will have one row for each unique tag along with the
   // total ticks summed across all events with that particular tag.
   void LogTicksPerTagCsv();
+#if defined(IA8201)
+  // get a mac8bx8b instructions
 
+  void AccumuateMacCount( uint32_t mac_count);
+  void LogMacCount() const;
+
+#endif
  private:
   // Maximum number of events that this class can keep track of. The
   // MicroProfiler will abort if AddEvent is called more than kMaxEvents number
@@ -75,6 +81,12 @@ class MicroProfiler : public MicroProfilerInterface {
   uint32_t start_ticks_[kMaxEvents];
   uint32_t end_ticks_[kMaxEvents];
   int num_events_ = 0;
+#if defined(IA8201) // only for dbg mode
+
+  uint32_t mac8b_counts_[kMaxEvents];
+  uint32_t macaflt_counts[kMaxEvents];
+  const char* dim_[kMaxEvents]; // dimension
+#endif
 
   struct TicksPerTag {
     const char* tag;

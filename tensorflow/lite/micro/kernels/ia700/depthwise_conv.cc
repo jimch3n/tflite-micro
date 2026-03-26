@@ -345,7 +345,7 @@ int DepthWiseConvKernel8xnInputOffset(const int32_t inputOffset,
   return 0;  // (unsigned)pA1 - (unsigned)pAinput; //stride of A
 }
 #endif
-TfLiteStatus PrepareInt8(TfLiteContext *context, TfLiteNode *node) {
+TfLiteStatus PrepareDSConvInt8(TfLiteContext *context, TfLiteNode *node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
@@ -822,7 +822,7 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
   TF_LITE_ENSURE(context, input != nullptr);
   if (input->type == kTfLiteInt8) {  // constraint
     micro_context->DeallocateTempTfLiteTensor(input);
-    return PrepareInt8(context, node);
+    return PrepareDSConvInt8(context, node);
   }
 
   // data->opt_constraint_float = 0;
@@ -2549,6 +2549,191 @@ TfLiteStatus EvalDepthWiseConvInt8Opt(TfLiteContext *context,
   // output);
   return status;
 }
+
+TfLiteStatus EvalDepthWiseConvInt8Opt2(TfLiteContext *context,
+                                      TfLiteNode *node) {
+  TFLITE_DCHECK(node->user_data != nullptr);
+  TFLITE_DCHECK(node->builtin_data != nullptr);
+
+  auto *params =
+      reinterpret_cast<TfLiteDepthwiseConvParams *>(node->builtin_data);
+  DSConvOpData &data_ex = *(static_cast<DSConvOpData *>(node->user_data));
+
+  TfLiteEvalTensor *output =
+      tflite::micro::GetEvalOutput(context, node, kDepthwiseConvOutputTensor);
+  const TfLiteEvalTensor *input =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvInputTensor);
+  const TfLiteEvalTensor *filter =
+      tflite::micro::GetEvalInput(context, node, kDepthwiseConvWeightsTensor);
+  const TfLiteEvalTensor *bias =
+      (NumInputs(node) == 3)
+          ? tflite::micro::GetEvalInput(context, node, kDepthwiseConvBiasTensor)
+          : nullptr;
+  TfLiteStatus status = kTfLiteOk;
+  // TODO(aselle): Consider whether float conv and quantized conv should be
+  // separate ops to avoid dispatch overhead here.
+  if (kTfLiteInt8 != input->type || data_ex.opt_constraint != DEPTHWISE_CONV_OPT_MAC8Bx8B_SPARSE) {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.: opt_constraint: %d",
+                       TfLiteTypeGetName(input->type), input->type,  data_ex.opt_constraint);
+  }
+ 
+   // status = DepthwiseConvPerChOpt2(context, node, params, data_ex, input,
+   //                                filter, bias, output);
+
+ OpDataConv *data = static_cast<OpDataConv *>(&data_ex.ConvOp);
+  DepthwiseParams op_params;
+  op_params.padding_type = PaddingType::kSame;
+  op_params.padding_values.width = data->padding.width;
+  op_params.padding_values.height = data->padding.height;
+  op_params.stride_width = params->stride_width;
+  op_params.stride_height = params->stride_height;
+  op_params.dilation_width_factor = params->dilation_width_factor;
+  op_params.dilation_height_factor = params->dilation_height_factor;
+  op_params.depth_multiplier = params->depth_multiplier;
+  op_params.input_offset = -data->input_zero_point;
+  op_params.weights_offset = 0;
+  op_params.output_offset = data->output_zero_point;
+  // TODO(b/130439627): Use calculated value for clamping.
+  op_params.quantized_activation_min = std::numeric_limits<int8_t>::min();
+  op_params.quantized_activation_max = std::numeric_limits<int8_t>::max();
+
+  RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
+  RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
+  RuntimeShape output_shape = tflite::micro::GetTensorShape(output);
+  RuntimeShape bias_shape = tflite::micro::GetTensorShape(bias);
+
+  //    const int batch_size = MatchingDim(input_shape, 0, output_shape, 0);
+  const int output_depth = MatchingDim(filter_shape, 3, output_shape, 3);
+  TFLITE_DCHECK_EQ(bias_shape.FlatSize(), output_depth);
+
+    //status = DepthwiseConvPerChOpt(context, node, params, data_ex, input,
+   //                                filter, bias, output);
+int32_t input_offset = -(data->input_zero_point);
+
+  // get scratch buffer
+  int32_t *p_aligned_scratch = nullptr;
+  if (0 == data_ex.opt_constraint) {
+    return kTfLiteError;
+  }
+  if (data_ex.buffer_idx > -1) {
+    p_aligned_scratch =
+        (int32_t *)context->GetScratchBuffer(context, data_ex.buffer_idx);
+
+    if (((uint32_t)p_aligned_scratch & 0xf) != 0)
+      p_aligned_scratch =
+          (int32_t *)((((uint32_t)p_aligned_scratch + 0xf) >> 4) << 4);
+  }
+  data_ex.ds_conv2d.pIm2Col = p_aligned_scratch;
+  data_ex.ds_conv2d.pOutput =
+      (int32_t *)((int8_t *)p_aligned_scratch + data_ex.sizeScratchIm2Col);
+  int sign = (input_offset == 128) ? 1 : 3;
+  /*
+ DepthwiseConvPerChannelPadding(
+      data_ex, tflite::micro::GetTensorData<int8_t>(input),
+      (const int8_t *)data_ex->mapped_filter,
+      // tflite::micro::GetTensorData<int32_t>(bias),
+      (int32_t *)data_ex->bias_aflt,
+      tflite::micro::GetTensorData<int8_t>(output), sign);
+      */
+  //   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
+  const int8_t *input_data = tflite::micro::GetTensorData<int8_t>(input);
+  const int8_t *filter_data = (const int8_t *)data_ex.mapped_filter;
+  const int32_t *bias_data= (int32_t *)data_ex.bias_aflt;
+  int8_t *output_data = tflite::micro::GetTensorData<int8_t>(output);
+  constexpr int group = 4;
+  constexpr int shift = 2;
+
+  const ds_conv2d_layer_t &ds_conv2d = data_ex.ds_conv2d;
+
+  const AScalar *outputMultiplerPerCh =
+      (const AScalar *)
+          data->per_channel_output_multiplier;  // data->outputMultiplerPerCh;
+  const AScalar &outputOffset = data_ex.outputOffset;
+  int inFCM = 0;
+  int inFCN = 0;
+  int inFCN16Size = 0;
+
+  int8_t *pBuffer = (int8_t *)ds_conv2d.pIm2Col;
+  int32_t *pOutput = (int32_t *)ds_conv2d.pOutput;
+  int8_t *outBuf = output_data;
+  int32_t outBufIdx = 0;
+  int32_t dim_kernel_x = ds_conv2d.ker_x;
+  int32_t dim_im_in_x = ds_conv2d.in_x;
+  int32_t ch_im_in = ds_conv2d.in_ch;
+  uint16_t dilation_y = ds_conv2d.dilation_y;
+  uint16_t dilation_x = ds_conv2d.dilation_x;
+
+  {
+    int ch_align = (((ds_conv2d.out_ch + group - 1) >> shift) << shift);
+
+    int in_ch_align = (ds_conv2d.in_ch & (group - 1)) == 0;
+    inFCM = ch_align;                           //
+    inFCN = ds_conv2d.ker_x * ds_conv2d.ker_y;  // filter_dim without ch
+    int inFCNA4 = (((inFCN * inFCM + 3) >> 2) << 2);
+    inFCN16Size = ((inFCNA4) + 15) / 16;
+
+    uint32_t input_offset_neg;
+    uint32_t input_offset;
+    if (data_ex.inputOffsetWithW == nullptr) {
+      input_offset = (ds_conv2d.input_offset == 128) ? 0x80808080 : 0x0;
+      input_offset_neg = 0;
+    } else {
+      input_offset = 0;
+      input_offset_neg = (data_ex.input_offset_int8_neg);
+    }
+    for (int i_out_y = 0; i_out_y < ds_conv2d.out_y; ++i_out_y) {
+      for (int i_out_x = 0; i_out_x < ds_conv2d.out_x; ++i_out_x) {
+        int offset_im_src, offset_im_dst;
+        int len_cpy_x, len_cpy_y;
+
+        im2col_ex_idx im2col_tab_2;
+        int padding =
+            tflite::ConvIm2ColIndex(ds_conv2d, i_out_x, i_out_y, &im2col_tab_2);
+        len_cpy_y = im2col_tab_2.cpy_len_y;
+        len_cpy_x = im2col_tab_2.len_wo_ch;
+        offset_im_dst = im2col_tab_2.dst_offset_wo_ch;
+        offset_im_src = im2col_tab_2.src_offset_wo_ch;
+        if (!padding) {
+          tflite::block_fill_words((int32_t *)pBuffer, input_offset_neg,
+                                   inFCN16Size * 4);
+        }
+
+#ifdef KN_DEBUG
+        // CHECK_ALIGN_4(pBuffer+offset_im_dst);
+        // CHECK_ALIGN_4((const int8_t *)input_data +offset_im_src);
+        CHECK_ALIGN_4(filter_data);
+#endif
+        if (in_ch_align) {
+          tflite::im2colex_padding_offset_align4(
+              pBuffer, offset_im_dst, (const int8_t *)input_data, offset_im_src,
+              dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+              input_offset, dilation_y, dilation_x);
+        } else {
+          // not align 8 copy
+          // destination offset is multplie of 4
+          // KN_ASSERT(input_offset == 0 );
+          tflite::im2col_padding_unalign(
+              pBuffer, offset_im_dst, (const int8_t *)input_data, offset_im_src,
+              dim_im_in_x, dim_kernel_x, len_cpy_x, len_cpy_y, ch_im_in,
+              ch_align, input_offset, dilation_y, dilation_x);
+        }
+        {
+          DepthWiseConvSparseInt8PerCh(
+              (int32_t *)pBuffer, (const int32_t *)filter_data,
+              (const AScalar *)bias_data, &outBuf[outBufIdx * ds_conv2d.in_ch],
+              ds_conv2d.in_ch, inFCN, data_ex.inputOffsetWithW, outputOffset,
+              outputMultiplerPerCh, pOutput, sign);
+
+          outBufIdx += 1;
+        }
+        // i_out_x_prev = i_out_x;
+      }
+      // i_out_y_prev = i_out_y;
+    }
+  }
+
+  return status;
+}
 }  // namespace
 
 TFLMRegistration Register_DEPTHWISE_CONV_2D() {
@@ -2559,8 +2744,14 @@ TFLMRegistration Register_DEPTHWISE_CONV_2D() {
 
 TFLMRegistration Register_DEPTHWISE_CONV_2D_INT8() {
   return tflite::micro::RegisterOp(Init,
-                                   /*prepare=*/PrepareInt8,
+                                   /*prepare=*/PrepareDSConvInt8,
                                    /*invoke=*/EvalDepthWiseConvInt8Opt);
+}
+// only for opt_constraint == 2
+TFLMRegistration Register_DEPTHWISE_CONV_2D_INT8_OPT2() {
+  return tflite::micro::RegisterOp(Init,
+                                   /*prepare=*/PrepareDSConvInt8,
+                                   /*invoke=*/EvalDepthWiseConvInt8Opt2);
 }
 TFLMRegistration Register_DEPTHWISE_CONV_2D_FLOAT16() {
   return tflite::micro::RegisterOp(Init,

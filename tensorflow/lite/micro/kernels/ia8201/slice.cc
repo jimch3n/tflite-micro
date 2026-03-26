@@ -115,7 +115,7 @@ TfLiteStatus SliceEval(TfLiteContext* context, TfLiteNode* node) {
   KN_PRINT_Q31_SIZE(op_params.begin, kMaxDim);
   KN_PRINT_Q31_SIZE(op_params.size, kMaxDim);
   
-  #if defined(DMX1A_SLICE_OPT)
+  #if defined(DMX1A_SLICE_OPT) || defined(HMD1A_SLICE_OPT)
   bool is_opt = input->dims->size == 3 && op_params.begin[2] == 0 &&
                 op_params.size[2] == 1 &&
                 op_params.size[3] == input->dims->data[1];
@@ -124,7 +124,7 @@ TfLiteStatus SliceEval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteFloat32:
       KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input),
                      ElementCount(*input->dims));
-#if defined(DMX1A_SLICE_OPT)
+#if defined(DMX1A_SLICE_OPT) || defined(HMD1A_SLICE_OPT)
       if(is_opt) // 2-d slice ,
       {
         float* src0 = (float *)tflite::micro::GetTensorData<float>(input);

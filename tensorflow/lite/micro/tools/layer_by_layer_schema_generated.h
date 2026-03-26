@@ -59,6 +59,7 @@ enum TensorTypes : int8_t {
   TensorTypes_UINT16 = 16,
   TensorTypes_INT4 = 17,
   TensorTypes_BFLOAT16 = 18,
+  TensorTypes_AFLOAT32 = 19,
   TensorTypes_MIN = TensorTypes_FLOAT32,
   TensorTypes_MAX = TensorTypes_BFLOAT16
 };

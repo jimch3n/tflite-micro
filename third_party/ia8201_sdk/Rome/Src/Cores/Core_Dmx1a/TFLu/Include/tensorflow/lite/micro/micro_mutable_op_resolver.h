@@ -183,7 +183,7 @@ class MicroMutableOpResolver : public MicroOpResolver {
   }
 
   TfLiteStatus AddConcatenation(const TFLMRegistration& registration = Register_CONCATENATION()) {
-    return AddBuiltin(BuiltinOperator_CONCATENATION, Register_CONCATENATION(),
+    return AddBuiltin(BuiltinOperator_CONCATENATION, registration,
                       ParseConcatenation);
   }
 
@@ -372,8 +372,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
                       ParseGatherNd);
   }
 
-  TfLiteStatus AddGreater() {
-    return AddBuiltin(BuiltinOperator_GREATER, Register_GREATER(),
+  TfLiteStatus AddGreater(const TFLMRegistration& registration =  Register_GREATER()) {
+    return AddBuiltin(BuiltinOperator_GREATER, registration,
                       ParseGreater);
   }
 
@@ -440,8 +440,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
                       ParseLogicalOr);
   }
 
-  TfLiteStatus AddLogistic() {
-    return AddBuiltin(BuiltinOperator_LOGISTIC, tflite::Register_LOGISTIC(),
+  TfLiteStatus AddLogistic(const TFLMRegistration & registration = tflite::Register_LOGISTIC() ) {
+    return AddBuiltin(BuiltinOperator_LOGISTIC, registration,
                       ParseLogistic);
   }
 
@@ -487,8 +487,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_NEG, Register_NEG(), ParseNeg);
   }
 
-  TfLiteStatus AddNotEqual() {
-    return AddBuiltin(BuiltinOperator_NOT_EQUAL, Register_NOT_EQUAL(),
+  TfLiteStatus AddNotEqual(const TFLMRegistration& registration = Register_NOT_EQUAL()) {
+    return AddBuiltin(BuiltinOperator_NOT_EQUAL,registration,
                       ParseNotEqual);
   }
 
@@ -601,8 +601,9 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_SIN, Register_SIN(), ParseSin);
   }
 
-  TfLiteStatus AddSlice() {
-    return AddBuiltin(BuiltinOperator_SLICE, Register_SLICE(), ParseSlice);
+  TfLiteStatus AddSlice(const TFLMRegistration &registration =
+                           tflite::Register_SLICE()) {
+    return AddBuiltin(BuiltinOperator_SLICE, registration, ParseSlice);
   }
 
   TfLiteStatus AddSoftmax(
@@ -697,8 +698,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
                       ParseTransposeConv);
   }
 
-  TfLiteStatus AddTranspose() {
-    return AddBuiltin(BuiltinOperator_TRANSPOSE, Register_TRANSPOSE(),
+  TfLiteStatus AddTranspose(const TFLMRegistration & registration = tflite::Register_TRANSPOSE()) {
+    return AddBuiltin(BuiltinOperator_TRANSPOSE, registration,
                       ParseTranspose);
   }
 

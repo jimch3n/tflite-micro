@@ -17,9 +17,10 @@ limitations under the License.
 #define SIGNAL_SRC_SQUARE_ROOT_H_
 
 #include <stdint.h>
-
+#ifndef    REMOVE_TFLM_SIGNAL
 namespace tflite {
 namespace tflm_signal {
+#endif
 // TODO(b/286250473): remove namespace once de-duped libraries above
 
 // Square root
@@ -27,7 +28,8 @@ uint16_t Sqrt32(uint32_t num);
 uint32_t Sqrt64(uint64_t num);
 // afloat/IA8201
 uint32_t SqrtAfloat(uint64_t num);
+#ifndef    REMOVE_TFLM_SIGNAL
 }  // namespace tflm_signal
 }  // namespace tflite
-
+#endif
 #endif  // SIGNAL_SRC_SQUARE_ROOT_H_

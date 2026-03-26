@@ -36,6 +36,10 @@ uint32_t MicroProfiler::BeginEvent(const char* tag) {
   tags_[num_events_] = tag;
   start_ticks_[num_events_] = GetCurrentTimeTicks();
   end_ticks_[num_events_] = start_ticks_[num_events_] - 1;
+#if defined(IA8201)
+  mac8b_counts_[num_events_] = 0;
+  macaflt_counts[num_events_] = 0;
+#endif
   return num_events_++;
 }
 
@@ -51,26 +55,78 @@ uint32_t MicroProfiler::GetTotalTicks() const {
   }
   return ticks;
 }
+#if defined(IA8201)
+void MicroProfiler::AccumuateMacCount(uint32_t mac_count)
+{
+  // minuse1
+  if (num_events_ -1 < kMaxEvents)
+  {
+    mac8b_counts_[num_events_-1] += mac_count;
+  }
+}
+void MicroProfiler::LogMacCount() const {
+#if !defined(TF_LITE_STRIP_ERROR_STRINGS)
+  uint32_t total_mac_inst = 0;
+  uint32_t total_mac_op = 0;
+  MicroPrintf("\"OpID\",\"Tag\",\"Mac Instruction (8b)\",\"Mac Op\"");
+  for (int i = 0; i < num_events_; ++i) {
 
+    uint32_t mac_counts = mac8b_counts_[i]; //end_ticks_[i] - start_ticks_[i];
+    if (mac_counts == 0)
+      continue;
+    uint32_t mac_ops =
+#if defined(DMX1A)
+      mac_counts * 16;
+#elif defined(HMD1A)
+      mac_counts * 8;
+#else
+      0;
+#endif
+    MicroPrintf("%-5d,%-16s,%-16d,%-16d" , i, tags_[i], mac_counts, mac_ops  );
+    total_mac_inst += (uint32_t)mac_counts;
+    total_mac_op += (uint32_t)mac_ops;
+  }
+  MicroPrintf("\ntotal Mac Instruction: %-16d  Mac operations: %-16d\n\n", total_mac_inst,
+    total_mac_op);
+#endif
+}
+#endif
 void MicroProfiler::Log() const {
 #if !defined(TF_LITE_STRIP_ERROR_STRINGS)
   for (int i = 0; i < num_events_; ++i) {
     uint32_t ticks = end_ticks_[i] - start_ticks_[i];
     MicroPrintf("%s took %u ticks (%d ms).", tags_[i], ticks, TicksToMs(ticks));
   }
+
+  // mac count estimation
 #endif
 }
 
+
 void MicroProfiler::LogCsv() const {
 #if !defined(TF_LITE_STRIP_ERROR_STRINGS)
-  MicroPrintf("\"Event\",\"Tag\",\"Ticks\"");
+  uint32_t total_ticks = 0;
+  for (int i = 0; i < num_events_; ++i) {
+    uint32_t ticks = end_ticks_[i] - start_ticks_[i];
+    TFLITE_DCHECK(tags_[i] != nullptr);
+    //int position = FindExistingOrNextPosition(tags_[i]);
+    //TFLITE_DCHECK(position >= 0);
+    //total_ticks_per_tag_[position].tag = tags_[i];
+    //total_ticks_per_tag_[position].ticks =
+    //  total_ticks_per_tag_[position].ticks + ticks;
+    total_ticks += ticks;
+  }
+
+  MicroPrintf("\"Event\",\"Tag\",\"Ticks\", \"Percentage\"");
   for (int i = 0; i < num_events_; ++i) {
 #if defined(HEXAGON) || defined(CMSIS_NN)
     int ticks = end_ticks_[i] - start_ticks_[i];
     MicroPrintf("%d,%s,%d", i, tags_[i], ticks);
 #else
     uint32_t ticks = end_ticks_[i] - start_ticks_[i];
-    MicroPrintf("%d,%s,%" PRIu32, i, tags_[i], ticks);
+    float percentage = (float)ticks / (float)total_ticks * 100.0f;
+
+    MicroPrintf("%-5d,%-16s,%-16d,%-2.2f%%", i, tags_[i], ticks, (double)percentage);
 #endif
   }
 #endif
@@ -124,6 +180,10 @@ int MicroProfiler::FindExistingOrNextPosition(const char* tag_name) {
 void MicroProfiler::ClearEvents() {
   for (int i = 0; i < num_events_; i++) {
     total_ticks_per_tag_[i].tag = nullptr;
+#if defined(IA8201)
+    mac8b_counts_[i] = 0;
+    macaflt_counts[i] = 0;
+#endif
   }
 
   num_events_ = 0;

@@ -18,6 +18,8 @@ limitations under the License.
 #ifndef REMOVE_REFOP_SUPPORT
 #include "tensorflow/lite/kernels/internal/reference/fully_connected.h"
 #endif
+
+#include "tensorflow/lite/micro/micro_profiler.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
@@ -789,7 +791,8 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
                          int8_t *output, int m, int n,
                          const AScalar &outOffsetFr32,
                          const uint32_t input_offset_int8x4,  // xor 128
-                         const AScalar &outMultiplerFr32, int signs) {
+                         const AScalar &outMultiplerFr32, int signs,
+  tflite::MicroProfiler *profiler=nullptr) {
   int8_t *pY = output;
 
   const int32_t *pA = A;
@@ -826,6 +829,12 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
   replicate_ar(VR_outMult, 0xf, outMultiplerFr32.fr);
   replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
   replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
+
+  if (profiler)
+  {
+    profiler->AccumuateMacCount(loopLimRow * (loopLimCol * 8 +
+      nBlockAligned2 - (loopLimCol << 3)));
+  }
   for (int i = 0; i < loopLimRow; i++) {
     VR_y = vseta_vr(0, 0, 0);
     mov_AccExtend_vr(VR_y);
@@ -983,7 +992,7 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
                                     int n, const AScalar &outOffsetFr32,
                                     const int32_t *inputOffsetWithW,  // xor 128
                                     const AScalar &outMultiplerFr32,
-                                    int signs) {
+                                    int signs, tflite::MicroProfiler *profiler=nullptr) {
   int8_t *pY = output;
 
   const int32_t *pA = A;
@@ -1023,6 +1032,12 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
   replicate_ar(VR_outMult, 0xf, outMultiplerFr32.fr);
   replicate_ar(VR_outOffset, 0xf, outOffsetFr32.fr);
   // replicate_ar(VR_inputOffset, 0xf, input_offset_int8x4);
+
+  if (profiler)
+  {
+    profiler->AccumuateMacCount(loopLimRow * (loopLimCol * 8 +
+      nBlockAligned2 - (loopLimCol << 3)));
+  }
   for (int i = 0; i < loopLimRow; i++) {
     if (inputOffsetWithW) {
       load32x4_vr_postI(VR_y, inputOffsetW, INC1);
@@ -2183,7 +2198,7 @@ static void FullyConnectedQuantizedInt8(
   //	p_dmx1a_fc_aligned_input = (int8_t *)context->GetScratchBuffer(context,
   // data.buffer_idx);
   //}
-
+  tflite::MicroProfiler* profiler = (tflite::MicroProfiler *)context->profiler;
   int sign = 3;
   //			int input_aligned4 = data.is_input_align_4;
   sign = (128 == op_params.input_offset)
@@ -2202,12 +2217,12 @@ static void FullyConnectedQuantizedInt8(
           (AScalar *)baisMVM, (int8_t *)outputLocal, output_depth, accum_depth,
           data.outputOffset, data.input_offset_int8,
           // op_params.output_offset,
-          data.outputMultipler, sign);
+          data.outputMultipler, sign, profiler);
     } else {
       status = FullyConnectedKernelInputOffset(
           (int32_t *)inputLocal, (int32_t *)p_fc_mapped_filter,
           (AScalar *)baisMVM, (int8_t *)outputLocal, output_depth, accum_depth,
-          data.outputOffset, data.inputOffsetWithW, data.outputMultipler, sign);
+          data.outputOffset, data.inputOffsetWithW, data.outputMultipler, sign, profiler);
     }
     if (status != 0) {
       TFLITE_DCHECK(status == 0);
@@ -2420,9 +2435,16 @@ TfLiteStatus Prepare(TfLiteContext *context, TfLiteNode *node) {
         // Allocate tensor weight
         AScalar *bias_aflt = (AScalar *)context->AllocatePersistentBuffer(
             context, sizeof(AScalar) * bias_size);
-        tflite::ConvertIEEEFloatToAfloat(bias_data, (AScalar *)bias_aflt,
-                                         bias_size);
-        data_ex->bias_aflt = bias_aflt;
+        if (biasEval->type == kTfLiteFloat32)
+        {
+          tflite::ConvertIEEEFloatToAfloat(bias_data, (AScalar*)bias_aflt,
+            bias_size);
+          data_ex->bias_aflt = bias_aflt;
+        }
+        else {
+          // ASSERT
+          MicroPrintf("FC unknown bias data type: %d\n", biasEval->type);
+        }
         KN_PRINT_AFLOAT(bias_aflt, ElementCount(*biasEval->dims));
       }
     }
@@ -2596,8 +2618,8 @@ TfLiteStatus EvalFloatInt8(TfLiteContext *context, TfLiteNode *node,
     float *inputLocal = (float *)tflite::micro::GetTensorData<float>(input);
     float *outputLocal = tflite::micro::GetTensorData<float>(output);
     const int8_t *filterLocal = tflite::micro::GetTensorData<int8_t>(filter);
-    const float *biasLocal =
-        bias ? tflite::micro::GetTensorData<float>(bias) : nullptr;
+    const float* biasLocal =
+      bias ? (float *)data.bias_aflt : nullptr; // tflite::micro::GetTensorData<float>(bias) : nullptr;
     const int output_depth = output_shape.Dims(output_dim_count - 1);
     const RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
     const int filter_dim_count = filter_shape.DimensionsCount();

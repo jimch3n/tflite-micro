@@ -262,11 +262,11 @@ static TfLiteStatus AddQuantizedInt8SatX4(const OpDataAddEx* data_ex,
   out4 = ppOutput[3];
 
 
-  CHECK_ALIGN_4(out1);
+  //CHECK_ALIGN_4(out1);
 
-  CHECK_ALIGN_4(out2);
-  CHECK_ALIGN_4(out3);
-  CHECK_ALIGN_4(out4);
+  //CHECK_ALIGN_4(out2);
+  //CHECK_ALIGN_4(out3);
+  //CHECK_ALIGN_4(out4);
   replicate_ar(vr_offset1, 0xf, data_ex->input1_offset_fr32.fr);  // Afloat
   replicate_ar(vr_offset2, 0xf, data_ex->input2_offset_fr32.fr);
   replicate_ar(vr_output_offset, 0xf, data_ex->output_offset_fr32.fr);

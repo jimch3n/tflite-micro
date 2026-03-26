@@ -150,6 +150,205 @@ inline int CalculatePositiveAxis(int axis, const TfLiteTensor* output_tensor) {
     return NumDimensions(output_tensor) + axis;
   }
 }
+
+#if defined (DMX1A_CONCATENATION_OPT)
+
+int32_t dmx_concat_8_8_prepare(ConCatOpDataEx* data,
+  const int32_t* const p_out_shape,
+ // const int8_t** pp_inps,
+  const RuntimeShape* input_shapes[],
+  int32_t num_out_dims,
+  int32_t num_inp,
+  int32_t num_inp_dims,
+  int32_t axis)
+{
+  //ARG_CHK_PTR(p_out, -1);
+  ARG_CHK_PTR(p_out_shape, -1);
+  //ARG_CHK_PTR(pp_inps, -1);
+  // ARG_CHK_PTR(pp_inps_shape, -1);
+   /* Pointer alignment checks */
+  ARG_CHK_ALIGN(p_out_shape, sizeof(int32_t), -1);
+ // ARG_CHK_ALIGN(pp_inps, sizeof(int8_t*), -1);
+  //ARG_CHK_ALIGN(pp_inps_shape, sizeof(int32_t*), -1);
+  //Validate Arguments
+  ARG_CHK_COND((num_out_dims <= 0 || num_out_dims > 6), -1);
+  ARG_CHK_COND((num_inp <= 0 || num_inp > 10), -1);
+  ARG_CHK_COND((num_inp_dims != num_out_dims), -1);
+  ARG_CHK_COND((axis < -num_out_dims || axis >= num_out_dims), -1);
+
+  int i = 0, j = 0;
+  for (i = 0; i < num_out_dims; i++)
+  {
+    ARG_CHK_COND((p_out_shape[i] <= 0), -1);
+  }
+
+  if (axis < 0)
+    axis = num_out_dims + axis;
+  int32_t concat_size = 0;
+
+  for (i = 0; i < num_inp; i++)
+  {
+    //ARG_CHK_PTR(pp_inps[i], -1);
+    // ARG_CHK_PTR(pp_inps_shape[i], -1);
+    // ARG_CHK_ALIGN(pp_inps_shape[i], sizeof(int32_t), -1);
+#pragma loop_count min=1
+    for (j = 0; j < num_out_dims; j++)
+    {
+      ARG_CHK_COND((input_shapes[i]->Dims(j) != p_out_shape[j] && j != axis), -1);
+    }
+    // ARG_CHK_COND((pp_inps_shape[i][axis] <= 0), -1);
+    concat_size += input_shapes[i]->Dims(axis);//pp_inps_shape[i][axis];
+  }
+
+  ARG_CHK_COND((p_out_shape[axis] != concat_size), -1);
+
+  //Calculate outer and inner size for axis
+  int32_t outer_size = 1;
+#pragma no_simd
+  for (int i = 0; i < axis; i++)
+  {
+    outer_size *= p_out_shape[i];
+  }
+
+  int32_t base_inner_size = 1;
+#pragma no_simd
+  for (int i = axis + 1; i < num_out_dims; i++)
+  {
+    base_inner_size *= p_out_shape[i];
+  }
+
+  data->concat_size = concat_size;
+  data->outer_size = outer_size;
+  data->base_inner_size = base_inner_size;
+  return 0;
+}
+
+int dmx_concat_8_8(const ConCatOpDataEx *data, int8_t *p_out, int32_t num_inp,
+  const int8_t** pp_inps, const RuntimeShape* input_shapes[], int32_t axis)
+{
+
+  int32_t base_inner_size = data->base_inner_size;
+  int32_t concat_size = data->concat_size;
+  int32_t outer_size = data->outer_size;
+
+  int8_t* ptmp_out = p_out;
+
+  for (int i = 0; i < num_inp; i++)
+  {
+  const int32_t copy_size = input_shapes[i]->Dims(axis) * base_inner_size;//pp_inps_shape[i][axis] * base_inner_size;
+  int8_t* output_ptr = ptmp_out;
+  const int8_t* input_ptr = pp_inps[i];
+
+  if (((copy_size & 1) == 0) && (((concat_size * base_inner_size) & 1) == 0)
+    && (((unsigned)input_ptr & 1) == 0) && (((unsigned)output_ptr & 1) == 0))
+  {
+    if (copy_size <= 8)
+    {
+      const int16_t* pae_inp = (const int16_t*)input_ptr;
+      for (int k = 0; k < outer_size; k++)
+      {
+        // word copy
+        int16_t* pae_out = (int16_t*)output_ptr;
+#pragma concurrent
+#pragma no_simd
+        for (int ic = 0; ic < (copy_size >> 1); ic++)
+        {
+          *pae_out++ = *pae_inp++;
+        }
+        output_ptr += concat_size * base_inner_size;
+      }
+    }
+    else
+    {
+
+      for (int k = 0; k < outer_size; k++)
+      {
+        const vr128* pae_inp = (const vr128*)input_ptr;
+        vr128* pae_out = (vr128*)output_ptr;
+        ulsr128 inp_a, out_a;
+        inp_a = align_32x4_load(pae_inp);//AE_LA64_PP(pae_inp);
+        out_a = align_32x4_store(output_ptr); //AE_ZALIGN64();
+        for (int ic = 0; ic < (copy_size >> 4); ic++)
+        {
+          vr128 d0;
+          load_32x4_vr_a(d0, inp_a, pae_inp);//, INC1, VRL);
+          store_32x4_vr_a(d0, out_a, pae_out);//, INC1, VRL);
+          //AE_LA16X4_IP(d0, inp_a, pae_inp);
+          //AE_SA16X4_IP(d0, out_a, pae_out);
+        }
+        //AE_SA64POS_FP(out_a, pae_out);
+        flush_32x4(out_a, pae_out); 
+        const int16_t* puae_inp = (const int16_t*)pae_inp;
+        int16_t* puae_out = (int16_t*)pae_out;
+#pragma concurrent
+        for (int ic = 0; ic < ((copy_size >> 1) & 7); ic++)
+        {
+          puae_out[ic] = puae_inp[ic];
+        }
+        input_ptr += copy_size;
+        output_ptr += concat_size * base_inner_size;
+      }
+
+    }
+  }
+  else
+  {
+    if (copy_size <= 6)
+    {
+      for (int k = 0; k < outer_size; k++)
+      {
+#pragma concurrent
+#pragma no_unroll
+        for (int ic = 0; ic < copy_size; ic++)
+        {
+          output_ptr[ic] = *input_ptr++;
+        }
+        output_ptr += concat_size * base_inner_size;
+      }
+    }
+    else
+    {
+
+      for (int k = 0; k < outer_size; k++)
+      {
+#if 0
+        const ae_int24x2* pae_inp = (const ae_int24x2*)input_ptr;
+        ae_int24x2* pae_out = (ae_int24x2*)output_ptr;
+        ae_valign inp_a, out_a;
+        inp_a = AE_LA64_PP(pae_inp);
+        out_a = AE_ZALIGN64();
+
+        int copy_size_by6 = AE_MOVAD32_H(AE_MOVINT32X2_FROMINT64(AE_MUL32_LL(copy_size, 0x2AAAAAAB)));
+        int copy_size_rem_start = 6 * copy_size_by6;
+#pragma concurrent
+        for (int ic = 0; ic < copy_size_by6; ic++)
+        {
+          ae_int24x2 d0;
+          AE_LA24X2_IP(d0, inp_a, pae_inp);
+          AE_SA24X2_IP(d0, out_a, pae_out);
+        }
+        AE_SA64POS_FP(out_a, pae_out);
+#endif
+
+        // FIXME:
+        //int copy_size_by6 = copy_size / 6;
+        int copy_size_rem_start = 0;// 6 * copy_size_by6;
+        for (int ic = copy_size_rem_start; ic < copy_size; ic++)
+        {
+          output_ptr[ic] = input_ptr[ic];
+        }
+        input_ptr += copy_size;
+        output_ptr += concat_size * base_inner_size;
+      }
+
+    }
+  }
+  ptmp_out += copy_size;
+}
+return 0;
+}
+
+#endif
 #if defined (HMD1A_CONCATENATION_OPT)
 
 int32_t hmd_concat_8_8_prepare(ConCatOpDataEx* data,
@@ -630,15 +829,49 @@ TfLiteStatus ConcatenationPrepare(TfLiteContext* context, TfLiteNode* node) {
       
     }
 #elif defined(DMX1A_CONCATENATION_OPT)
-  data->input_offset = (uint16_t*)context->AllocatePersistentBuffer(
+ 
+  if (output_type == kTfLiteInt8)
+  {
+    data->input_offset = nullptr;
+    data->input_size = nullptr;
+    data->opt_constraint = 2;
+    // GetAllInputTensorData(context, node, inputs_data_int8);
+     /*
+         int ret = xa_nn_concat_8_8(
+   output_ptr, tflite::micro::GetTensorShape(output).DimsData(),
+   inputs_data, inputs_shape_ptr,
+   tflite::micro::GetTensorShape(output).DimensionsCount(),
+   data->inputs_count,
+   inputs_shape[0].DimensionsCount(), data->params.axis);
+     */
+    int ret = dmx_concat_8_8_prepare(data, output_shape.DimsData(),
+      //  inputs_data_int8, 
+      inputs_shape_ptr,
+      output_shape.DimensionsCount(),
+      data->params.inputs_count,
+      inputs_shape[0].DimensionsCount(),
+      data->params.axis);
+    if (0 != ret)
+    {
+      status = kTfLiteError;
+    }
+    KN_PRINTD(data->concat_size);
+    KN_PRINTD(data->outer_size);
+    KN_PRINTD(data->base_inner_size);
+  }
+  else {
+    data->input_offset = (uint16_t*)context->AllocatePersistentBuffer(
       context, sizeof(uint16_t) * inputs_count * outer_size);
-  data->input_size = (uint32_t*)context->AllocatePersistentBuffer(
+    data->input_size = (uint32_t*)context->AllocatePersistentBuffer(
       context, sizeof(uint32_t) * inputs_count * outer_size);
-  static uint32_t concat_persist_size = 0;
-  concat_persist_size += sizeof(uint32_t) * inputs_count * outer_size +
-    sizeof(uint16_t) * inputs_count * outer_size;
+    static uint32_t concat_persist_size = 0;
+    concat_persist_size += sizeof(uint32_t) * inputs_count * outer_size +
+      sizeof(uint16_t) * inputs_count * outer_size;
 
-  KN_PRINTD(concat_persist_size);
+  }
+  
+
+  //KN_PRINTD(concat_persist_size);
 #endif
  
 
@@ -707,7 +940,7 @@ TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE(context, output_tensor != nullptr);
 
   TfLiteType output_type = output_tensor->type;
-#if defined (HMD1A_CONCATENATION_OPT)
+#if defined (HMD1A_CONCATENATION_OPT)  || defined(DMX1A_CONCATENATION_OPT)
   const ConCatOpDataEx* data =
     static_cast<const ConCatOpDataEx*>(node->user_data);
 #endif
@@ -723,7 +956,7 @@ TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
       EvalQuantizedUInt8(context, node);
       break;
     case kTfLiteInt8:
-#if defined (HMD1A_CONCATENATION_OPT)
+#if defined (HMD1A_CONCATENATION_OPT) || defined(DMX1A_CONCATENATION_OPT)
     if (data->opt_constraint == 2)
     {
       RuntimeShape inputs_shape[kMaxInputNum];
@@ -738,9 +971,13 @@ TfLiteStatus ConcatenationEval(TfLiteContext* context, TfLiteNode* node) {
 
       TFLITE_DCHECK(node->user_data != nullptr);
   int8_t* output_ptr = tflite::micro::GetTensorData<int8_t>(output);
+#ifdef HMD1A
   int ret = hmd_concat_8_8(data, output_ptr, data->inputs_count,
     inputs_data, inputs_shape_ptr, data->params.axis);
-
+#elif defined(DMX1A)
+  int ret = dmx_concat_8_8(data, output_ptr, data->inputs_count,
+    inputs_data, inputs_shape_ptr, data->params.axis);
+#endif
 
   if (0 != ret) status = kTfLiteError;
     }else 

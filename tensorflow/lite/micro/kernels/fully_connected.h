@@ -90,6 +90,7 @@ TFLMRegistration Register_FULLY_CONNECTED();
 // Returns a TFLMRegistration struct for kernel variant that only supports
 // int8.
 TFLMRegistration Register_FULLY_CONNECTED_INT8();
+TFLMRegistration Register_FULLY_CONNECTED_INT8_OPT1();
 TFLMRegistration Register_FULLY_CONNECTED_FLOAT32();
 
 // support float32 x float16 and float32 x int8 hybrid

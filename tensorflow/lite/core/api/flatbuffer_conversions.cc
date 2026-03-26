@@ -135,7 +135,7 @@ TfLitePadding ConvertPadding(Padding padding) {
   }
   return kTfLitePaddingUnknown;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT
 // Converts the flatbuffer mirror padding enum to what is used at runtime.
 TfLiteMirrorPaddingMode ConvertMirrorPadding(MirrorPadMode padding) {
   switch (padding) {
@@ -158,7 +158,7 @@ TfLiteRngAlgorithm ConvertRngAlgorithm(RngAlgorithm algorithm) {
   }
   return kTfLiteRngAlgorithmUnknown;
 }
-
+#endif
 #ifndef TF_LITE_STATIC_MEMORY
 TfLiteStatus ParseOpDataTfLite(const Operator* op, BuiltinOperator op_type,
                                ErrorReporter* error_reporter,
@@ -1125,7 +1125,7 @@ TfLiteStatus ParseAdd(const Operator* op, ErrorReporter* error_reporter,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT
 TfLiteStatus ParseAddN(const Operator* op, ErrorReporter* error_reporter,
                        BuiltinDataAllocator* allocator, void** builtin_data) {
   return kTfLiteOk;
@@ -1289,7 +1289,7 @@ TfLiteStatus ParseCeil(const Operator*, ErrorReporter*, BuiltinDataAllocator*,
                        void**) {
   return kTfLiteOk;
 }
-
+#endif
 TfLiteStatus ParseConcatenation(const Operator* op,
                                 ErrorReporter* error_reporter,
                                 BuiltinDataAllocator* allocator,
@@ -1352,7 +1352,7 @@ TfLiteStatus ParseConv2D(const Operator* op, ErrorReporter* error_reporter,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -1403,7 +1403,7 @@ TfLiteStatus ParseDepthToSpace(const Operator* op,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#endif
 TfLiteStatus ParseDepthwiseConv2D(const Operator* op,
                                   ErrorReporter* error_reporter,
                                   BuiltinDataAllocator* allocator,
@@ -1447,7 +1447,7 @@ TfLiteStatus ParseDequantize(const Operator*, ErrorReporter*,
                              BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT // testonly do not link builtion options
 TfLiteStatus ParseDiv(const Operator* op, ErrorReporter* error_reporter,
                       BuiltinDataAllocator* allocator, void** builtin_data) {
   CheckParsePointerParams(op, error_reporter, allocator, builtin_data);
@@ -1534,7 +1534,7 @@ TfLiteStatus ParseFloorMod(const Operator*, ErrorReporter*,
                            BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#endif
 TfLiteStatus ParseFullyConnected(const Operator* op,
                                  ErrorReporter* error_reporter,
                                  BuiltinDataAllocator* allocator,
@@ -1582,7 +1582,7 @@ TfLiteStatus ParseFullyConnected(const Operator* op,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT // testonly do not link builtion options
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -1750,7 +1750,7 @@ TfLiteStatus ParseLogicalOr(const Operator*, ErrorReporter*,
                             BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#endif
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -1758,7 +1758,7 @@ TfLiteStatus ParseLogistic(const Operator*, ErrorReporter*,
                            BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT // testonly do not link builtion options
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -1842,7 +1842,7 @@ TfLiteStatus ParseMirrorPad(const Operator* op, ErrorReporter* error_reporter,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#endif
 TfLiteStatus ParseMul(const Operator* op, ErrorReporter* error_reporter,
                       BuiltinDataAllocator* allocator, void** builtin_data) {
   CheckParsePointerParams(op, error_reporter, allocator, builtin_data);
@@ -1866,7 +1866,7 @@ TfLiteStatus ParseMul(const Operator* op, ErrorReporter* error_reporter,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -1969,7 +1969,7 @@ TfLiteStatus ParsePrelu(const Operator*, ErrorReporter*, BuiltinDataAllocator*,
                         void**) {
   return kTfLiteOk;
 }
-
+#endif
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -1977,7 +1977,7 @@ TfLiteStatus ParseQuantize(const Operator*, ErrorReporter*,
                            BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -2027,7 +2027,7 @@ TfLiteStatus ParseRelu6(const Operator*, ErrorReporter*, BuiltinDataAllocator*,
                         void**) {
   return kTfLiteOk;
 }
-
+#endif
 TfLiteStatus ParseReshape(const Operator* op, ErrorReporter* error_reporter,
                           BuiltinDataAllocator* allocator,
                           void** builtin_data) {
@@ -2064,7 +2064,7 @@ TfLiteStatus ParseReshape(const Operator* op, ErrorReporter* error_reporter,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT // testonly do not link builtion options
 TfLiteStatus ParseResizeBilinear(const Operator* op,
                                  ErrorReporter* error_reporter,
                                  BuiltinDataAllocator* allocator,
@@ -2521,7 +2521,7 @@ TfLiteStatus ParseSin(const Operator*, ErrorReporter*, BuiltinDataAllocator*,
                       void**) {
   return kTfLiteOk;
 }
-
+#endif
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
 // selective registration for the OpResolver implementation in micro.
@@ -2529,7 +2529,7 @@ TfLiteStatus ParseSlice(const Operator*, ErrorReporter*, BuiltinDataAllocator*,
                         void**) {
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT
 TfLiteStatus ParseSoftmax(const Operator* op, ErrorReporter* error_reporter,
                           BuiltinDataAllocator* allocator,
                           void** builtin_data) {
@@ -2749,7 +2749,7 @@ TfLiteStatus ParseStridedSlice(const Operator* op,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#endif
 TfLiteStatus ParseSub(const Operator* op, ErrorReporter* error_reporter,
                       BuiltinDataAllocator* allocator, void** builtin_data) {
   CheckParsePointerParams(op, error_reporter, allocator, builtin_data);
@@ -2774,7 +2774,7 @@ TfLiteStatus ParseSub(const Operator* op, ErrorReporter* error_reporter,
   *builtin_data = params.release();
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT // testonly do not link builtion options
 TfLiteStatus ParseSvdf(const Operator* op, ErrorReporter* error_reporter,
                        BuiltinDataAllocator* allocator, void** builtin_data) {
   CheckParsePointerParams(op, error_reporter, allocator, builtin_data);
@@ -2809,6 +2809,7 @@ TfLiteStatus ParseTanh(const Operator*, ErrorReporter*, BuiltinDataAllocator*,
                        void**) {
   return kTfLiteOk;
 }
+#endif // end of remove_refop_support
 //
 // We have this parse function instead of directly returning kTfLiteOk from the
 // switch-case in ParseOpData because this function is used as part of the
@@ -2817,7 +2818,7 @@ TfLiteStatus ParseTranspose(const Operator*, ErrorReporter*,
                             BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#ifndef REMOVE_REFOP_SUPPORT // testonly do not link builtion options
 TfLiteStatus ParseTransposeConv(const Operator* op,
                                 ErrorReporter* error_reporter,
                                 BuiltinDataAllocator* allocator,
@@ -2954,7 +2955,7 @@ TfLiteStatus ParseRightShift(const Operator*, ErrorReporter*,
                              BuiltinDataAllocator*, void**) {
   return kTfLiteOk;
 }
-
+#endif // end of remove_refops
 TfLiteStatus ParseOpData(const Operator* op, BuiltinOperator op_type,
                          ErrorReporter* error_reporter,
                          BuiltinDataAllocator* allocator, void** builtin_data) {

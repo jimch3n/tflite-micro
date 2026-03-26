@@ -196,6 +196,7 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
   }
 
   int output_size = NumElements(output);
+  int input_size = NumElements(input);
   op_data->num_output_elements = output_size;
 
   op_data->num_axis = static_cast<int>(ElementCount(*axis->dims));
@@ -283,6 +284,16 @@ TfLiteStatus PrepareMeanOrSum(TfLiteContext* context, TfLiteNode* node) {
 #endif
   }
 
+
+  // kTfLite int64 summation axis 2d, 0,1 output 1
+  if (input->type == kTfLiteInt64)
+  {
+    if (op_data_ex->num_elements_in_axis == input_size &&
+      output_size == 1)
+    {
+      op_data_ex->opt_constraint = 3; // 
+    }
+  }
   TF_LITE_ENSURE_OK(context, PrepareSimple(context, node));
   // TODO(b/144955155): Support uint8_t(b/144955155) and int8_t(b/144955018)
 
@@ -1639,8 +1650,26 @@ TfLiteStatus EvalSum(TfLiteContext* context, TfLiteNode* node) {
 #if defined(DMX1A_SUM_OPT) || defined(HMD1A_SUM_OPT)
   if (op_data_ex->opt_constraint) {
     // TODO
-    TF_LITE_ENSURE_EQ(context, 1, 0);
-    return kTfLiteError;
+    //TF_LITE_ENSURE_EQ(context, 1, 0);
+
+    if (op_data_ex->opt_constraint == 3)
+    {
+      const int64_t* inputData = tflite::micro::GetTensorData<int64_t>(input);
+        uint32_t input_size = ElementCount(*input->dims);
+        int64_t* outputData = tflite::micro::GetTensorData<int64_t>(output);
+      // int64 opt
+      int64_t output_sum = 0;
+      for (size_t ii = 0; ii < input_size; ii++)
+      {
+        output_sum += inputData[ii];
+      }
+
+      KN_PRINTX_INT64(output_sum);
+      outputData[0] = output_sum;
+    }
+    else {
+      return kTfLiteError;
+    }
   } else if (op_data_ex->opt_constraint_float) {
     KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input),
                    ElementCount(*input->dims));
@@ -1663,6 +1692,52 @@ TfLiteStatus EvalSum(TfLiteContext* context, TfLiteNode* node) {
 
   return kTfLiteOk;
 }
+
+TfLiteStatus EvalMeanFloat32(TfLiteContext* context, TfLiteNode* node) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+
+  OpDataReduceEx* op_data_ex = static_cast<OpDataReduceEx*>(node->user_data);
+
+  OpDataReduce* op_data = static_cast<OpDataReduce*>(&op_data_ex->ReduceOp);
+  if (kTfLiteFloat32 != input->type) {
+    TF_LITE_ENSURE_MSG(context, false,
+                       "Currently, only float32, int8 or uint8 input type "
+                       "is supported.");
+    return kTfLiteError;
+  }
+
+  // Defer to specialized implementation for 4D Mean across axes 1 & 2.
+#if defined(DMX1A_MEAN_OPT) || defined(HMD1A_MEAN_OPT)
+ if (op_data_ex->opt_constraint_float) {
+    //  int32_t* temp_buffer = static_cast<int32_t*>(
+    //	  context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+
+    TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+    ReduceMeanorSumFloat(op_data_ex, input,
+                         tflite::micro::GetTensorData<float>(input),
+                         tflite::micro::GetTensorData<float>(output), 1);
+
+    KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+                   ElementCount(*output->dims));
+  }
+
+  else
+#endif
+
+  {
+#ifndef REMOVE_REFOP_SUPPORT
+
+    TfLiteStatus status =  EvalMeanHelper(context, node, op_data);
+
+    KN_PRINT_Q7_SIZE(output->data.int8, ElementCount(*output->dims));
+    return status;
+#else
+    return kTfLiteError;
+#endif
+  }
+  return kTfLiteOk;
+}
+
 TfLiteStatus EvalMeanInt8(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
 
@@ -1691,6 +1766,35 @@ TfLiteStatus EvalMeanInt8(TfLiteContext* context, TfLiteNode* node) {
         op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
         tflite::micro::GetTensorData<int8_t>(output), temp_buffer, 1);
   }
+  else if (op_data_ex->opt_constraint == 2)
+  {
+    TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+    int32_t* temp_buffer = static_cast<int32_t*>(
+      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+
+    ReduceMeanQuantizedInt8Axis2KD(
+      op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
+      tflite::micro::GetTensorShape(input),
+      tflite::micro::GetTensorData<int8_t>(output),
+      tflite::micro::GetTensorShape(output),
+      temp_buffer, 1);
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
+  }
+#if !defined(HMD1A_MEAN_OPT) // for dmx only align 4 output , hmd already aligned 4 output 
+  else if (op_data_ex->opt_constraint == 3)
+  {
+    TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+    int32_t* temp_buffer = static_cast<int32_t*>(
+      context->GetScratchBuffer(context, op_data->temp_buffer_idx));
+    ReduceMeanQuantizedInt8Axis2KD_OutAlign4(op_data_ex, tflite::micro::GetTensorData<int8_t>(input),
+      tflite::micro::GetTensorShape(input),
+      tflite::micro::GetTensorData<int8_t>(output),
+      tflite::micro::GetTensorShape(output),
+      temp_buffer, 1);
+
+    KN_PRINT_Q7_SIZE(tflite::micro::GetTensorData<int8_t>(output), ElementCount(*output->dims));
+  }
+#endif
 #endif
   else {
 #ifndef REMOVE_REFOP_SUPPORT
@@ -1789,6 +1893,12 @@ TFLMRegistration Register_MEAN_INT8() {
                                    /*prepare=*/PrepareMeanOrSum,
                                    /*invoke=*/EvalMeanInt8);
 }
+TFLMRegistration Register_MEAN_FLOAT32() {
+  return tflite::micro::RegisterOp(InitReduce,
+                                   /*prepare=*/PrepareMeanOrSum,
+                                   /*invoke=*/EvalMeanFloat32);
+}
+
 TFLMRegistration Register_REDUCE_MAX() {
   return tflite::micro::RegisterOp(InitReduce,
                                    /*prepare=*/PrepareMax,

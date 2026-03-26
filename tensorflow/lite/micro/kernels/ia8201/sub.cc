@@ -1371,6 +1371,37 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
 
   return kTfLiteOk;
 }
+
+
+TfLiteStatus EvalSubInt8(TfLiteContext* context, TfLiteNode* node) {
+  auto* params = reinterpret_cast<TfLiteSubParams*>(node->builtin_data);
+
+  const TfLiteEvalTensor* input1 =
+      tflite::micro::GetEvalInput(context, node, kSubInputTensor1);
+  const TfLiteEvalTensor* input2 =
+      tflite::micro::GetEvalInput(context, node, kSubInputTensor2);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  OpData& data = *(static_cast<OpData*>(node->user_data));
+
+  if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
+#ifndef REMOVE_REFOP_SUPPORT
+    TF_LITE_ENSURE_OK(context, EvalSubQuantized(context, node, params, &data,
+                                                input1, input2, output));
+#else
+    return kTfLiteError;
+#endif
+  } else {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
+                       TfLiteTypeGetName(output->type), output->type);
+    return kTfLiteError;
+  }
+
+  return kTfLiteOk;
+}
+
 TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
   auto* params = reinterpret_cast<TfLiteSubParams*>(node->builtin_data);
 
@@ -1398,6 +1429,11 @@ TFLMRegistration Register_SUB() {
   return tflite::micro::RegisterOp(InitSub,
                                    /*prepare=*/PrepareSub,
                                    /*invoke=*/Eval);
+}
+TFLMRegistration Register_SUB_INT8() {
+  return tflite::micro::RegisterOp(InitSub,
+                                   /*prepare=*/PrepareSub,
+                                   /*invoke=*/EvalSubInt8);
 }
 TFLMRegistration Register_SUB_FLOAT32() {
   return tflite::micro::RegisterOp(InitSub,

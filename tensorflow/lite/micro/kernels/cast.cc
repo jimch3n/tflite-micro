@@ -12,6 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+//#define KN_DEBUG
+
+
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
 
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
@@ -68,6 +72,11 @@ TfLiteStatus copyToTensor(TfLiteContext* context, const FromT* in,
       break;
     case kTfLiteFloat32:
       copyCast(in, tflite::micro::GetTensorData<float>(out), num_elements);
+      break;
+    case kTfLiteInt64: //FIXME:
+      copyCast(in, tflite::micro::GetTensorData<int64_t>(out), num_elements);
+
+      KN_PRINT_Q63_SIZE(tflite::micro::GetTensorData<int64_t>(out), num_elements);
       break;
     default:
       // Unsupported type.

@@ -13,8 +13,6 @@
   <ItemGroup>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\fake_micro_context.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\flatbuffer_utils.cc" />
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations.cc" />
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\add_n.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\arg_min_max.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\assign_variable.cc" />
@@ -26,7 +24,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ceil.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer_common.cc" />
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\comparisons.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\cumsum.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\depth_to_space.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\detection_postprocess.cc" />
@@ -78,7 +75,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logical_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\logistic_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\log_softmax.cc" />
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\maximum_minimum.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\micro_tensor_utils.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mirror_pad.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\mul_common.cc" />
@@ -206,6 +202,19 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\strided_slice_common.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\transpose.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\dequantize_common.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\activations.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\activations_common.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\comparisons.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\maximum_minimum.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\config.h" />
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\debug_helper.h" />
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\debug_log_callback.h" />
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\micro_time.h" />
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\platform.h" />
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\system_setup.h" />
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\xt_profiler.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -218,13 +227,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Dmx1a|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Hmd1a|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>

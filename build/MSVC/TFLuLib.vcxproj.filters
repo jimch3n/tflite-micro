@@ -55,6 +55,9 @@
     <Filter Include="Source Files\compiler">
       <UniqueIdentifier>{e347061a-0ac0-46a5-bfba-e5b0ae23bf0e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\ia8201">
+      <UniqueIdentifier>{33498964-1ca9-4451-bcc4-a398d3ae41a1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\fake_micro_context.cc">
@@ -108,12 +111,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\add.cc">
       <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\activations_common.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\assign_variable.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
@@ -136,9 +133,6 @@
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\cumsum.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\comparisons.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\circular_buffer_common.cc">
@@ -316,9 +310,6 @@
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\fill.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\maximum_minimum.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\floor.cc">
@@ -642,5 +633,40 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\ia8201\dequantize_common.cc">
       <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\maximum_minimum.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\activations.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\activations_common.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\comparisons.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\config.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\debug_helper.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\debug_log_callback.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\micro_time.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\platform.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\system_setup.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\xt_profiler.h">
+      <Filter>Header Files\ia8201</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

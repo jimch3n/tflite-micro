@@ -334,10 +334,6 @@ TfLiteStatus SinEval(TfLiteContext* context, TfLiteNode* node) {
 TfLiteStatus CosEval(TfLiteContext* context, TfLiteNode* node) {
   return EvalNumeric(context, node, std::cos);
 }
-
-TfLiteStatus LogEval(TfLiteContext* context, TfLiteNode* node) {
-  return EvalNumeric(context, node, std::log);
-}
 #if defined(DMX1A_SQUARE_OPT) || defined(HMD1A_SQUARE_OPT)
 inline TfLiteStatus EvalSqrtFloat(TfLiteContext* context, TfLiteNode* node,
                                   TfLiteType expected_type) {
@@ -353,6 +349,30 @@ inline TfLiteStatus EvalSqrtFloat(TfLiteContext* context, TfLiteNode* node,
   return kTfLiteOk;
 }
 #endif
+#if defined(DMX1A_LOG_OPT) || defined(HMD1A_LOG_OPT)
+inline TfLiteStatus EvalLogFloat(TfLiteContext* context, TfLiteNode* node,
+                                 TfLiteType expected_type) {
+  const TfLiteEvalTensor* input = tflite::micro::GetEvalInput(context, node, 0);
+  TfLiteEvalTensor* output = tflite::micro::GetEvalOutput(context, node, 0);
+  TF_LITE_ENSURE_TYPES_EQ(context, input->type, expected_type);
+  const size_t num_elements = ElementCount(*input->dims);
+  const float* in_data = tflite::micro::GetTensorData<float>(input);
+  float* out_data = tflite::micro::GetTensorData<float>(output);
+  for (size_t i = 0; i < num_elements; ++i) {
+    out_data[i] = AScalar(in_data[i]).f_log().to_float();
+  }
+  return kTfLiteOk;
+}
+#endif
+
+TfLiteStatus LogEval(TfLiteContext* context, TfLiteNode* node) {
+  #if defined(DMX1A_LOG_OPT) || defined(HMD1A_LOG_OPT)
+    return EvalLogFloat(context, node, kTfLiteFloat32);
+  #else
+  return EvalNumeric(context, node, std::log);
+  #endif
+}
+
 TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
 #if defined(DMX1A_SQRT_OPT) || defined(HMD1A_SQRT_OPT)
   return EvalSqrtFloat(context, node, kTfLiteFloat32);

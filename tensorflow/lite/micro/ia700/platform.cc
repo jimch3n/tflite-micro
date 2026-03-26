@@ -66,10 +66,12 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
         if (*pMappedOps == '.') {
 //    if (opNumber != 0)
 #ifdef KN_DEBUG
-          printf("Mapped[%d] = %d\n", idx, opNumber);
+          MicroPrintf("Mapped[%d] = %d", idx, opNumber);
+          //   MicroPrintf("Missing registration for opcode_index %d\n", index);
 #endif
           if (opNumber > 0xffffU) {
             // op number too large ERROR
+            MicroPrintf("error! map opNumber: %d over %d", idx, opNumber);
             return -3;
             //break;
           }
@@ -81,7 +83,7 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
         }
         opNumber += (*pMappedOps - '0') * decimals[dec];
 #ifdef KN_DEBUG
-        printf("parsing = %c dec table: %d\n", *pMappedOps, decimals[dec]);
+        //MicroPrintf("parsing = %c dec table: %d", *pMappedOps, decimals[dec]);
 #endif
         dec++;
       }
@@ -96,8 +98,9 @@ int check_kn_tflite_model(const char *description, TfLiteContext *ctx) {
   } else {
     // reset mopedOps to zero
     memset(ctx->mappedOps, 0, sizeof(ctx->mappedOps));
-    return -1;
+    return 0;
   }
+  return 0;
 }
 
 // before prepare

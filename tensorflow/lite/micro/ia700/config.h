@@ -52,7 +52,8 @@ limitations under the License.
 #define HEMILITE_SQUARED_DIFF_OPT  // squared_difference float only
 #define HEMILITE_LSTM_OPT //lstm
 
-
+#define HEMILITE_SLICE_OPT //slice
+#define HEMILITE_TRANSPOSE_OPT //transpose
 //#define SIG_FB_LOG_OPT   //afloat
 //#define SIG_FB_SQRT_OPT  //afloat + AE_NSA64
 

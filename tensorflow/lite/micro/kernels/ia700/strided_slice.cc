@@ -238,8 +238,11 @@ TfLiteStatus PrepareStridedSlice(TfLiteContext* context, TfLiteNode* node) {
   //        sizeof(uint16_t) * output_size);
   // }
 #endif
-
+#ifndef REMOVE_REFOP_SUPPORT
   return CheckOutputSize(context, &op_context);
+  #else
+return kTfLiteError;
+  #endif
 }
 
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {

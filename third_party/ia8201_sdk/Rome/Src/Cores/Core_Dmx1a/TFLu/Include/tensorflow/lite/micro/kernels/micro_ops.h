@@ -65,6 +65,7 @@ TFLMRegistration Register_CONCATENATION_INT8();
 TFLMRegistration Register_CONV_2D();
 #if defined(IA8201)  || defined(IA700)
 TFLMRegistration Register_CONV_2D_INT8REF();
+TFLMRegistration Register_CONV_2D_INT8OPT2();
 TFLMRegistration Register_CONV_2D_FLOAT32();
 TFLMRegistration Register_CONV_2D_FLOAT16();
 TFLMRegistration Register_CONV_2D_FLOATINT8();
@@ -103,6 +104,8 @@ TFLMRegistration Register_LOGICAL_AND();
 TFLMRegistration Register_LOGICAL_NOT();
 TFLMRegistration Register_LOGICAL_OR();
 TFLMRegistration Register_LOGISTIC();
+TFLMRegistration Register_LOGISTIC_INT8() ;
+TFLMRegistration Register_LOGISTIC_FLOAT32() ;
 TFLMRegistration Register_MAX_POOL_2D();
 #if defined(IA8201)  || defined(IA700)
 TFLMRegistration Register_MAX_POOL_2D_INT8();
@@ -111,6 +114,7 @@ TFLMRegistration Register_MAXIMUM();
 TFLMRegistration Register_MEAN();
 #if defined(IA8201)  || defined(IA700)
 TFLMRegistration Register_MEAN_INT8();
+TFLMRegistration Register_MEAN_FLOAT32();
 #endif
 TFLMRegistration Register_MINIMUM();
 TFLMRegistration Register_MIRROR_PAD();
@@ -143,6 +147,7 @@ TFLMRegistration Register_SELECT_V2();
 TFLMRegistration Register_SHAPE();
 TFLMRegistration Register_SIN();
 TFLMRegistration Register_SLICE();
+TFLMRegistration Register_SLICE_FLOAT32();
 TFLMRegistration Register_SOFTMAX();
 TFLMRegistration Register_SPACE_TO_BATCH_ND();
 TFLMRegistration Register_SPACE_TO_DEPTH();
@@ -170,6 +175,7 @@ TFLMRegistration Register_SUM();
 TFLMRegistration Register_SVDF();
 TFLMRegistration Register_TANH();
 TFLMRegistration Register_TRANSPOSE();
+TFLMRegistration Register_TRANSPOSE_FLOAT32();
 TFLMRegistration Register_TRANSPOSE_CONV();
 // TODO(b/230666079): resolve conflict with xtensa implementation
 TFLMRegistration Register_UNIDIRECTIONAL_SEQUENCE_LSTM();

@@ -1583,7 +1583,7 @@ int DepthWiseConvKernel8xn(const int32_t *x, const int32_t *pAinput,
   return 0;
 }
 
-int DepthWiseConvApplyOffsetPerCh(
+static int DepthWiseConvApplyOffsetPerCh(
     int8_t *outputQ7, int32_t *pDst, const AScalar *bias, int output_depth,
     const AScalar &outOffsetFr32,
     const AScalar *pOutMultiplerFr32,  // array output channel
@@ -2349,7 +2349,7 @@ int DepthWiseConvKernel8xn(const int32_t *x, const int32_t *pAinput,
 
   return 0;  // (unsigned)pA1 - (unsigned)pAinput; //stride of A
 }
-int DepthWiseConvApplyOffsetPerCh(
+static int DepthWiseConvApplyOffsetPerCh(
     int8_t *outputQ7, int32_t *pDst, const AScalar *bias, int output_depth,
     const AScalar &outOffsetFr32,
     const AScalar *pOutMultiplerFr32,  // array output channel
@@ -2370,7 +2370,9 @@ int DepthWiseConvApplyOffsetPerCh(
 
   replicate_ar(VR_outOffset, 0x3, outOffsetFr32.fr);
   ulsr32 UR_outMultPerCh = align_32x2_load(pOutMultiplerFr32);
-
+#ifdef KN_DEBUG
+  CHECK_ALIGN_2(outputQ7);
+#endif
   uint32_t groupOfChannel = (uint32_t)output_depth >> 1;
   if (groupOfChannel > 0) {
     load_32x2_vr_a(VR_outMultPerCh, UR_outMultPerCh, pOutMultiplerFr32);
@@ -2393,10 +2395,13 @@ int DepthWiseConvApplyOffsetPerCh(
       convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
       rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
       // accExt
-
+#ifdef UNALIGN_OUT_TENSOR
       VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
       store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
       store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
+#else
+      store16x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
+#endif
     }
 
     VR_out = vadds(VR_y, VR_b0, 0x0);
@@ -2407,10 +2412,13 @@ int DepthWiseConvApplyOffsetPerCh(
     convert_32F_to_16I_x2(VR_out, (unsigned int)1 - 8, 1);
     rnd_sat_pack(VR_q7_out, VRQ0, VR_out, VR_out, 1);
     // accExt
-
+#ifdef UNALIGN_OUT_TENSOR
     VR_out = shift8_into32_arith(VR_q7_out, 24, 0, VRQ0, VRL);
     store8x1_vr_postI(VR_out, pY, INC1, VRQ0);
     store8x1_vr_postI(VR_out, pY, INC1, VRQ1);
+#else
+    store16x1_vr_postI(VR_q7_out, pY, INC1, VRQ0);
+#endif
   }
 
   if (output_depth & 1) {
@@ -3073,21 +3081,7 @@ static TfLiteStatus EvalDepthWiseConvQuantizedPerChannel(
   // in the optimized implementations.
   TfLiteStatus status = kTfLiteOk;
   OpDataConv *data = static_cast<OpDataConv *>(&data_ex->ConvOp);
-  DepthwiseParams op_params;
-  op_params.padding_type = PaddingType::kSame;
-  op_params.padding_values.width = data->padding.width;
-  op_params.padding_values.height = data->padding.height;
-  op_params.stride_width = params->stride_width;
-  op_params.stride_height = params->stride_height;
-  op_params.dilation_width_factor = params->dilation_width_factor;
-  op_params.dilation_height_factor = params->dilation_height_factor;
-  op_params.depth_multiplier = params->depth_multiplier;
-  op_params.input_offset = -data->input_zero_point;
-  op_params.weights_offset = 0;
-  op_params.output_offset = data->output_zero_point;
-  // TODO(b/130439627): Use calculated value for clamping.
-  op_params.quantized_activation_min = std::numeric_limits<int8_t>::min();
-  op_params.quantized_activation_max = std::numeric_limits<int8_t>::max();
+
 
   RuntimeShape filter_shape = tflite::micro::GetTensorShape(filter);
   RuntimeShape input_shape = tflite::micro::GetTensorShape(input);
@@ -3107,6 +3101,21 @@ static TfLiteStatus EvalDepthWiseConvQuantizedPerChannel(
 #endif
   {
 #ifndef REMOVE_REFOP_SUPPORT
+    DepthwiseParams op_params;
+    op_params.padding_type = PaddingType::kSame;
+    op_params.padding_values.width = data->padding.width;
+    op_params.padding_values.height = data->padding.height;
+    op_params.stride_width = params->stride_width;
+    op_params.stride_height = params->stride_height;
+    op_params.dilation_width_factor = params->dilation_width_factor;
+    op_params.dilation_height_factor = params->dilation_height_factor;
+    op_params.depth_multiplier = params->depth_multiplier;
+    op_params.input_offset = -data->input_zero_point;
+    op_params.weights_offset = 0;
+    op_params.output_offset = data->output_zero_point;
+    // TODO(b/130439627): Use calculated value for clamping.
+    op_params.quantized_activation_min = std::numeric_limits<int8_t>::min();
+    op_params.quantized_activation_max = std::numeric_limits<int8_t>::max();
     reference_integer_ops::DepthwiseConvPerChannel(
         op_params, data->per_channel_output_multiplier,
         data->per_channel_output_shift, tflite::micro::GetTensorShape(input),

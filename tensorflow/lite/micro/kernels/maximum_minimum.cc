@@ -12,7 +12,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-
+//#define KN_DEBUG
+#include "tensorflow/lite/micro/ia8201/debug_helper.h"
+#include "tensorflow/lite/micro/micro_utils.h"  //@elementcount
 #include "tensorflow/lite/kernels/internal/reference/maximum_minimum.h"
 
 #include "tensorflow/lite/c/builtin_op_data.h"
@@ -79,11 +81,23 @@ void TFLiteOperation(TfLiteContext* context, TfLiteNode* node,
 template <KernelType kernel_type, typename OpType>
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   OpContext op_context(context, node);
-
+  #ifdef KN_DEBUG
+  const TfLiteEvalTensor* input =
+    tflite::micro::GetEvalInput(context, node, 0);
+ 
+  TfLiteEvalTensor* output =
+    tflite::micro::GetEvalOutput(context, node, 0);
+#endif
   if (kernel_type == kReference) {
     switch (op_context.output->type) {
       case kTfLiteFloat32:
+        KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(input),
+          ElementCount(*input->dims));
+
         TFLiteOperation<float, OpType>(context, node, op_context);
+        KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+          ElementCount(*output->dims));
+
         break;
       case kTfLiteInt8:
         TFLiteOperation<int8_t, OpType>(context, node, op_context);

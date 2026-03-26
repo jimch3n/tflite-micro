@@ -30,7 +30,7 @@ struct DequantizeOpData {
   int output_shift;
   int32_t output_zero_point;
 };
-#if defined (IA8201)
+#if defined(IA8201) || defined(IA700)
 struct DequantizeOpDataEx {
   tflite::DequantizationParams quantization_params;
   // The scaling factor from input to output (aka the 'real multiplier') can

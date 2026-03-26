@@ -6,7 +6,7 @@
 # -------------------------------------------------------------
 
 export SHELLOPTS
-
+#set -x
 ROME_SDK_ROOT=../third_party/ia8201_sdk/Rome
 # For Linux platform
 if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
@@ -47,6 +47,9 @@ build_dmx_hmd()
     BUILD_TYPE=release
     RTS=1
   fi
+   BUILD_TYPE=release
+    RTS=1
+
 	#for core in $CORES;
 	#do 
 	cd ../
@@ -62,7 +65,7 @@ build_dmx_hmd()
 #	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=ia8201 TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=ia8201 RM_TFLM_SIGNAL=1 -j4 install
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=ia8201 TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=ia8201 -j4 install
 	elif [ "$target" == "dinstall" ]; then
-	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=ia8201 TARGET_ARCH=$core BUILD_TYPE=debug OPTIMIZED_KERNEL_DIR=ia8201 RM_TFLM_SIGNAL=1 -j4 install
+	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=ia8201 TARGET_ARCH=$core BUILD_TYPE=debug       OPTIMIZED_KERNEL_DIR=ia8201 -j4 install
 	else
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=ia8201 TARGET_ARCH=$core BUILD_TYPE=release OPTIMIZED_KERNEL_DIR=ia8201 -j3  $target
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=ia8201 TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=ia8201 $target 
@@ -91,26 +94,34 @@ build_hml()
     BUILD_TYPE=release
     RTS=1
   fi
-  echo BUILD: $BUILD_TYPE
+  	echo BUILD: $BUILD_TYPE
 	cd ../
 	#
 	echo build CORE $core
+	echo "target: $target $ZTEST"
 	if [ "$target" == "clean" ]; then
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG clean
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG clean
 	elif [ "$target" == "test" ]; then
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -j8 && \
-	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG -k test 
+	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG USE_TFLM_COMPRESSION=$ZTEST -k test 
 	elif [ "$target" == "install" ]; then
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1 -j4 install
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=0 -j4 install
+	elif [ "$target" == "tiny_install" ]; then
+	echo "tiny_install"
+	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1 -j4 install
+	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=tiny OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=0 USE_TFLM_COMPRESSION=1 -j4 install
 	elif [ "$target" == "dinstall" ]; then
 	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=debug OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1 -j4 install
-	elif [ "$target" == "rro_install" ]; then
-	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1 -j4 install
+	elif [ "$target" == "zinstall" ]; then
+	 make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG RM_TFLM_SIGNAL=1  -j4 install
+	
 	else
+	#ZTEST from global env var
+
 	 #make -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=release OPTIMIZED_KERNEL_DIR=$TG -j3  $target
-	 make  -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG $target 
+	 make  -f tensorflow/lite/micro/tools/make/Makefile TARGET=$TG TARGET_ARCH=$core BUILD_TYPE=$BUILD_TYPE OPTIMIZED_KERNEL_DIR=$TG USE_TFLM_COMPRESSION=$ZTEST $target 
 	fi
 	cd -
 	#done

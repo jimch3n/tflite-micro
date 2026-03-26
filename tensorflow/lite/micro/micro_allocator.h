@@ -258,6 +258,7 @@ class MicroAllocator {
   size_t used_bytes() const;
 
   TfLiteBridgeBuiltinDataAllocator* GetBuiltinDataAllocator();
+  virtual ~MicroAllocator() {};
 
  protected:
   MicroAllocator(SingleArenaBufferAllocator* memory_allocator,
@@ -265,7 +266,6 @@ class MicroAllocator {
   MicroAllocator(IPersistentBufferAllocator* persistent_buffer_allocator,
                  INonPersistentBufferAllocator* non_persistent_buffer_allocator,
                  MicroMemoryPlanner* memory_planner);
-  virtual ~MicroAllocator();
 
 #ifdef USE_TFLM_COMPRESSION
 

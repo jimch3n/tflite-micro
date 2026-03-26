@@ -120,6 +120,11 @@ TfLiteStatus ConvertTensorType(TfLiteType type, TensorTypes& tensor_type) {
     case kTfLiteInt4:
       tensor_type = TensorTypes_INT4;
       return kTfLiteOk;
+#if defined(IA8201)
+     case kTfLiteAfloat32:
+      tensor_type = TensorTypes_AFLOAT32;
+      return kTfLiteOk;
+#endif
     case kTfLiteNoType:
       MicroPrintf("Unsupported data type %d in tensor\n", tensor_type);
       return kTfLiteError;

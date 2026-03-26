@@ -59,7 +59,7 @@ constexpr size_t kMaxScratchBuffersPerOp = 12;
 // Sentinel value used as a placeholder to mark a ScratchBufferRequest request
 // needs a node id assignment.
 constexpr int kUnassignedScratchBufferRequestIndex = -1;
-
+  
 const TfLiteIntArray kZeroLengthIntArray = {};
 
 class MicroBuiltinDataAllocator : public TfLiteBridgeBuiltinDataAllocator {
@@ -76,7 +76,7 @@ class MicroBuiltinDataAllocator : public TfLiteBridgeBuiltinDataAllocator {
     // Do not deallocate, builtin data needs to be available for the life time
     // of the model.
   }
-
+  
  private:
   IPersistentBufferAllocator* persistent_allocator_;
 
@@ -540,7 +540,7 @@ MicroAllocator::MicroAllocator(
       memory_planner_(memory_planner),
       model_is_allocating_(false) {}
 
-MicroAllocator::~MicroAllocator() {}
+//MicroAllocator::~MicroAllocator() {}
 
 MicroAllocator* MicroAllocator::Create(uint8_t* tensor_arena, size_t arena_size,
                                        MicroMemoryPlanner* memory_planner) {
@@ -615,7 +615,7 @@ MicroAllocator* MicroAllocator::Create(uint8_t* persistent_tensor_arena,
             sizeof(LinearMemoryPlanner), alignof(LinearMemoryPlanner));
     memory_planner = new (memory_planner_buffer) LinearMemoryPlanner();
   }
-
+  
   uint8_t* micro_allocator_buffer =
       persistent_buffer_allocator->AllocatePersistentBuffer(
           sizeof(MicroAllocator), alignof(MicroAllocator));

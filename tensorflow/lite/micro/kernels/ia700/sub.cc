@@ -43,7 +43,7 @@ namespace tflite {
 // constexpr int kSubInputTensor2 = 1;
 // constexpr int kSubOutputTensor = 0;
 
-struct OpData {
+struct OpDataSubEx {
   OpDataSub SubOp;
 
   AScalar input1_multiplier_fr32;
@@ -61,7 +61,7 @@ struct OpData {
 TfLiteStatus CalculateOpData(TfLiteContext* context, TfLiteSubParams* params,
                              const TfLiteTensor* input1,
                              const TfLiteTensor* input2, TfLiteTensor* output,
-                             OpData* data_ex) {
+                             OpDataSubEx* data_ex) {
   OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
   data->requires_broadcast = !HaveSameShapes(input1, input2);
 
@@ -171,7 +171,7 @@ static void SubFloatConstI(float* output, const float* input1,
   }
 }
 
-static void SubQuantizedInt8ConstI1(const OpData* data, int8_t* output,
+static void SubQuantizedInt8ConstI1(const OpDataSubEx* data, int8_t* output,
                                     const int8_t* input1, const int8_t* input2,
                                     int n) {
   vr64 vr_input1, vr_input2;
@@ -414,7 +414,7 @@ static void SubFloat(float* output, const float* input1, const float* input2,
   }
 }
 
-static TfLiteStatus SubQuantizedInt8Sat(const OpData* data,
+static TfLiteStatus SubQuantizedInt8Sat(const OpDataSubEx* data,
                                         const int8_t* input1,
                                         const int8_t* input2, int8_t* output,
                                         int n) {
@@ -527,14 +527,14 @@ static TfLiteStatus SubQuantizedInt8Sat(const OpData* data,
 #endif
 void* InitSub(TfLiteContext* context, const char* buffer, size_t length) {
   TFLITE_DCHECK(context->AllocatePersistentBuffer != nullptr);
-  return context->AllocatePersistentBuffer(context, sizeof(OpData));
+  return context->AllocatePersistentBuffer(context, sizeof(OpDataSubEx));
 }
 
 TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   TFLITE_DCHECK(node->builtin_data != nullptr);
 
-  OpData* data_ex = static_cast<OpData*>(node->user_data);
+  OpDataSubEx* data_ex = static_cast<OpDataSubEx*>(node->user_data);
 
   OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
 
@@ -641,7 +641,7 @@ TfLiteStatus PrepareSub(TfLiteContext* context, TfLiteNode* node) {
 
 #ifndef REMOVE_REFOP_SUPPORT
 void EvalSubFloat(TfLiteContext* context, TfLiteNode* node,
-                  TfLiteSubParams* params, OpData* data_ex,
+                  TfLiteSubParams* params, OpDataSubEx* data_ex,
                   const TfLiteEvalTensor* input1,
                   const TfLiteEvalTensor* input2, TfLiteEvalTensor* output) {
   float output_activation_min, output_activation_max;
@@ -672,7 +672,7 @@ void EvalSubFloat(TfLiteContext* context, TfLiteNode* node,
 #endif
 
 TfLiteStatus EvalSubQuantized(TfLiteContext* context, TfLiteNode* node,
-                              TfLiteSubParams* params, OpData* data_ex,
+                              TfLiteSubParams* params, OpDataSubEx* data_ex,
                               const TfLiteEvalTensor* input1,
                               const TfLiteEvalTensor* input2,
                               TfLiteEvalTensor* output) {
@@ -823,7 +823,7 @@ TfLiteStatus EvalSubQuantized(TfLiteContext* context, TfLiteNode* node,
 }
 
 TfLiteStatus EvalSubFloat32(TfLiteContext* context, TfLiteNode* node,
-                            TfLiteSubParams* params, OpData* data_ex,
+                            TfLiteSubParams* params, OpDataSubEx* data_ex,
                             const TfLiteEvalTensor* input1,
                             const TfLiteEvalTensor* input2,
                             TfLiteEvalTensor* output) {
@@ -935,7 +935,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  OpData& data = *(static_cast<OpData*>(node->user_data));
+  OpDataSubEx& data = *(static_cast<OpDataSubEx*>(node->user_data));
 
   if (output->type == kTfLiteFloat32) {
     EvalSubFloat32(context, node, params, &data, input1, input2, output);
@@ -962,7 +962,7 @@ TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
       tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
 
   TFLITE_DCHECK(node->user_data != nullptr);
-  OpData& data = *(static_cast<OpData*>(node->user_data));
+  OpDataSubEx& data = *(static_cast<OpDataSubEx*>(node->user_data));
   if (output->type != kTfLiteFloat32) {
     TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
                        TfLiteTypeGetName(output->type), output->type);
@@ -972,6 +972,51 @@ TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
 
   return kTfLiteOk;
 }
+
+TfLiteStatus EvalFloat32Opt1(TfLiteContext* context, TfLiteNode* node) {
+  auto* params = reinterpret_cast<TfLiteSubParams*>(node->builtin_data);
+
+  const TfLiteEvalTensor* input1 =
+      tflite::micro::GetEvalInput(context, node, kSubInputTensor1);
+  const TfLiteEvalTensor* input2 =
+      tflite::micro::GetEvalInput(context, node, kSubInputTensor2);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kSubOutputTensor);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  OpDataSubEx& data = *(static_cast<OpDataSubEx*>(node->user_data));
+  if (output->type != kTfLiteFloat32 ||   data.opt_constraint_float != 1) {
+    TF_LITE_KERNEL_LOG(context, "Type %s (%d) not supported.",
+                       TfLiteTypeGetName(output->type), output->type);
+    return kTfLiteError;
+  }
+  
+float output_activation_min, output_activation_max;
+
+  // const OpDataSub* data = static_cast<OpDataSub*>(&data_ex->SubOp);
+  CalculateActivationRange(params->activation, &output_activation_min,
+                           &output_activation_max);
+  tflite::ArithmeticParams op_params;
+  SetActivationParams(output_activation_min, output_activation_max, &op_params);
+#if 1 //defined(HEMILITE_SUB_OPT)
+  AScalar act_min, act_max;
+  CalculateActivationRangeAflt(params->activation, &act_min, &act_max);
+
+ 
+    const int flat_size =
+        MatchingElementsSize(tflite::micro::GetTensorShape(input1),
+                             tflite::micro::GetTensorShape(input2),
+                             tflite::micro::GetTensorShape(output));
+    SubFloat(tflite::micro::GetTensorData<float>(output),
+             tflite::micro::GetTensorData<float>(input1),
+             tflite::micro::GetTensorData<float>(input2), act_min, act_max,
+             flat_size);
+    //      KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output),
+    //      flat_size);
+#endif
+  return kTfLiteOk;
+}
+
 //}  // namespace sub
 
 TFLMRegistration Register_SUB() {
@@ -983,6 +1028,11 @@ TFLMRegistration Register_SUB_FLOAT32() {
   return tflite::micro::RegisterOp(InitSub,
                                    /*prepare=*/PrepareSub,
                                    /*invoke=*/EvalFloat32);
+}
+TFLMRegistration Register_SUB_FLOAT32_OPT1() {
+  return tflite::micro::RegisterOp(InitSub,
+                                   /*prepare=*/PrepareSub,
+                                   /*invoke=*/EvalFloat32Opt1);
 }
 //}  // namespace micro
 //}  // namespace ops

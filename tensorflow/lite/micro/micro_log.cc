@@ -37,7 +37,7 @@ void VDebugLog(const char* format, ...) {
 void VMicroPrintf(const char* format, va_list args) {
   DebugLog(format, args);
   // TODO(b/290051015): remove "\r\n"
-  VDebugLog("\r\n");
+  VDebugLog("\n");
 }
 
 void MicroPrintf(const char* format, ...) {

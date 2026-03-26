@@ -315,7 +315,7 @@ void DecompressionState::DecompressToBufferWidth3_32(int8_t* buffer) {
 // more than 2x faster, but with a large code size increase
 template <typename T>
 void DecompressionState::DecompressToBufferWidthAny(T* buffer) {
-  ScopedMicroProfiler scoped_profiler(__func__, micro_profiler_);
+  //ScopedMicroProfiler scoped_profiler(__func__, micro_profiler_);
 
   if (comp_data_.data.lut_data->use_alternate_axis) {
     const size_t stride = comp_data_.data.lut_data->value_table_channel_stride;

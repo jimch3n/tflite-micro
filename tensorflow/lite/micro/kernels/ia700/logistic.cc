@@ -147,7 +147,7 @@ void* LogisticInit(TfLiteContext* context, const char* buffer, size_t length) {
   return context->AllocatePersistentBuffer(context, sizeof(OpData));
 }
 
-TfLiteStatus IA700_LogisticPrepare(TfLiteContext* context, TfLiteNode* node) {
+TfLiteStatus LogisticPrepare(TfLiteContext* context, TfLiteNode* node) {
   TFLITE_DCHECK(node->user_data != nullptr);
   OpData* data = static_cast<OpData*>(node->user_data);
 
@@ -442,7 +442,8 @@ void EvalLogisticFloat(const TfLiteEvalTensor* input,
 #endif
   KN_PRINT_FLOAT(tflite::micro::GetTensorData<float>(output), flat_size);
 }
-TfLiteStatus IA700_LogisticEval(TfLiteContext* context, TfLiteNode* node) {
+
+TfLiteStatus LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   const TfLiteEvalTensor* input =
       tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
   TfLiteEvalTensor* output =
@@ -523,13 +524,42 @@ TfLiteStatus IA700_LogisticEval(TfLiteContext* context, TfLiteNode* node) {
   return kTfLiteOk;
 }
 
-//}  // namespace activations
+
+TfLiteStatus LogisticEvalFloat32(TfLiteContext* context, TfLiteNode* node) {
+  const TfLiteEvalTensor* input =
+      tflite::micro::GetEvalInput(context, node, kLogisticInputTensor);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kLogisticOutputTensor);
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  //OpData* data = static_cast<OpData*>(node->user_data);
+
+  if (input->type != kTfLiteFloat32)
+  {
+    MicroPrintf("unsupport type: %d\n",input->type);
+    return kTfLiteError;
+  }
+  const int flat_size = MatchingFlatSize(tflite::micro::GetTensorShape(input),
+                                        tflite::micro::GetTensorShape(output));
+  SigmoidV_Full((float*)tflite::micro::GetTensorData<float>(output),
+                tflite::micro::GetTensorData<float>(input), flat_size);
+
+
+  return kTfLiteOk;
+}
 
 TFLMRegistration Register_LOGISTIC() {
   return tflite::micro::RegisterOp(LogisticInit,
-                                   /*prepare=*/IA700_LogisticPrepare,
-                                   /*invoke=*/IA700_LogisticEval);
+                                   /*prepare=*/LogisticPrepare,
+                                   /*invoke=*/LogisticEval);
 }
+
+TFLMRegistration Register_LOGISTIC_FLOAT32() {
+  return tflite::micro::RegisterOp(LogisticInit,
+                                   /*prepare=*/LogisticPrepare,
+                                   /*invoke=*/LogisticEvalFloat32);
+}
+
 //}  // namespace micro
 //}  // namespace ops
 }  // namespace tflite

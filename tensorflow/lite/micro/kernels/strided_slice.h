@@ -35,7 +35,7 @@ void* StridedSliceInit(TfLiteContext* context, const char* buffer,
 
 TfLiteStatus StridedSlicePrepare(TfLiteContext* context, TfLiteNode* node);
 
-#if defined(IA8201)
+#if defined(IA8201) || defined(IA700)
 // only for 8201
 struct StridedSliceOpData {
   tflite::StridedSliceParams op_params;
