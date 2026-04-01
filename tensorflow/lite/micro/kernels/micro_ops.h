@@ -159,12 +159,13 @@ TFLMRegistration Register_SOFTMAX();
 TFLMRegistration Register_SPACE_TO_BATCH_ND();
 TFLMRegistration Register_SPACE_TO_DEPTH();
 TFLMRegistration Register_SPLIT();
+TFLMRegistration Register_SPLIT_FLOAT32();
 TFLMRegistration Register_SPLIT_V();
 TFLMRegistration Register_SQRT();
 TFLMRegistration Register_SQUARE();
 TFLMRegistration Register_SQUARED_DIFFERENCE();
 #if defined(IA8201)  || defined(IA700)
-
+//TFLMRegistration Register_SPLIT_FLOAT32();
 TFLMRegistration Register_SQUARED_DIFFERENCE_FLOAT32();
 TFLMRegistration Register_STRIDED_SLICE_FLOAT32();
 TFLMRegistration Register_STRIDED_SLICE_INT8();
@@ -182,6 +183,7 @@ TFLMRegistration Register_SUB_INT8() ;
 TFLMRegistration Register_SUM();
 TFLMRegistration Register_SVDF();
 TFLMRegistration Register_TANH();
+TFLMRegistration Register_TANH_FLOAT32();
 TFLMRegistration Register_TRANSPOSE();
 TFLMRegistration Register_TRANSPOSE_FLOAT32();
 TFLMRegistration Register_TRANSPOSE_CONV();

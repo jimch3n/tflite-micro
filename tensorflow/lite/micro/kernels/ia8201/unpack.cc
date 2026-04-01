@@ -105,4 +105,8 @@ TFLMRegistration Register_UNPACK() {
   return tflite::micro::RegisterOp(nullptr, nullptr, Eval);
 }
 
+TFLMRegistration Register_UNPACK_FLOAT32() {
+  return tflite::micro::RegisterOp(nullptr, nullptr, Eval);
+}
+
 }  // namespace tflite

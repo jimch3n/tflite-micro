@@ -1059,6 +1059,97 @@ TfLiteStatus ConcatenationEvalInt8(TfLiteContext* context, TfLiteNode* node) {
    
   return status;
 }
+TfLiteStatus ConcatenationPrepareFloat32(TfLiteContext* context,
+                                        TfLiteNode* node) {
+  const TfLiteConcatenationParams* params =
+      reinterpret_cast<TfLiteConcatenationParams*>(node->builtin_data);
+
+  MicroContext* micro_context = GetMicroContext(context);
+
+  TfLiteTensor* input_tensor = micro_context->AllocateTempInputTensor(node, 0);
+  TF_LITE_ENSURE(context, input_tensor != nullptr);
+  TfLiteType input_type = input_tensor->type;
+  TfLiteTensor* output_tensor =
+      micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  TF_LITE_ENSURE(context, output_tensor != nullptr);
+  TfLiteType output_type = output_tensor->type;
+
+  micro_context->DeallocateTempTfLiteTensor(input_tensor);
+  micro_context->DeallocateTempTfLiteTensor(output_tensor);
+
+  // Only support Float32
+  TF_LITE_ENSURE_EQ(context, params->activation, kTfLiteActNone);
+  TF_LITE_ENSURE_EQ(context, input_type, kTfLiteFloat32);
+  TF_LITE_ENSURE_EQ(context, output_type, kTfLiteFloat32);
+
+  const int num_inputs = NumInputs(node);
+  TF_LITE_ENSURE(context, num_inputs <= kMaxInputNum);
+
+  for (int i = 0; i < num_inputs; ++i) {
+    TfLiteTensor* input = micro_context->AllocateTempInputTensor(node, i);
+    TF_LITE_ENSURE(context, input != nullptr);
+    int num_dimensions = NumDimensions(input);
+    if (num_dimensions > RuntimeShape::kMaxSmallSize) {
+      MicroPrintf(
+          "Op Concatenation does not currently support num dimensions > %d "
+          "Tensor has %d dimensions.",
+          RuntimeShape::kMaxSmallSize, num_dimensions);
+      return kTfLiteError;
+    }
+    micro_context->DeallocateTempTfLiteTensor(input);
+  }
+
+  TFLITE_DCHECK(node->user_data != nullptr);
+  ConCatOpDataEx* data = static_cast<ConCatOpDataEx*>(node->user_data);
+
+  TfLiteTensor* output =
+      micro_context->AllocateTempOutputTensor(node, kOutputTensor);
+  TF_LITE_ENSURE(context, output != nullptr);
+
+  data->params.axis = CalculatePositiveAxis(params->axis, output);
+  data->params.inputs_count = node->inputs->size;
+
+#if defined(DMX1A_CONCATENATION_OPT) || defined(HMD1A_CONCATENATION_OPT)
+  TfLiteStatus status = kTfLiteOk;
+  TfLiteEvalTensor* outputEval =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+  const RuntimeShape* inputs_shape_ptr[kMaxInputNum];
+  const float* inputs_data_flt[kMaxInputNum];
+  int inputs_count = data->params.inputs_count;
+  const RuntimeShape& output_shape = GetTensorShape(output);
+  int32_t outer_size = 1;
+  for (int i = 0; i < data->params.axis; ++i) {
+    outer_size *= output_shape.Dims(i);
+  }
+  data->inputs_count = inputs_count;
+  data->outer_size = outer_size;
+
+  RuntimeShape inputs_shape[kMaxInputNum];
+  GetAllInputTensorShapes(context, node, inputs_shape);
+  GetShapesPointers(inputs_shape, node->inputs->size, inputs_shape_ptr);
+
+  data->opt_constraint = 0;
+  data->input_offset = (uint16_t*)context->AllocatePersistentBuffer(
+      context, sizeof(uint16_t) * inputs_count * outer_size);
+  data->input_size = (uint32_t*)context->AllocatePersistentBuffer(
+      context, sizeof(uint32_t) * inputs_count * outer_size);
+
+  GetAllInputTensorData(context, node, inputs_data_flt);
+  ConcatenationEx(data->params, inputs_shape_ptr, inputs_data_flt,
+      output_shape,
+      tflite::micro::GetTensorData<float>(outputEval),
+      data->input_offset, data->input_size);
+  data->opt_constraint = 1;
+#endif
+
+  micro_context->DeallocateTempTfLiteTensor(output);
+#if defined(DMX1A_CONCATENATION_OPT) || defined(HMD1A_CONCATENATION_OPT)
+  return status;
+#else
+  return kTfLiteOk;
+#endif
+}
+
 TfLiteStatus ConcatenationEvalFloat32(TfLiteContext* context, TfLiteNode* node) {
   // const TfLiteTensor* output_tensor = GetOutput(context, node,
   // kOutputTensor); TF_LITE_ENSURE(context, output_tensor != nullptr); get
@@ -1091,7 +1182,7 @@ TFLMRegistration Register_CONCATENATION_INT8(){
 }
 TFLMRegistration Register_CONCATENATION_FLOAT32() {
   return tflite::micro::RegisterOp(ConcatenationInit,
-                                   /*prepare=*/ConcatenationPrepare,
+                                   /*prepare=*/ConcatenationPrepareFloat32,
                                    /*invoke=*/ConcatenationEvalFloat32);
 }
 //}  // namespace micro

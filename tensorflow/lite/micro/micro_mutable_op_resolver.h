@@ -621,8 +621,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
                       ParseSpaceToDepth);
   }
 
-  TfLiteStatus AddSplit() {
-    return AddBuiltin(BuiltinOperator_SPLIT, Register_SPLIT(), ParseSplit);
+  TfLiteStatus AddSplit(const TFLMRegistration & registration = tflite::Register_SPLIT()) {
+    return AddBuiltin(BuiltinOperator_SPLIT, registration, ParseSplit);
   }
 
   TfLiteStatus AddSplitV() {
@@ -688,8 +688,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
     return AddBuiltin(BuiltinOperator_SVDF, registration, ParseSvdf);
   }
 
-  TfLiteStatus AddTanh() {
-    return AddBuiltin(BuiltinOperator_TANH, Register_TANH(), ParseTanh);
+  TfLiteStatus AddTanh(const TFLMRegistration& registration = Register_TANH()) {
+    return AddBuiltin(BuiltinOperator_TANH, registration, ParseTanh);
   }
 
   TfLiteStatus AddTransposeConv(
@@ -703,8 +703,8 @@ class MicroMutableOpResolver : public MicroOpResolver {
                       ParseTranspose);
   }
 
-  TfLiteStatus AddUnpack() {
-    return AddBuiltin(BuiltinOperator_UNPACK, Register_UNPACK(), ParseUnpack);
+  TfLiteStatus AddUnpack(const TFLMRegistration & registration = tflite::Register_UNPACK()) {
+    return AddBuiltin(BuiltinOperator_UNPACK, registration, ParseUnpack);
   }
 
   TfLiteStatus AddUnidirectionalSequenceLSTM(

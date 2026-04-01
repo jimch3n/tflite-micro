@@ -822,6 +822,29 @@ TFLMRegistration Register_TANH() {
                                    /*prepare=*/TanhPrepare,
                                    /*invoke=*/TanhEval);
 }
+
+TfLiteStatus TanhEvalFloat32(TfLiteContext* context, TfLiteNode* node) {
+  const TfLiteEvalTensor* input =
+      tflite::micro::GetEvalInput(context, node, kInputTensor);
+  TfLiteEvalTensor* output =
+      tflite::micro::GetEvalOutput(context, node, kOutputTensor);
+
+  if (input->type != kTfLiteFloat32) {
+    TF_LITE_KERNEL_LOG(context, "Input type %s not supported, expect float32.",
+                       TfLiteTypeGetName(input->type));
+    return kTfLiteError;
+  }
+
+  EvalTanhFloat(input, output);
+  return kTfLiteOk;
+}
+
+TFLMRegistration Register_TANH_FLOAT32() {
+  return tflite::micro::RegisterOp(TanhInit,
+                                   /*prepare=*/TanhPrepare,
+                                   /*invoke=*/TanhEvalFloat32);
+}
+
 //}  // namespace micro
 //}  // namespace ops
 }  // namespace tflite
