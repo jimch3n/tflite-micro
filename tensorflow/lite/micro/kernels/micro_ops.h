@@ -161,6 +161,7 @@ TFLMRegistration Register_SPACE_TO_DEPTH();
 TFLMRegistration Register_SPLIT();
 TFLMRegistration Register_SPLIT_FLOAT32();
 TFLMRegistration Register_SPLIT_V();
+TFLMRegistration Register_SPLIT();
 TFLMRegistration Register_SQRT();
 TFLMRegistration Register_SQUARE();
 TFLMRegistration Register_SQUARED_DIFFERENCE();

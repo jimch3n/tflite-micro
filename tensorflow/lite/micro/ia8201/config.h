@@ -90,7 +90,8 @@ limitations under the License.
 #define HMD1A_SQUARED_DIFF_OPT //squared_difference float only
 // unidirectional_lstm_sequence
 #define HMD1A_LSTM_OPT
-
+#define HMD1A_MINMAX_OPT //minimum maximum
+#define HMD1A_RELU_OPT 
 // signal kernel optimization
 //#define SIG_FB_LOG_OPT   // afloat 
 #define SIG_FB_SQRT_OPT  // afloat

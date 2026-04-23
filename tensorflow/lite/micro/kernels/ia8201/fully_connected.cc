@@ -1828,7 +1828,8 @@ int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
                          int8_t *output, int m, int n,
                          const AScalar &outOffsetFr32,
                          const uint32_t input_offset_int8x4,  // xor 128
-                         const AScalar &outMultiplerFr32, int signs) {
+                         const AScalar &outMultiplerFr32, int signs,
+                         tflite::MicroProfiler *profiler=nullptr) {
   int8_t *pY = output;
 
   const int32_t *pA = A;
@@ -2006,7 +2007,8 @@ int FullyConnectedKernelInputOffset(int32_t *x, const int32_t *A,
                                     int n, const AScalar &outOffsetFr32,
                                     const int32_t *inputOffsetWithW,  // xor 128
                                     const AScalar &outMultiplerFr32,
-                                    int signs) {
+                                    int signs,
+                                    tflite::MicroProfiler *profiler=nullptr) {
   int8_t *pY = output;
 
   const int32_t *pA = A;

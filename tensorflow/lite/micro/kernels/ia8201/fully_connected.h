@@ -64,12 +64,6 @@ void FullyConnectedParamsQuantized(const OpDataFullyConnectedEx& op_data_ex,
 
 // eval quantized 8x8 with xor
 
-int FullyConnectedKernel(int32_t *x, const int32_t *A, const AScalar *bias,
-                         int8_t *output, int m, int n,
-                         const AScalar &outOffsetFr32,
-                         const uint32_t input_offset_int8x4,  // xor 128
-                         const AScalar &outMultiplerFr32, int signs) ;
-
 }  // namespace tflite
 
 #endif  // TENSORFLOW_LITE_MICRO_KERNELS_FULLY_CONNECTED_H_

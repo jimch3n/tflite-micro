@@ -335,6 +335,92 @@ void MinMaxQuantizedInt8(const OpDataMinMax* data, const int8_t* input1,
 }
 
 #endif
+
+#ifdef HMD1A_MINMAX_OPT
+
+void MinMaxQuantizedInt8(const OpDataMinMax* data, const int8_t* input1,
+                         const int8_t* input2, int8_t* output, int n,
+                         int minimum_flag) {
+  vr64 vr_input1, vr_input2;
+  vr64 vr_q7_out, vr_output;
+  int loopLim = n >> 1;
+
+  if (minimum_flag) {
+    if (loopLim > 0) {
+      load8x2_vr_postI(vr_input1, input1, INC1);
+      load8x2_vr_postI(vr_input2, input2, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
+      convert_16I_to_32F_x2(vr_input2, 0);
+
+      for (int ii = 0; ii < loopLim - 1; ii++) {
+        vr_output = vmin(vr_input1, vr_input2);
+        convert_32F_to_16I_x2(vr_output, 0, 0);
+        rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+        store16x1_vr_postI(vr_q7_out, output, INC1, VRQ0);
+
+        load8x2_vr_postI(vr_input1, input1, INC1);
+        load8x2_vr_postI(vr_input2, input2, INC1);
+        convert_16I_to_32F_x2(vr_input1, 0);
+        convert_16I_to_32F_x2(vr_input2, 0);
+      }
+      vr_output = vmin(vr_input1, vr_input2);
+      convert_32F_to_16I_x2(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      store16x1_vr_postI(vr_q7_out, output, INC1, VRQ0);
+    }
+    // reminder
+    if (n & 1) {
+      load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
+      load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+      convert_16I_to_32F_x2(vr_input1, 0);
+      convert_16I_to_32F_x2(vr_input2, 0);
+      vr_output = vmin(vr_input1, vr_input2);
+      convert_32F_to_16I_x2(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+      store8x1_vr_postI(vr_output, output, INC1, VRQ0);
+    }
+  } else {
+    // maximum
+    if (loopLim > 0) {
+      load8x2_vr_postI(vr_input1, input1, INC1);
+      load8x2_vr_postI(vr_input2, input2, INC1);
+      convert_16I_to_32F_x2(vr_input1, 0);
+      convert_16I_to_32F_x2(vr_input2, 0);
+
+      for (int ii = 0; ii < loopLim - 1; ii++) {
+        vr_output = vmax(vr_input1, vr_input2);
+        convert_32F_to_16I_x2(vr_output, 0, 0);
+        rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+        store16x1_vr_postI(vr_q7_out, output, INC1, VRQ0);
+
+        load8x2_vr_postI(vr_input1, input1, INC1);
+        load8x2_vr_postI(vr_input2, input2, INC1);
+        convert_16I_to_32F_x2(vr_input1, 0);
+        convert_16I_to_32F_x2(vr_input2, 0);
+      }
+      vr_output = vmax(vr_input1, vr_input2);
+      convert_32F_to_16I_x2(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      store16x1_vr_postI(vr_q7_out, output, INC1, VRQ0);
+    }
+    // reminder
+    if (n & 1) {
+      load8x1_vr_postI(vr_input1, input1, INC1, VRQ0);
+      load8x1_vr_postI(vr_input2, input2, INC1, VRQ0);
+      convert_16I_to_32F_x2(vr_input1, 0);
+      convert_16I_to_32F_x2(vr_input2, 0);
+      vr_output = vmax(vr_input1, vr_input2);
+      convert_32F_to_16I_x2(vr_output, 0, 0);
+      rnd_sat_pack(vr_q7_out, VRQ0, vr_output, vr_output, 1);
+      vr_output = shift8_into32_arith(vr_q7_out, 24, 0, VRQ0, VRL);
+      store8x1_vr_postI(vr_output, output, INC1, VRQ0);
+    }
+  }
+}
+
+#endif
+
 template <KernelType kernel_type, typename OpType>
 TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   OpContext op_context(context, node);

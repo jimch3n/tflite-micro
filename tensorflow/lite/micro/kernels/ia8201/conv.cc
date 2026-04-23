@@ -1164,7 +1164,7 @@ static int ConvQuantizedInt8PerChInputOffset(
 
   if(profiler)
   {
-    profiler->AccumuateMacCount(loopLimRow*looLimCol*8);
+    profiler->AccumuateMacCount(loopLimRow*loopLimCol*8);
   }
   for (int i = 0; i < loopLimRow; i++) {
     if (inputOffsetW) {
