@@ -258,9 +258,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_depth.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split.cc">
-      <Filter>Source Files\kernel</Filter>
-    </ClCompile>
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split_v.cc">
       <Filter>Source Files\kernel</Filter>
     </ClCompile>
@@ -643,6 +640,9 @@
       <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
     <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\comparisons.cc">
+      <Filter>Source Files\ia8201-kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\split.cc">
       <Filter>Source Files\ia8201-kernel</Filter>
     </ClCompile>
   </ItemGroup>

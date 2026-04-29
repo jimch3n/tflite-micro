@@ -93,7 +93,6 @@
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\shape.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_batch_nd.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\space_to_depth.cc" />
-    <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\split_v.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\squeeze.cc" />
     <ClCompile Include="$(TFLM_ROOT)\tensorflow\lite\micro\kernels\transpose_conv.cc" />
@@ -206,6 +205,7 @@
     <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\activations_common.cc" />
     <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\comparisons.cc" />
     <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\maximum_minimum.cc" />
+    <ClCompile Include="..\..\tensorflow\lite\micro\kernels\ia8201\split.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tensorflow\lite\micro\ia8201\config.h" />

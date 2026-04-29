@@ -47,7 +47,6 @@ limitations under the License.
 #include "AVL.h"
 #endif
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-#include "crc32.h"
 #include "tensorflow/lite/micro/tools/benchmarking/op_resolver.h"
 #define TENSOR_ARENA_FACTOR (1.05f) // actuall allocate and plus 5%
 #define MAX_MODEL_NUM 8
@@ -83,7 +82,6 @@ using TflmOpResolver = tflite::MicroMutableOpResolver<113>;//98 + 2 + 9 > ;
  int verbose = 0;
  int stream = 0;
  int test_tensor = 0;
- int check_crc32 = 0;
  static int usage(const char *prog)
  {
 
@@ -97,6 +95,21 @@ using TflmOpResolver = tflite::MicroMutableOpResolver<113>;//98 + 2 + 9 > ;
 
 	 return -1;
  }
+
+static void dump_raw_bytes_if_needed(const TfLiteTensor* tensor) {
+	if (tensor == nullptr || tensor->data.data == nullptr) {
+		return;
+	}
+	if (tensor->type != kTfLiteFloat32 || tensor->bytes >= sizeof(float)) {
+		return;
+	}
+	const int8_t* raw = reinterpret_cast<const int8_t*>(tensor->data.data);
+	printf("raw_bytes:");
+	for (size_t idx = 0; idx < tensor->bytes; ++idx) {
+		printf(" %d", raw[idx]);
+	}
+	printf("\n");
+}
 
 // static float temp_feat_float[1024 * 64];
  //template<typename inputT>
@@ -461,6 +474,7 @@ using TflmOpResolver = tflite::MicroMutableOpResolver<113>;//98 + 2 + 9 > ;
              TfLiteTensor* output = interpreter->output(jj);
              printf("output[%3d] = size: %d, type: %s\n", jj, output->bytes,
                     TfLiteTypeGetName(output->type));
+						 dump_raw_bytes_if_needed(output);
              if (!verbose && input_random) continue;
              if (output->type == kTfLiteInt8) {
                for (size_t m = 0; m < output->bytes; m++) {
@@ -721,50 +735,6 @@ using TflmOpResolver = tflite::MicroMutableOpResolver<113>;//98 + 2 + 9 > ;
 		 pKwModel[ii] = (unsigned char*)aligned_malloc(modelSize, 8);
 		 fread(pKwModel[ii], sizeof(char), modelSize, fInDat);
 		 fclose(fInDat);
-		 // dummy allocator
-		int crcerr=0;
-		 // check crc32 tail
-		if (check_crc32)
-		{
-
-			if (modelSize <= 8)
-			{
-				printf("crc size error: %d", modelSize);
-				crcerr = 1;
-				break;
-			}
-
-			// Get signature 'TFL3' @ 4-7 bytes
-			char* TFL_sig = (char*)pKwModel[ii];
-
-			if (!(TFL_sig[4] == 'T' &&
-				TFL_sig[5] == 'F' &&
-				TFL_sig[6] == 'L' &&
-				TFL_sig[7] == '3'))
-			{
-				fprintf(stderr, "crc32 wrong signature error: %02x %02x %02x %02x",
-					TFL_sig[4], TFL_sig[5], TFL_sig[6], TFL_sig[7]);
-				crcerr = 1;
-				break;
-
-			}
-
-			// The last 32-bit are the CRC. Exclude them from the CRC calculation.
-			uint32_t crc = tflite::Crc32(pKwModel[ii], modelSize - sizeof(uint32_t));
-			uint32_t expected_crc =
-				*reinterpret_cast<const uint32_t*>(
-					&(reinterpret_cast<const int8_t*>(pKwModel[ii])
-						[modelSize - sizeof(uint32_t)]));
-			if (crc != expected_crc) {
-				fprintf(stderr, "Wrong CRC: 0x%x, expected: 0x%x\n", crc, expected_crc);
-				crcerr = 1;
-				break;
-			}
-		}
-		 if(crcerr==1)
-		 {
-		 	printf("error break!\n"); return -4;
-		 }
 		 int idx = ii; // from 0 as begin;
 		 printf("INPUT MODEL [%s] tflite model size = %d bytes\n", kwModelFileName, modelSize);
 		 model_size[idx] = modelSize;
@@ -875,9 +845,6 @@ using TflmOpResolver = tflite::MicroMutableOpResolver<113>;//98 + 2 + 9 > ;
 		 }
 		 else if (strncmp(argv[ii], "-str", 4) == 0) {
 			 stream = 1;
-		 }
-		 else if (strncmp(argv[ii], "-crc", 4) == 0) {
-			 check_crc32 = 1;
 		 }
 		 else{// if (strncmp(argv[ii], "-npy", 2) == 0) {
 			 model[midx] = argv[ii];
