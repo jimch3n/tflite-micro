@@ -1355,7 +1355,7 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   OpData& data = *(static_cast<OpData*>(node->user_data));
 
   if (output->type == kTfLiteFloat32) {
-    EvalSubFloat(context, node, params, &data, input1, input2, output);
+    return EvalSubFloat32(context, node, params, &data, input1, input2, output);
   } else if (output->type == kTfLiteInt8 || output->type == kTfLiteInt16) {
 #ifndef REMOVE_REFOP_SUPPORT
     TF_LITE_ENSURE_OK(context, EvalSubQuantized(context, node, params, &data,
@@ -1419,9 +1419,7 @@ TfLiteStatus EvalFloat32(TfLiteContext* context, TfLiteNode* node) {
                        TfLiteTypeGetName(output->type), output->type);
     return kTfLiteError;
   }
-  EvalSubFloat(context, node, params, &data, input1, input2, output);
-
-  return kTfLiteOk;
+  return EvalSubFloat32(context, node, params, &data, input1, input2, output);
 }
 //}  // namespace sub
 
